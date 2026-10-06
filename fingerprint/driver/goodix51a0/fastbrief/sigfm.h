@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -30,6 +32,11 @@ extern "C"
   /* Score how closely frame matches enrolled.
    * Returns >=0 on success (higher = better match), <0 on error. */
   int sigfm_match_score(SigfmImgInfo *frame, SigfmImgInfo *enrolled);
+
+  /* Same per-view score as sigfm_match_score(), additionally marking probe
+   * keypoints that are inliers of the winning rigid transform. */
+  int sigfm_match_score_mask(SigfmImgInfo *frame, SigfmImgInfo *enrolled,
+                             uint8_t *query_mask);
 
   /* Serialize info into a byte array.  Caller frees the return value.
    * Sets *outlen to the length of the returned buffer. */

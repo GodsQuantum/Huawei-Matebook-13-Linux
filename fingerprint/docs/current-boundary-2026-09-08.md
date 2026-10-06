@@ -213,7 +213,7 @@ The 34-transfer Linux research model is therefore complete for the reconstructed
 first-contact software path. The libfprint candidate is aligned with this model.
 
 Canonical resume document:
-[`../FINAL_HANDOFF_2026-09-08.md`](../FINAL_HANDOFF_2026-09-08.md).
+[`validated-checkpoint-71.18.md`](validated-checkpoint-71.18.md).
 
 The next discriminating evidence is Windows-vs-Linux physical/platform
 observability, not another unchanged protocol permutation.

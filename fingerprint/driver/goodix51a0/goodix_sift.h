@@ -15,6 +15,9 @@ void            gx_sift_free (GxSiftFeatures *features);
 guint           gx_sift_keypoints (const GxSiftFeatures *features);
 int             gx_sift_match (const GxSiftFeatures *a,
                                const GxSiftFeatures *b);
+int             gx_sift_match_mask (const GxSiftFeatures *probe,
+                                    const GxSiftFeatures *enrolled,
+                                    guint8 *probe_mask);
 GByteArray     *gx_sift_serialize (const GxSiftFeatures *features);
 GxSiftFeatures *gx_sift_deserialize (const guint8 *data, gsize len);
 GxSiftFeatures *gx_sift_copy (const GxSiftFeatures *features);

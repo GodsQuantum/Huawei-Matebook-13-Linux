@@ -2,6 +2,13 @@
 
 > **Français : [README.FR.md](README.FR.md)** · **简体中文：[README.ZH-CN.md](README.ZH-CN.md)**
 
+> **Deprecated on the validated MateBook 13 reference unit.** The custom
+> blacklist/unload/PCI-remove manager can leave the MX250 absent from PCI and
+> break GPU applications such as DaVinci Resolve. The current validated setup
+> uses standard NVIDIA R580 + PRIME Render Offload and normal runtime power
+> management. Keep this directory for research/history; do not install it on
+> the reference setup.
+
 This section solves a specific Linux problem on Huawei MateBook 13 models equipped with an Intel iGPU and NVIDIA GeForce MX250: **how to keep the dGPU truly out of the way while idle, yet launch selected applications on NVIDIA without logging out or rebooting.**
 
 ## Why not leave Hybrid enabled?

@@ -497,8 +497,8 @@ ls_refine(const SigfmImgInfo *frame, const SigfmImgInfo *enrolled, const Match *
 }
 
 static int
-ransac_score(const SigfmImgInfo *frame, const SigfmImgInfo *enrolled,
-             const Match *matches, int n_matches)
+ransac_score_mask(const SigfmImgInfo *frame, const SigfmImgInfo *enrolled,
+                  const Match *matches, int n_matches, guint8 *query_mask)
 {
   if (n_matches < 2)
     return 0;
@@ -564,18 +564,48 @@ ransac_score(const SigfmImgInfo *frame, const SigfmImgInfo *enrolled,
         }
     }
 
-  /* Least-squares refinement from all inliers of best model */
+  /* Least-squares refinement from all inliers of best model.  Keep the
+   * refined transform itself so an optional caller can mark exactly which
+   * PROBE keypoints were geometrically explained by this enrolled view.
+   * The returned per-view score is unchanged from the historical matcher. */
   if (best_inliers >= 3)
     {
       float ra, rb, rc, rd, rtx, rty;
       int refined
           = ls_refine(frame, enrolled, matches, n_matches, best_a, best_b, best_c, best_d,
                       best_tx, best_ty, eps_sq, &ra, &rb, &rc, &rd, &rtx, &rty);
-      if (refined > best_inliers)
-        best_inliers = refined;
+      if (refined >= best_inliers)
+        {
+          best_inliers = refined;
+          best_a = ra; best_b = rb; best_c = rc; best_d = rd;
+          best_tx = rtx; best_ty = rty;
+        }
     }
 
+  if (query_mask && best_inliers > 0)
+    for (int m = 0; m < n_matches; m++)
+      {
+        float px = frame->kp[matches[m].qi].x;
+        float py = frame->kp[matches[m].qi].y;
+        float qx = enrolled->kp[matches[m].ti].x;
+        float qy = enrolled->kp[matches[m].ti].y;
+        float pred_x = best_a * px + best_b * py + best_tx;
+        float pred_y = best_c * px + best_d * py + best_ty;
+        float ex = pred_x - qx;
+        float ey = pred_y - qy;
+
+        if (ex * ex + ey * ey < eps_sq)
+          query_mask[matches[m].qi] = 1;
+      }
+
   return best_inliers;
+}
+
+static int
+ransac_score(const SigfmImgInfo *frame, const SigfmImgInfo *enrolled,
+             const Match *matches, int n_matches)
+{
+  return ransac_score_mask(frame, enrolled, matches, n_matches, NULL);
 }
 
 
@@ -851,6 +881,33 @@ sigfm_match_score(SigfmImgInfo *frame, SigfmImgInfo *enrolled)
     }
 
   int score = ransac_score(frame, enrolled, matches, n);
+  g_free(matches);
+  return score;
+}
+
+int
+sigfm_match_score_mask(SigfmImgInfo *frame, SigfmImgInfo *enrolled,
+                       guint8 *query_mask)
+{
+  if (!frame || !enrolled || frame->n_kp == 0 || enrolled->n_kp == 0)
+    return 0;
+
+  int max_m = frame->n_kp;
+  Match *matches = g_malloc((gsize)max_m * sizeof(Match));
+
+  /* Intentionally identical to sigfm_match_score(): same KNN, ratio test,
+   * reciprocal cross-check and rigid RANSAC.  The ONLY extra output is the
+   * union-able mask of probe keypoints belonging to the accepted RANSAC
+   * cluster. */
+  int n = knn_match(frame, enrolled, matches, max_m);
+  n = cross_check_filter(frame, enrolled, matches, n);
+  if (n < MIN_MATCH)
+    {
+      g_free(matches);
+      return 0;
+    }
+
+  int score = ransac_score_mask(frame, enrolled, matches, n, query_mask);
   g_free(matches);
   return score;
 }

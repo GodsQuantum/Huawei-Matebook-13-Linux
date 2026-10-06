@@ -71,5 +71,5 @@ validated.
 
 The historical bounded active-probe tooling remains under `../research/` for
 auditability. Closed experiments must not be repeated unchanged. Read
-`../FINAL_HANDOFF_2026-09-08.md` and `../docs/safety.md` before considering any
+`../docs/validated-checkpoint-71.18.md` and `../docs/safety.md` before considering any
 hardware-active experiment.

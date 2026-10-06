@@ -2,6 +2,12 @@
 
 > **English: [README.md](README.md)** · **Français : [README.FR.md](README.FR.md)**
 
+> **在已验证的 MateBook 13 参考机上已弃用。** 这个自定义管理器会 blacklist /
+> 卸载 NVIDIA，并把 MX250 从 PCI 总线移除；它可能导致独显消失并让 DaVinci
+> Resolve 等应用无法启动。当前验证配置使用标准 NVIDIA R580 + PRIME Render
+> Offload 和正常的 runtime 电源管理。本目录仅保留用于研究/历史，不应在参考
+> 配置上安装。
+
 本节解决 Huawei MateBook 13（Intel iGPU + NVIDIA GeForce MX250）上的一个具体问题：**空闲时让独显真正退出工作状态，同时在需要时无需注销或重启即可让指定应用使用 NVIDIA。**
 
 ## 为什么不保持 Hybrid 常驻？

@@ -1,116 +1,96 @@
 # Huawei MateBook 13 Linux 支持
 
-> 面向 Huawei MateBook 13 系列的 Linux 实用说明、修复与逆向工程。
+> 面向 Huawei MateBook 13 系列的“一条命令 + native first”Linux 硬件 onboarding。
 >
-> **English: [README.md](README.md)** · **Français : [README.FR.md](README.FR.md)**
+> **English: [README.md](README.md)** · **Français: [README.FR.md](README.FR.md)**
 
-在已验证的 Intel + NVIDIA MX250 MateBook 13 上，Linux 日常使用已经很成熟。本仓库主要解决两个仍然影响体验的问题：
+## 目标
 
-1. **GPU 与电源管理**：只在需要时启用 NVIDIA MX250，空闲时让独显真正退出 PCI，以提高电池续航。
-2. **指纹识别**：为 Goodix GXFP51A0 / GF3658 ST411 提供实验性的原生 libfprint 驱动。
+受支持的 MateBook 13 在全新安装 Linux 或更换发行版后，应能用一条命令恢复到已验证的硬件状态：
 
-## 当前状态
+```bash
+git clone https://github.com/GodsQuantum/huawei-matebook-13-linux.git
+cd huawei-matebook-13-linux
+./install.sh
+```
 
-| 模块 | 状态 | 本仓库提供 |
+项目原则：**native first**。Linux 已经正确支持的组件只做检测和验证；只有真正缺失的硬件支持才由本仓库补充。
+
+详见 [`docs/ONE_COMMAND_ONBOARDING.md`](docs/ONE_COMMAND_ONBOARDING.md)。
+
+## 参考硬件
+
+当前已验证的参考机型为 Huawei `WRTB-WXX9` / MateBook 13：
+
+- Intel Comet Lake-U UHD；
+- NVIDIA GeForce MX250 / GP108M (`10de:1d13`)；
+- Intel CNVi Wi-Fi + Bluetooth；
+- Intel HDA audio；
+- IMC Networks UVC camera (`13d3:56c6`)；
+- ELAN touchpad / touch / stylus；
+- 主线内核 `huawei_wmi`；
+- Goodix `GXFP51A0` / GF3658 ST411 指纹传感器。
+
+其它 MateBook 13 硬件版本按设备 ID 检测，不默认视为完全相同。
+
+## 状态
+
+| 模块 | 状态 | 项目策略 |
 | --- | --- | --- |
-| **GPU / 电源 — NVIDIA MX250** | **已在参考配置上正常工作** | 完整 Intel-only 空闲、应用级热启用、PRIME Render Offload、自动卸载/PCI remove、Plasma/KWin 隔离、桌面应用与 Steam 管理 |
-| **指纹 — Goodix GXFP51A0 / GF3658** | **原生实验驱动已在参考硬件上工作** | libfprint/fprintd/KDE 原生路径、TLS/PMK、80×64 采集、FAST/BRIEF/RANSAC 匹配、20 次 enrollment 与有界验证重试 |
+| **指纹 — GXFP51A0 / GF3658** | **已验证 71.18 checkpoint** | 本仓库维护原生 libfprint/fprintd 驱动；固定阈值 7；枚举前目标 spidev recovery；连续 3 次 KDE 锁屏首按成功 |
+| **GPU — NVIDIA MX250** | **标准 PRIME 正常工作** | 使用发行版 NVIDIA R580 legacy + PRIME Render Offload；默认不安装旧 PCI-remove 管理器 |
+| **Huawei hotkeys / Fn lock / 电池阈值** | **主线内核支持** | 使用 `huawei_wmi`，不重复安装驱动 |
+| **摄像头 / Wi-Fi / Bluetooth / touchpad / stylus / audio** | **参考机原生支持** | 只验证 |
+| **电源配置 / suspend** | **发行版管理** | 不叠加多个 power manager |
 
-## 已验证的 GPU 配置
+## 指纹 checkpoint 71.18
 
-- Intel 集成显卡；
-- NVIDIA GeForce MX250 / GP108M（PCI `10de:1d13`）；
-- KDE Plasma Wayland；
-- NVIDIA 专有 **R580** 驱动分支。
+71.18 在进一步优化前冻结为已知良好版本。
 
-NVIDIA 590+ 已停止支持 Pascal，因此 MX250 必须使用 R580 分支。
+核心 recovery：
 
-## 1. GPU 与电源 — 按需 MX250
+```text
+fprintd 启动/重启
+→ 只 unbind spi-GXFP51A0:00
+→ GPIO264 active-HIGH reset
+→ settle
+→ 只 rebind spi-GXFP51A0:00
+→ udev settle
+→ libfprint/fprintd
+```
 
-**从这里开始：** [`gpu-power/`](gpu-power/)
+一个故意保留在 TLS degraded 状态的传感器无需 reboot 或 power-cycle 即恢复。warm Claim 回到约 **82–83 ms FAST_READY**，之后连续三次 KDE 锁屏都在第一次物理按压成功，baseline 分数为 **8/7、11/7、12/7**。
 
-目标不是保持 Hybrid 常驻，而是让机器在空闲时真正回到 Intel：
+技术记录：[`fingerprint/docs/validated-checkpoint-71.18.md`](fingerprint/docs/validated-checkpoint-71.18.md)。
 
-    完整 Intel-only 空闲
-            ↓
-    PCI rescan
-            ↓
-    加载 NVIDIA R580
-            ↓
-    只为选中的应用 PRIME Render Offload
-            ↓
-    应用退出
-            ↓
-    卸载 NVIDIA
-            ↓
-    PCI remove
-            ↓
-    再次回到完整 Intel-only
+仅安装 fingerprint：
 
-KWin 固定使用 Intel，避免在 MX250 热添加时自动占用 NVIDIA render node。
+```bash
+./fingerprint/install.sh
+```
 
-### 快速开始
+## GPU 策略
 
-    cd gpu-power
-    chmod +x huawei-matebook-13-gpu-manager.sh
-    ./huawei-matebook-13-gpu-manager.sh --lang zh install
+参考 MX250 使用发行版标准 PRIME：桌面运行在 Intel UHD，需要独显的程序通过 `prime-run` 使用 MX250，空闲状态交给 NVIDIA/PCIe runtime PM。
 
-重启后：
+历史 [`gpu-power/`](gpu-power/) PCI-remove 管理器只保留用于研究，不进入默认 onboarding。
 
-    GPU-control
-    GPU-control add
-    GPU-control steam-all-on
-    GPU-control status
-    GPU-control doctor
-    GPU-control test
+## 硬件 doctor
 
-`GPU-control` 默认显示不会唤醒独显的只读概览。未列出的应用继续使用 Intel；Steam 客户端本身也保持在 Intel。
+```bash
+./matebook13-doctor.sh
+# 或
+./install.sh --doctor-only
+```
 
-完整说明：[`gpu-power/README.ZH-CN.md`](gpu-power/README.ZH-CN.md)
+doctor 只读检查 Huawei WMI、PRIME/NVIDIA、GXFP51A0、摄像头、hotkeys、touchpad、Wi-Fi、Bluetooth、video 和 audio。
 
-## 2. 指纹 — Goodix GXFP51A0 / GF3658 Milan
+## 安全与隐私
 
-**rel22 安装包：** [GitHub release](https://github.com/GodsQuantum/huawei-matebook-13-linux/releases/tag/fingerprint-gxfp51a0-rel22)
+默认 onboarding 不刷写 firmware，不静默修改电池充电阈值，不为了 fingerprint 固定/降级 kernel，也不安装多个互相竞争的电源管理器。
 
-rel22 在 fprintd 启动前自动准备 GXFP51A0 的 SPI/spidev 传输，因此冷启动后的初始登录界面也可以直接使用指纹认证。
-
-Release 包含 Arch/CachyOS 原生包、可移植 Linux 源码 bundle、安装说明以及 SHA-256 校验清单。
-
-**文档/源码：** [`fingerprint/`](fingerprint/)
-
-当前参考目标为 MateBook 13 2021 上的 `GXFP51A0` / GF3658 / ST411。生产路径：
-
-    GXFP51A0
-    -> libfprint
-    -> fprintd
-    -> KDE / GNOME / PAM / CLI
-
-已验证路径包含 TLS/PMK、80×64 主机侧图像、20 次 enrollment、FAST/BRIEF/RANSAC 匹配以及固定、有界的验证重试。驱动不会刷写指纹固件，也不需要专用桌面 UI。
-
-详细安装、安全边界和硬件范围：[`fingerprint/README.ZH-CN.md`](fingerprint/README.ZH-CN.md)
-
-## 硬件范围
-
-Huawei 使用 MateBook 13 名称发布了多个硬件版本。不能假定所有型号都有相同的 NVIDIA GPU、ACPI 或指纹控制器。
-
-GPU 工具要求 MX250 PCI ID `10de:1d13`，默认拒绝不匹配的硬件。指纹项目明确针对 `ACPI\\GXFP51A0` / GF3658 Milan。
-
-## 隐私与安全
-
-这是公开硬件仓库。请不要提交：
-
-- 用户名、个人 home 路径或主机名；
-- 设备序列号、机器 UUID；
-- 无必要的私有/公网 IP；
-- 密码、API token、私钥；
-- 原始 Goodix `_DSM` payload、PSK、PMK 或其他设备唯一的指纹安全材料；
-- 专有 Windows 二进制、固件镜像或大段原始反汇编；
-- 指纹采集图像或 enrollment 模板。
-
-## 贡献
-
-参见 [CONTRIBUTING.md](CONTRIBUTING.md)。报告结果时请区分 **CONFIRMED**、**INFERRED** 和 **HYPOTHESIS**。安全问题参见 [SECURITY.md](SECURITY.md)。
+不要公开用户名、home 路径、hostname、序列号、UUID、凭据、指纹图像/模板、PMK/PSK、专有 firmware 或 Windows 二进制。
 
 ## 许可证
 
-仓库根目录代码为 GPL-2.0-only（见 [LICENSE](LICENSE)）。指纹生产驱动子树按文件 SPDX 标记使用 LGPL-2.1-or-later。
+仓库根目录为 GPL-2.0-only；fingerprint 驱动文件保留各自 SPDX 许可证。

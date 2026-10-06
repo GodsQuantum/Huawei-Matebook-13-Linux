@@ -22,6 +22,7 @@ int main(void)
     static const uint8_t bg[] = {
         0x00,0xae,0x36,0x50,0x36,0x82,0x80,0x80,0x80,0x80,0x20
     };
+    static const uint8_t warm_bg[] = {0x00,0xae,0x36,0x50,0x36,0x20};
     static const uint8_t finger[] = {0x36,0x32,0x00,0xae,0x32,0x20};
     static const uint8_t cleanup[] = {0x34,0x20,0x50,0x32};
 
@@ -32,6 +33,11 @@ int main(void)
     assert(r.steps[2].inner[3] == 0x0du);
     assert(r.steps[6].inner[4] == 0x20u && r.steps[6].inner[5] == 0x02u);
     assert(r.steps[6].inner[6] == 0x68u && r.steps[6].inner[7] == 0x0bu);
+
+    assert(gxfp_build_warm_background_capture_recipe(&r));
+    expect_commands(&r, warm_bg, sizeof warm_bg);
+    for (size_t i = 0; i < r.count; i++)
+        assert(r.steps[i].inner[0] != 0x80u); /* no register/DAC writes warm */
 
     assert(gxfp_build_finger_capture_recipe(&r));
     expect_commands(&r, finger, sizeof finger);

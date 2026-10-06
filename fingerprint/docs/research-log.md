@@ -526,7 +526,7 @@ next discriminating evidence is physical/platform Windows-vs-Linux
 CS/SCLK/MOSI/MISO/GPIO48 behavior.
 
 Canonical resume:
-`../FINAL_HANDOFF_2026-09-08.md`.
+`validated-checkpoint-71.18.md`.
 
 ## 2026-09-08: contributor-tooling consolidation
 

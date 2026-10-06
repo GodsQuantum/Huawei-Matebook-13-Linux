@@ -103,16 +103,37 @@ struct _FpiDeviceGoodix51A0
   int           fdt_base[GXFP_FDT_ZONE_COUNT]; /* FDT baseline (finger absent) */
   gboolean      have_fdt;    /* is fdt_base populated? */
   int           fdt_abs;     /* per-unit absolute floor, derived from baseline */
-  int           timing_scale;/* protocol-delay multiplier in %, grows on desync */
-  int           timing_saved;/* last value persisted to disk, to avoid rewrites */
+  int           timing_scale;/* session-local protocol-delay multiplier in % */
+  int           capture_gap_scale; /* session-local capture-step gap % */
+  guint         capture_clean_streak; /* consecutive complete frames without GET_IMAGE retry */
+  gboolean      capture_retry_seen; /* current frame needed a GET_IMAGE/TLS retry */
+  gboolean      capture_pacing_suppressed; /* lifecycle loss is not pacing evidence */
+  gboolean      capture_recovery_pending; /* transport failed; rebuild between presses */
   gboolean      bg_dirty;    /* background taken with a finger down */
   gboolean      production_ready; /* TLS + fresh background + FDT prepared during open */
   gboolean      warm_valid;       /* TLS/background/FDT retained across fp_device close */
+  gint64        warm_last_activity_us; /* monotonic time of last validated sensor activity */
+  gint64        bg_last_refresh_us; /* monotonic time of last accepted finger-off ImageBase */
+  gint64        warm_sleep_delta_us; /* CLOCK_BOOTTIME-MONOTONIC when warm state was armed */
+  gboolean      warm_sleep_clock_valid; /* baseline validity; zero is a legitimate pre-first-suspend value */
+  gboolean      force_cold_reset; /* suspend/lifecycle invalidation: never reuse stale sensor state */
 };
 
 G_DECLARE_FINAL_TYPE (FpiDeviceGoodix51A0, fpi_device_goodix51a0, FPI,
                       DEVICE_GOODIX51A0, FpDevice)
 G_DEFINE_TYPE (FpiDeviceGoodix51A0, fpi_device_goodix51a0, FP_TYPE_DEVICE)
+
+static guint gx_capture_gap_us (FpiDeviceGoodix51A0 *self);
+static void gx_capture_transport_desync (FpiDeviceGoodix51A0 *self);
+static void gx_capture_pacing_success (FpiDeviceGoodix51A0 *self);
+static void gx_protocol_timing_miss (FpiDeviceGoodix51A0 *self,
+                                     const gchar          *source);
+static gboolean gx_warm_crossed_sleep (FpiDeviceGoodix51A0 *self);
+static gboolean gx_warm_validate (FpiDeviceGoodix51A0 *self);
+static void gx_warm_abandon (FpiDeviceGoodix51A0 *self);
+static gboolean gx_cold_prepare (FpiDeviceGoodix51A0 *self);
+static void gx_transport_close (FpiDeviceGoodix51A0 *self);
+static gboolean gx_transport_open (FpDevice *dev, GError **error);
 
 static const FpIdEntry goodix51a0_id_table[] = {
   { .udev_types = FPI_DEVICE_UDEV_SUBTYPE_SPIDEV, .spi_acpi_id = "GXFP51A0" },
@@ -139,6 +160,30 @@ static void gx_dump_capture (FpiDeviceGoodix51A0 *self,
 /* ------------------------------------------------------------------ */
 /*  SPI transport: one frame is exactly one transfer                   */
 /* ------------------------------------------------------------------ */
+
+/* Exact GXFP51A0 Windows 1.1.141.36 WakeupMCU (gfspi.dll SHA-256
+ * 4fc5956220cc7bd86d002437e9cae5508d724763a430e4994ba7ce64144a6d59,
+ * function 0x1800413e4): one raw four-byte SpbPeripheralWrite
+ * {0x0f,0x00,0x00,0x0e}, then Sleep(5).  This is deliberately NOT a Milan
+ * protocol frame and expects no sensor ACK. */
+static gboolean
+gx_wakeup_mcu (FpiDeviceGoodix51A0 *self)
+{
+  static const guint8 wake[4] = { 0x0f, 0x00, 0x00, 0x0e };
+  struct spi_ioc_transfer xfer = { 0 };
+
+  xfer.tx_buf = (unsigned long) wake;
+  xfer.len = sizeof wake;
+  if (ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) < 1)
+    {
+      fp_warn ("GXFP51A0 AUTH_TRACE WakeupMCU raw SPI write failed");
+      return FALSE;
+    }
+
+  g_usleep (5000);
+  fp_warn ("GXFP51A0 AUTH_TRACE WakeupMCU raw SPI write complete");
+  return TRUE;
+}
 
 static gboolean
 gx_write_frame (FpiDeviceGoodix51A0 *self, guint8 type,
@@ -249,9 +294,34 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
 #ifndef GX_DRAIN_IRQ_POLL_MS
 #define GX_DRAIN_IRQ_POLL_MS 10
 #endif
+/* Windows completes FDT-down asynchronously: first ACK 0x32, then a separate
+ * 20-byte FDT/touch report.  The generic post-reply silence budget is only
+ * 40 ms, while the already-validated explicit FDT probe allows 100 ms for its
+ * second response.  Give FDT-down the same second-response window before
+ * advancing to GET_IMAGE. */
+#ifndef GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS
+#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100
+#endif
+#define GX_FDT_DOWN_SECOND_REPLY_POLLS   (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
+G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
+G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_POLLS == 10);
 #ifndef GX_GET_IMAGE_ATTEMPTS
 #define GX_GET_IMAGE_ATTEMPTS 2
 #endif
+/*
+ * Exact Windows GXFP51A0/ST411/14115 WBDI trace calls image SetMode (0x20)
+ * with a 1000 ms ACK timeout.  Do not declare a command swallowed after the
+ * old ~120 ms no-evidence window: on reference MateBook 13 that caused nearly every first
+ * biometric GET_IMAGE to be replayed.  Replaying remains allowed exactly once,
+ * but only after the full Windows-equivalent ACK window produced neither a
+ * clear ACK nor a TLS image record.
+ */
+#ifndef GX_GET_IMAGE_ACK_TIMEOUT_MS
+#define GX_GET_IMAGE_ACK_TIMEOUT_MS 1000
+#endif
+#define GX_GET_IMAGE_NO_REPLY_POLLS   (GX_GET_IMAGE_ACK_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
+G_STATIC_ASSERT (GX_GET_IMAGE_ACK_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
+G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
 
   static guint8 scratch[GOODIX_RX_MAX];
   int expected_plain_replies = 0;
@@ -263,7 +333,12 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
    * draining. GET_IMAGE remains special because its ACK/TLS ordering varies. */
   switch (body[0])
     {
-    case 0x32u: expected_plain_replies = 1; break; /* FDT down */
+    /* Windows ST411/14115 emits two plain responses for FDT-down before
+     * image capture: the 0x32 ACK, then the 20-byte FDT data/touch report.
+     * Leaving the second response pending contaminates the IRQ/response queue
+     * immediately before GET_IMAGE and makes the first 0x20 command appear
+     * swallowed. Drain both before advancing the capture recipe. */
+    case 0x32u: expected_plain_replies = 2; break; /* FDT-down ACK + data */
     case 0x36u: expected_plain_replies = 2; break; /* FDT manual/data */
     case 0x50u: expected_plain_replies = 2; break; /* NAV */
     case 0x80u: expected_plain_replies = 1; break; /* register write */
@@ -283,8 +358,11 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
       gboolean ack_seen = FALSE;
       gboolean tls_seen = FALSE;
       int no_reply_miss_limit =
-        (body[0] == 0x20u || body[0] == 0xaeu) ? 12 : 25;
+        body[0] == 0x20u ? GX_GET_IMAGE_NO_REPLY_POLLS :
+        body[0] == 0xaeu ? 12 : 25;
       int r, got = 0, i, misses = 0;
+      int post_reply_miss_limit =
+        body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
 
       /* Capture commands are sent directly. The recipe carries explicit NOPs
        * at the positions observed on GXFP51A0; do not prepend one here. */
@@ -312,7 +390,7 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
                 return FALSE;
 
               misses++;
-              if (got && misses >= GX_DRAIN_SILENCE)
+              if (got && misses >= post_reply_miss_limit)
                 break;
               if (!got && misses >= no_reply_miss_limit)
                 break;
@@ -350,7 +428,7 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
             }
 
           misses++;
-          if (got && misses >= GX_DRAIN_SILENCE)
+          if (got && misses >= post_reply_miss_limit)
             break;
           if (!got && misses >= no_reply_miss_limit)
             break;
@@ -358,6 +436,9 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
 
       fp_dbg ("drain cmd=%02x: %d cleartext reply/replies ack=%d tls=%d attempt=%d/%d",
               body[0], got, ack_seen, tls_seen, attempt, attempts);
+      if (body[0] == 0x32u)
+        fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
+                 got, expected_plain_replies, ack_seen);
 
       if (out_ack_seen && ack_seen)
         *out_ack_seen = TRUE;
@@ -378,14 +459,17 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
 
       if (attempt < attempts)
         {
-          fp_warn ("GXFP51A0 GET_IMAGE had no ACK/TLS; retrying attempt=%d/%d",
-                   attempt + 1, attempts);
+          self->capture_retry_seen = TRUE;
+          fp_warn ("GXFP51A0 GET_IMAGE had no ACK/TLS after %d ms ACK window; "
+                   "retrying attempt=%d/%d",
+                   GX_GET_IMAGE_ACK_TIMEOUT_MS, attempt + 1, attempts);
           g_usleep (8000 * self->timing_scale / 100);
         }
     }
 
   fp_warn ("GXFP51A0 GET_IMAGE failed: no ACK/TLS after %d attempts",
            attempts);
+  gx_capture_transport_desync (self);
   return FALSE;
 }
 
@@ -484,7 +568,11 @@ gx_bio_recv (gpointer ctx, guint8 *b, gsize l)
 static void
 gx_gpio_reset (FpiDeviceGoodix51A0 *self)
 {
-  (void) self;
+  /* A cold reset is most reliable while no SPI file descriptor is open.
+   * rel71.16 proved that opening spidev first and only then toggling GPIO264
+   * can leave ST411 in a half-open TLS state across fprintd restarts. */
+  fp_warn ("GXFP51A0 RESET_TRACE GPIO264 300/600 boundary (spi_fd=%d)",
+           self ? self->spi_fd : -1);
   if (gx51_reset_gpio264 () < 0)
     fp_warn ("GXFP51A0: reviewed GPIO264 reset failed");
 }
@@ -563,6 +651,7 @@ gx_target_send_ack (FpiDeviceGoodix51A0       *self,
             {
               fp_warn ("GXFP51A0 target ACK diagnostic: no-irq retry cmd=0x%02x attempt=%d/%d",
                        command, attempt, GX_TARGET_ACK_ATTEMPTS);
+              gx_protocol_timing_miss (self, "target-ack");
               g_usleep (8000 * self->timing_scale / 100);
               continue;
             }
@@ -1160,22 +1249,32 @@ gx_tls_teardown (FpiDeviceGoodix51A0 *self)
 }
 
 /* Exact 14115/51x7 capture recipes, as validated by the Linux imaging path.
- * The learned timing scale belongs to target/TLS recovery. Finger/background
- * capture was validated repeatedly at the nominal 30 ms step gap; multiplying
- * it by a recovered init scale only adds latency after a transient handshake. */
-static gboolean
-gx_send_capture_recipe (FpiDeviceGoodix51A0 *self, gboolean background)
-{
+ * 30 ms remains the default on the reference 2021 unit. Slower controllers can
+ * learn a capture-only pacing multiplier after a real GET_IMAGE transport
+ * desync; this is deliberately separate from TLS/init timing. */
 #ifndef GX_SEQ_GAP_US
 #define GX_SEQ_GAP_US 30000
 #endif
+
+typedef enum
+{
+  GX_CAPTURE_FINGER,
+  GX_CAPTURE_BACKGROUND_COLD,
+  GX_CAPTURE_BACKGROUND_WARM
+} GxCaptureKind;
+
+static gboolean
+gx_send_capture_recipe (FpiDeviceGoodix51A0 *self, GxCaptureKind kind)
+{
   struct gxfp_capture_recipe recipe;
   gboolean ok;
   gsize i;
 
-  if (background)
+  if (kind == GX_CAPTURE_BACKGROUND_COLD)
     ok = self->have_target_cal &&
          gxfp_build_background_capture_recipe (&self->target_cal, &recipe);
+  else if (kind == GX_CAPTURE_BACKGROUND_WARM)
+    ok = gxfp_build_warm_background_capture_recipe (&recipe);
   else
     ok = gxfp_build_finger_capture_recipe (&recipe);
   if (!ok)
@@ -1190,7 +1289,7 @@ gx_send_capture_recipe (FpiDeviceGoodix51A0 *self, gboolean background)
         return FALSE;
       fp_dbg ("chrono cmd=%02x drain=%ld us", packet->inner[0],
               (long) (g_get_monotonic_time () - t0));
-      g_usleep (GX_SEQ_GAP_US);
+      g_usleep (gx_capture_gap_us (self));
     }
   return TRUE;
 }
@@ -1234,23 +1333,24 @@ gx_take_tls_frame (FpiDeviceGoodix51A0 *self, guint8 *rec, gsize cap)
 
 
 static int
-gx_retry_get_image_after_tls_timeout (FpiDeviceGoodix51A0 *self,
-                                      guint8 *rec,
-                                      gsize cap)
+gx_fail_get_image_after_tls_timeout (FpiDeviceGoodix51A0 *self)
 {
-  struct gxfp_target_packet packet;
-  gboolean ack_seen = FALSE;
-  gboolean tls_seen = FALSE;
+  /* Reaching this point means gx_send_plain_drain() already observed evidence
+   * that GET_IMAGE was accepted (normally its cleartext ACK), then no TLS image
+   * arrived during the full bounded TLS wait.  The command may still complete
+   * late.  Replaying it here is unsafe: two accepted GET_IMAGE commands can
+   * leave two application records in flight, so the next semantic capture can
+   * consume a stale record even when AES-GCM sequence authentication itself
+   * still succeeds.  The only unambiguous recovery boundary is a fresh MCU/TLS
+   * session.  By contrast, gx_send_plain_drain() still retries once when
+   * neither ACK nor TLS was observed, because there is no evidence that command
+   * reached the sensor. */
+  fp_warn ("GXFP51A0 GET_IMAGE was accepted but TLS image timed out; "
+           "not replaying accepted command; forcing full session recovery");
 
-  if (!gxfp_build_get_image (&packet))
-    return -1;
-
-  fp_warn ("GXFP51A0 GET_IMAGE ACK arrived but TLS image timed out; retrying once");
-  if (!gx_send_plain_drain (self, packet.inner, packet.inner_len,
-                            &ack_seen, &tls_seen))
-    return -1;
-
-  return gx_take_tls_frame (self, rec, cap);
+  if (!self->capture_recovery_pending)
+    gx_capture_transport_desync (self);
+  return -1;
 }
 
 
@@ -1283,7 +1383,7 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
           gssize got;
 
           if (raw < 0)
-            raw = gx_retry_get_image_after_tls_timeout (self, rec, GOODIX_RX_MAX);
+            raw = gx_fail_get_image_after_tls_timeout (self);
 
           got = raw > 0
                   ? gx_tls_decrypt_record (self->tls, rec, (gsize) raw,
@@ -1293,11 +1393,13 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
             {
               fp_warn ("capture cleanup image record failed (%d raw, %ld plain)",
                        raw, (long) got);
+              if (!self->capture_recovery_pending)
+                gx_capture_transport_desync (self);
               goto out;
             }
         }
 
-      g_usleep (GX_SEQ_GAP_US);
+      g_usleep (gx_capture_gap_us (self));
     }
 
   ok = TRUE;
@@ -1311,13 +1413,18 @@ out:
 /* Captures one full image, assuming a TLS session is already up, and fills
  * px[GOODIX_IMG_PIXELS] with 12-bit samples. */
 static gboolean
-gx_capture_frame (FpiDeviceGoodix51A0 *self, guint16 *px, gboolean background)
+gx_capture_frame_ex (FpiDeviceGoodix51A0 *self,
+                     guint16             *px,
+                     GxCaptureKind        kind,
+                     gboolean             cleanup)
 {
+  gboolean background = kind != GX_CAPTURE_FINGER;
   g_autofree guint8 *img = g_malloc (GOODIX_RX_MAX);
   int total = 0;
 
+  self->capture_retry_seen = FALSE;
   gint64 tA = g_get_monotonic_time ();
-  if (!gx_send_capture_recipe (self, background))
+  if (!gx_send_capture_recipe (self, kind))
     return FALSE;
   fp_dbg ("timing: capture sequence %ld us",
            (long) (g_get_monotonic_time () - tA));
@@ -1333,13 +1440,16 @@ gx_capture_frame (FpiDeviceGoodix51A0 *self, guint16 *px, gboolean background)
     gssize got;
 
     if (raw < 0)
-      raw = gx_retry_get_image_after_tls_timeout (self, rec, GOODIX_RX_MAX);
+      raw = gx_fail_get_image_after_tls_timeout (self);
 
     got = raw > 0 ? gx_tls_decrypt_record (self->tls, rec, (gsize) raw,
                                            img, GOODIX_RX_MAX) : -1;
     if (got < 0)
       {
-        fp_warn ("cannot decrypt the image record (%d raw bytes)", raw);
+        fp_warn ("cannot authenticate/decrypt the image record (%d raw bytes); "
+                 "forcing full session recovery", raw);
+        if (!self->capture_recovery_pending)
+          gx_capture_transport_desync (self);
         return FALSE;
       }
     total = (int) got;
@@ -1368,12 +1478,31 @@ gx_capture_frame (FpiDeviceGoodix51A0 *self, guint16 *px, gboolean background)
     gx_dump_capture (self, px);
 #endif
 
-  if (!background && !gx_send_capture_cleanup (self))
+  if (!background && cleanup)
     {
-      fp_warn ("GXFP51A0 post-capture cleanup failed");
-      return FALSE;
+      if (!gx_send_capture_cleanup (self))
+        {
+          fp_warn ("GXFP51A0 post-capture cleanup failed");
+          return FALSE;
+        }
+      gx_capture_pacing_success (self);
     }
   return TRUE;
+}
+
+static gboolean
+gx_capture_frame (FpiDeviceGoodix51A0 *self, guint16 *px, gboolean background)
+{
+  return gx_capture_frame_ex (self, px,
+                              background ? GX_CAPTURE_BACKGROUND_COLD
+                                         : GX_CAPTURE_FINGER,
+                              TRUE);
+}
+
+static gboolean
+gx_capture_warm_background_frame (FpiDeviceGoodix51A0 *self, guint16 *px)
+{
+  return gx_capture_frame_ex (self, px, GX_CAPTURE_BACKGROUND_WARM, TRUE);
 }
 
 
@@ -1400,7 +1529,11 @@ gx_capture_avg (FpiDeviceGoodix51A0 *self, int nframes, guint16 *avg)
   for (f = 0; f < nframes; f++)
     {
       if (!gx_capture_frame (self, px, TRUE))
-        continue;
+        {
+          if (self->capture_recovery_pending)
+            return FALSE;
+          continue;
+        }
       for (i = 0; i < GOODIX_IMG_PIXELS; i++)
         acc[i] += px[i];
       got++;
@@ -1426,7 +1559,9 @@ gx_capture_avg (FpiDeviceGoodix51A0 *self, int nframes, guint16 *avg)
 #define GX_FDT_IRQ_TIMEOUT_MS 100
 
 static int
-gx_fdt_probe (FpiDeviceGoodix51A0 *self, int *out_zones)
+gx_fdt_probe_ex (FpiDeviceGoodix51A0 *self,
+                 int                 *out_zones,
+                 guint8              *out_touchflag)
 {
   struct gxfp_target_packet packet;
   guint8 rx[256], ty, ack_status, touchflag;
@@ -1473,12 +1608,16 @@ gx_fdt_probe (FpiDeviceGoodix51A0 *self, int *out_zones)
 
       for (k = 0; k < (int) GXFP_FDT_ZONE_COUNT; k++)
         out_zones[k] = (int) zones[k];
+      if (out_touchflag)
+        *out_touchflag = touchflag;
 
       return 0;
 
 retry:
       fp_warn ("GXFP51A0 FDT probe retry: stage=%s attempt=%d/%d",
                stage, attempt, GX_FDT_PROBE_ATTEMPTS);
+      if (attempt == 1)
+        gx_protocol_timing_miss (self, stage);
       if (attempt < GX_FDT_PROBE_ATTEMPTS)
         {
           /* Give a late/stale transaction a small quiesce window before
@@ -1488,6 +1627,24 @@ retry:
     }
 
   return -1;
+}
+
+static guint
+gx_fdt_touch_count (guint8 touchflag)
+{
+  guint count = 0;
+
+  for (guint8 zones = touchflag & 0x3fu; zones; zones >>= 1)
+    count += zones & 1u;
+  return count;
+}
+
+#define GX_FDT_TOUCH_MIN_ZONES 5
+
+static gboolean
+gx_fdt_touch_is_finger (guint8 touchflag)
+{
+  return gx_fdt_touch_count (touchflag) >= GX_FDT_TOUCH_MIN_ZONES;
 }
 
 /* Mean of the six exact-target FDT zones: an absolute test needing no baseline. */
@@ -1662,38 +1819,142 @@ gx_read_fw_version (FpiDeviceGoodix51A0 *self, gchar *out, gsize cap)
 /*  Session: TLS setup, background frame, detection baseline           */
 /* ------------------------------------------------------------------ */
 
-/* Learned protocol-timing multiplier, remembered across opens.
+/* Runtime timing adaptation.
  *
- * timing_scale grows within a session when the sensor loses sync (see below),
- * but resets to nominal on every open — so a consistently slow unit paid one
- * failed handshake at the start of every session. Persisting the last value
- * that WORKED skips that: the next open starts at the timing this unit is known
- * to need. It lives in fprintd's state directory (the only writable path under
- * ProtectSystem=strict), is device- not user-scoped, and is a single integer.
- * Delete the file to reset the learned value. */
-#define GX_TIMING_FILE "/var/lib/fprint/.goodix51a0-timing"
+ * rel24-rel40 persisted protocol/capture timing under /var/lib/fprint.  That
+ * looked useful for slow controllers, but deep-S3/prewarm transport loss could
+ * be mis-attributed as a speed problem and ratchet 100 -> 150 -> ... -> 300
+ * across reboots.  rel42 deliberately keeps both scales process-local.
+ *
+ * Every fresh/cold lifecycle starts at the Windows-validated nominal timing.
+ * A real runtime failure may loosen timings for the current fprintd lifetime,
+ * while clean captures decay back toward nominal.  No lifecycle/prewarm event
+ * can poison a future boot through persistent tuning state. */
+#define GX_TIMING_SCALE_MIN 100
+#define GX_TIMING_SCALE_MAX 300
+#define GX_TIMING_SCALE_STEP 50
 
-static int
-gx_timing_load (void)
+#define GX_CAPTURE_SCALE_MIN 100
+#define GX_CAPTURE_SCALE_MAX 300
+#define GX_CAPTURE_SCALE_STEP 50
+#define GX_CAPTURE_CLEAN_DECAY_STREAK 8
+
+/* Protocol timing is a controller/session characteristic, not biometric
+ * evidence. Start every fresh fprintd process at Windows-nominal 100%, then
+ * widen only after an observed missed ACK/FDT response. Keep the result in RAM
+ * for the daemon lifetime so a recovery does not relearn the same controller.
+ * Nothing is persisted across daemon restarts or boots. */
+static void
+gx_protocol_timing_miss (FpiDeviceGoodix51A0 *self,
+                         const gchar          *source)
 {
-  g_autofree gchar *txt = NULL;
-  int v;
+  int previous = MAX (self->timing_scale, GX_TIMING_SCALE_MIN);
 
-  if (!g_file_get_contents (GX_TIMING_FILE, &txt, NULL, NULL))
-    return 100;
-  v = atoi (txt);
-  return (v >= 100 && v <= 300) ? v : 100;   /* clamp; ignore a garbled file */
+  if (previous >= GX_TIMING_SCALE_MAX)
+    return;
+
+  self->timing_scale =
+    MIN (previous + GX_TIMING_SCALE_STEP, GX_TIMING_SCALE_MAX);
+
+  fp_warn ("GXFP51A0 protocol timing auto-calibration: %d%% -> %d%% "
+           "after %s miss; session-local only",
+           previous, self->timing_scale, source ? source : "protocol");
+}
+
+static guint
+gx_capture_gap_us (FpiDeviceGoodix51A0 *self)
+{
+  int scale = CLAMP (self->capture_gap_scale,
+                     GX_CAPTURE_SCALE_MIN, GX_CAPTURE_SCALE_MAX);
+
+  return (guint) ((guint64) GX_SEQ_GAP_US * (guint) scale / 100u);
 }
 
 static void
-gx_timing_save (int scale)
+gx_capture_transport_desync (FpiDeviceGoodix51A0 *self)
 {
-  g_autofree gchar *txt = g_strdup_printf ("%d\n", scale);
+  int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
 
-  if (!g_file_set_contents (GX_TIMING_FILE, txt, -1, NULL))
-    fp_warn ("could not persist timing scale to %s", GX_TIMING_FILE);
+  self->capture_clean_streak = 0;
+  self->capture_recovery_pending = TRUE;
+
+  /* Lifecycle/prewarm failures say nothing about the steady-state capture
+   * gap. They request a session rebuild only and must never change pacing. */
+  if (self->capture_pacing_suppressed)
+    {
+      fp_warn ("GXFP51A0 lifecycle recovery desync: pacing remains %d%% "
+               "(%u us gap); full MCU/session recovery required",
+               previous, gx_capture_gap_us (self));
+      return;
+    }
+
+  self->capture_gap_scale =
+    MIN (previous + GX_CAPTURE_SCALE_STEP, GX_CAPTURE_SCALE_MAX);
+
+  fp_warn ("GXFP51A0 session capture desync: pacing %d%% -> %d%% "
+           "(%u us gap); full MCU/session recovery required; not persisted",
+           previous, self->capture_gap_scale, gx_capture_gap_us (self));
+}
+
+static void
+gx_capture_pacing_success (FpiDeviceGoodix51A0 *self)
+{
+  if (self->capture_retry_seen)
+    {
+      int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
+      int protocol_floor =
+        CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
+               GX_CAPTURE_SCALE_MIN, 250);
+      int target = MIN (GX_CAPTURE_SCALE_MAX,
+                        MAX (previous + GX_CAPTURE_SCALE_STEP, protocol_floor));
+
+      self->capture_clean_streak = 0;
+
+      /* A successfully decoded real finger frame that needed the transport
+       * retry is direct evidence that nominal capture pacing was too tight for
+       * this session.  Do not wait for three failed user presses: calibrate the
+       * NEXT physical press immediately.  The already-observed protocol timing
+       * provides a conservative floor (300% protocol -> 250% capture on the
+       * reference MateBook), while controllers with nominal protocol timing
+       * still move only one 50-point step.  Nothing is persisted. */
+      if (target > previous)
+        {
+          self->capture_gap_scale = target;
+          fp_info ("GXFP51A0 session capture pacing calibrated by retry-assisted "
+                   "finger frame: %d%% -> %d%% (%u us gap, protocol=%d%%); "
+                   "not persisted",
+                   previous, self->capture_gap_scale,
+                   gx_capture_gap_us (self), self->timing_scale);
+        }
+
+      self->capture_retry_seen = FALSE;
+      self->warm_last_activity_us = g_get_monotonic_time ();
+      return;
+    }
+
+
+  if (self->capture_gap_scale > GX_CAPTURE_SCALE_MIN)
+    {
+      self->capture_clean_streak++;
+      if (self->capture_clean_streak >= GX_CAPTURE_CLEAN_DECAY_STREAK)
+        {
+          int previous = self->capture_gap_scale;
+
+          self->capture_gap_scale =
+            MAX (GX_CAPTURE_SCALE_MIN,
+                 previous - GX_CAPTURE_SCALE_STEP);
+          self->capture_clean_streak = 0;
+          fp_info ("GXFP51A0 session capture pacing decayed after %d clean "
+                   "captures: %d%% -> %d%% (%u us gap)",
+                   GX_CAPTURE_CLEAN_DECAY_STREAK, previous,
+                   self->capture_gap_scale, gx_capture_gap_us (self));
+        }
+    }
   else
-    g_chmod (GX_TIMING_FILE, 0600);
+    self->capture_clean_streak = 0;
+
+  self->capture_retry_seen = FALSE;
+  self->warm_last_activity_us = g_get_monotonic_time ();
 }
 
 /* Establishes the TLS channel. This is the expensive step, about half a
@@ -1741,13 +2002,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
 
       /* Self-healing on desync. The protocol delays are tuned to the author's
        * unit and sit right at the edge; a different SPI controller can be
-       * slower and lose sync. Only successful timing values are persisted. */
-      if (self->timing_scale < 300)
-        {
-          self->timing_scale = MIN (self->timing_scale + 50, 300);
-          fp_info ("handshake failed; loosening protocol timings to %d%%",
-                   self->timing_scale);
-        }
+       * slower and lose sync. Adaptation is session-local and never persisted. */
+      gx_protocol_timing_miss (self, "tls-handshake");
 
       {
         gchar fw[64] = { 0 };
@@ -1788,12 +2044,9 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
     fp_warn ("no TLS session after %d/%d attempts; if this persists the sensor "
              "needs a full recovery (long reset plus an spidev rebind)",
              att - 1, max_attempts);
-  else if (self->timing_scale > self->timing_saved)
-    {
-      gx_timing_save (self->timing_scale);
-      self->timing_saved = self->timing_scale;
-      fp_info ("learned timing scale %d%% persisted", self->timing_scale);
-    }
+  else if (self->timing_scale > GX_TIMING_SCALE_MIN)
+    fp_info ("GXFP51A0 session protocol timing settled at %d%%; not persisted",
+             self->timing_scale);
 
   return self->tls_up;
 }
@@ -1831,11 +2084,14 @@ gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean)
       if (c && g_cancellable_is_cancelled (c))
         return FALSE;
 
-      if (gx_fdt_probe (self, cur) == 0)
+      guint8 touchflag = 0;
+
+      if (gx_fdt_probe_ex (self, cur, &touchflag) == 0)
         {
           int mean = gx_fdt_mean (cur);
 
-          if (mean >= GOODIX_FDT_ABS)
+          if (!gx_fdt_touch_is_finger (touchflag) &&
+              mean >= GOODIX_FDT_ABS)
             {
               *out_mean = mean;
               fp_info ("GXFP51A0 clean calibration anchor: mean=%d", mean);
@@ -1870,11 +2126,14 @@ gx_wait_sensor_clear (FpiDeviceGoodix51A0 *self,
 
   while (waited <= GX_CLEAR_WAIT_MS)
     {
-      if (gx_fdt_probe (self, cur) == 0)
+      guint8 touchflag = 0;
+
+      if (gx_fdt_probe_ex (self, cur, &touchflag) == 0)
         {
           int mean = gx_fdt_mean (cur);
 
-          if (off_anchor_mean - mean <= GX_DIAG_BASELINE_MAX_DRIFT)
+          if (!gx_fdt_touch_is_finger (touchflag) &&
+              off_anchor_mean - mean <= GX_DIAG_BASELINE_MAX_DRIFT)
             {
               if (out_mean)
                 *out_mean = mean;
@@ -1917,11 +2176,14 @@ gx_diag_press_countdown (FpiDeviceGoodix51A0 *self, int off_anchor_mean)
           fp_info ("GXFP51A0 CAPTURE_DIAGNOSTIC_PRESS_IN_%d", q);
           g_usleep (G_USEC_PER_SEC);
 
-          if (gx_fdt_probe (self, cur) == 0)
+          guint8 touchflag = 0;
+
+          if (gx_fdt_probe_ex (self, cur, &touchflag) == 0)
             {
               int mean = gx_fdt_mean (cur);
 
-              if (off_anchor_mean - mean > GX_DIAG_BASELINE_MAX_DRIFT)
+              if (gx_fdt_touch_is_finger (touchflag) ||
+                  off_anchor_mean - mean > GX_DIAG_BASELINE_MAX_DRIFT)
                 {
                   fp_warn ("GXFP51A0 CAPTURE_DIAGNOSTIC_COUNTDOWN_RESTART: REMOVE_FINGER mean=%d anchor=%d",
                            mean, off_anchor_mean);
@@ -1950,6 +2212,7 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 
   if (!gx_tls_session (self))
     return FALSE;
+
 
   /* The sensor drives GPIO48 level-high while a response is pending. The
    * first background capture must not race the tail of the TLS handshake:
@@ -2023,24 +2286,28 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
         /* A finger may land during the ~2 s background capture. Reject that
          * frame and wait for release rather than baking the finger into the
          * reference image. */
-        if (gx_fdt_probe (self, cur) != 0)
+        guint8 touchflag = 0;
+
+        if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
           return FALSE;
 
         mean = gx_fdt_mean (cur);
         if (mean > off_anchor_mean)
           off_anchor_mean = mean;
 
-        if (off_anchor_mean - mean <= GX_DIAG_BASELINE_MAX_DRIFT)
+        if (!gx_fdt_touch_is_finger (touchflag) &&
+            off_anchor_mean - mean <= GX_DIAG_BASELINE_MAX_DRIFT)
           break;
 
-        fp_warn ("GXFP51A0 background contaminated by touch: mean=%d anchor=%d; discarding",
-                 mean, off_anchor_mean);
+        fp_warn ("GXFP51A0 background contaminated by touch: mean=%d anchor=%d touch=0x%02x; discarding",
+                 mean, off_anchor_mean, touchflag);
         if (!gx_wait_sensor_clear (self, off_anchor_mean, NULL))
           return FALSE;
       }
 
-    fp_info ("session ready in %d ms",
-             (int) ((g_get_monotonic_time () - t0) / 1000));
+    self->bg_last_refresh_us = g_get_monotonic_time ();
+    fp_info ("session ready in %d ms; fresh ImageBase armed",
+             (int) ((self->bg_last_refresh_us - t0) / 1000));
   }
 
   /* Detection baseline. In one-shot diagnostic mode, validate it against the
@@ -2058,12 +2325,17 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
         int baseline_mean;
 
         for (q = 0; q < 4; q++)
-          if (gx_fdt_probe (self, t) == 0)
-            {
-              for (k = 0; k < (int) GXFP_FDT_ZONE_COUNT; k++)
-                acc[k] += t[k];
-              nb++;
-            }
+          {
+            guint8 touchflag = 0;
+
+            if (gx_fdt_probe_ex (self, t, &touchflag) == 0 &&
+                !gx_fdt_touch_is_finger (touchflag))
+              {
+                for (k = 0; k < (int) GXFP_FDT_ZONE_COUNT; k++)
+                  acc[k] += t[k];
+                nb++;
+              }
+          }
 
         if (!nb)
           continue;
@@ -2105,6 +2377,25 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 }
 
 #define GX_PREPARE_ATTEMPTS 2
+#define GX_BG_FRESH_MAX_US (G_GINT64_CONSTANT(20) * G_USEC_PER_SEC)
+G_STATIC_ASSERT (GX_BG_FRESH_MAX_US == G_GINT64_CONSTANT(20000000));
+
+static gint64
+gx_background_age_us (FpiDeviceGoodix51A0 *self)
+{
+  gint64 now;
+
+  if (!self->bg_frame || self->bg_last_refresh_us <= 0)
+    return G_MAXINT64;
+  now = g_get_monotonic_time ();
+  return MAX (G_GINT64_CONSTANT(0), now - self->bg_last_refresh_us);
+}
+
+static gboolean
+gx_background_is_fresh (FpiDeviceGoodix51A0 *self)
+{
+  return gx_background_age_us (self) <= GX_BG_FRESH_MAX_US;
+}
 
 static void
 gx_invalidate_capture_context (FpiDeviceGoodix51A0 *self)
@@ -2113,6 +2404,7 @@ gx_invalidate_capture_context (FpiDeviceGoodix51A0 *self)
   self->warm_valid = FALSE;
   self->have_fdt = FALSE;
   self->bg_dirty = FALSE;
+  self->bg_last_refresh_us = 0;
   self->tls_rxlen = 0;
   self->tls_rxpos = 0;
 }
@@ -2121,15 +2413,32 @@ static gboolean
 gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
 {
   gchar fw[64] = { 0 };
+  g_autoptr(GError) reopen_error = NULL;
 
   gx_invalidate_capture_context (self);
   gx_tls_teardown (self);
 
-  /* A timed-out image record leaves the TLS sequence and MCU transaction
-   * boundary uncertain.  Recovery is therefore a full hardware reset, not a
-   * blind replay on the same session.  The validated PMK cache is deliberately
-   * retained: a transport timeout does not prove that the key changed. */
+  /* A timed-out TLS/image transaction can leave ST411 state coupled to the
+   * currently open spidev file.  Do not reset through an already-open SPI
+   * transport.  Close both SPI/IRQ handles, pulse the reviewed GPIO264 reset,
+   * then open a completely fresh transport before proving the A8 boundary.
+   *
+   * This is deliberately NOT a sysfs unbind/rebind and needs no kernel,
+   * distro, udev or desktop-specific helper.  It is the narrowest native
+   * userspace equivalent to a cold device boundary and is safe to use inside
+   * a live libfprint operation. */
+  gx_transport_close (self);
   gx_gpio_reset (self);
+
+  if (!gx_transport_open (FP_DEVICE (self), &reopen_error))
+    {
+      fp_warn ("GXFP51A0 capture-context recovery could not reopen transport: %s",
+               reopen_error ? reopen_error->message : "unknown error");
+      return FALSE;
+    }
+
+  fp_warn ("GXFP51A0 RESET_TRACE transport reopened after detached GPIO264 reset");
+
   if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
       g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
     {
@@ -2146,6 +2455,8 @@ gx_prepare_capture_context (FpiDeviceGoodix51A0 *self,
                             gboolean capture_diagnostic)
 {
   int attempt;
+  gboolean previous_pacing_suppression;
+  gboolean ok = FALSE;
 
   /* Diagnostics are intentionally single-shot so protocol failures remain
    * visible to the research harness.  Production operations get a bounded
@@ -2156,15 +2467,27 @@ gx_prepare_capture_context (FpiDeviceGoodix51A0 *self,
       g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY"))
     return gx_prepare_capture_context_once (self, capture_diagnostic);
 
+  /* Context preparation is lifecycle/calibration work, not biometric
+   * performance evidence.  A GET_IMAGE miss while building background/FDT
+   * must request recovery but must never slow the capture gap used by the
+   * first real finger.  Preserve an already-adapted scale from an earlier
+   * genuine biometric capture; only suppress further adaptation here. */
+  previous_pacing_suppression = self->capture_pacing_suppressed;
+  self->capture_pacing_suppressed = TRUE;
+
   for (attempt = 1; attempt <= GX_PREPARE_ATTEMPTS; attempt++)
     {
       GCancellable *c = fpi_device_get_cancellable (FP_DEVICE (self));
 
       if (c && g_cancellable_is_cancelled (c))
-        return FALSE;
+        goto out;
 
       if (gx_prepare_capture_context_once (self, FALSE))
-        return TRUE;
+        {
+          self->capture_recovery_pending = FALSE;
+          ok = TRUE;
+          goto out;
+        }
 
       fp_warn ("GXFP51A0 capture-context preparation failed attempt=%d/%d",
                attempt, GX_PREPARE_ATTEMPTS);
@@ -2173,7 +2496,9 @@ gx_prepare_capture_context (FpiDeviceGoodix51A0 *self,
         break;
     }
 
-  return FALSE;
+out:
+  self->capture_pacing_suppressed = previous_pacing_suppression;
+  return ok;
 }
 
 static gboolean
@@ -2182,19 +2507,90 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
   gboolean capture_diagnostic =
     g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") != NULL;
 
+  /* A Verify/Identify operation may already be open when the machine enters
+   * deep S3. In that case fprintd does not necessarily close/reopen the device,
+   * so gx_dev_open() never gets a chance to invalidate stale TLS/FDT state.
+   * Recover natively inside the existing operation, before any post-resume FDT
+   * or GET_IMAGE command can hit the dead MCU session. */
+  if (self->force_cold_reset)
+    {
+      fp_warn ("GXFP51A0 active resume recovery: rebuilding cold sensor "
+               "context before continuing authentication");
+      gx_warm_abandon (self);
+      self->capture_recovery_pending = FALSE;
+      self->capture_gap_scale = 0;
+      self->capture_clean_streak = 0;
+      self->capture_retry_seen = FALSE;
+      self->capture_pacing_suppressed = TRUE;
+
+      gx_gpio_reset (self);
+      self->force_cold_reset = FALSE;
+
+      if (!gx_cold_prepare (self))
+        return FALSE;
+
+      return gx_wakeup_mcu (self);
+    }
+
+  if (self->capture_recovery_pending)
+    {
+      fp_info ("GXFP51A0 rebuilding capture context after transport desync");
+      if (!gx_recover_capture_context (self))
+        return FALSE;
+    }
+
   /* Diagnostics deliberately retain their interactive preparation so the
    * research harness can observe each boundary. Normal fprintd clients are
    * prepared during device open/Claim, before EnrollStart or VerifyStart is
    * returned to the desktop. */
   if (capture_diagnostic || g_getenv ("GXFP_DIAGNOSTIC_ONESHOT") ||
       g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY"))
-    return gx_prepare_capture_context (self, capture_diagnostic);
+    {
+      if (!gx_prepare_capture_context (self, capture_diagnostic))
+        return FALSE;
+      return g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY") != NULL ||
+             gx_wakeup_mcu (self);
+    }
 
   if (self->production_ready && self->tls_up && self->have_fdt &&
       self->bg_frame)
     {
+      /* FAST_READY proves that the retained TLS/FDT transport is alive, but
+       * ImageBase drifts much faster than the TLS lifecycle. reference MateBook 13 traces
+       * show that a background only tens of seconds old can collapse genuine
+       * scores from double digits to 2-4. Keep Claim sub-second, then refresh
+       * the imaging reference here on the existing SESSION worker before
+       * biometric READY. If the user is already touching the sensor,
+       * gx_warm_validate() safely defers the refresh and the bounded reposition
+       * path remains available. */
+      if (!gx_background_is_fresh (self))
+        {
+          gint64 age_us = gx_background_age_us (self);
+          gint64 previous_refresh = self->bg_last_refresh_us;
+
+          fp_warn ("GXFP51A0 AUTH_TRACE ImageBase age=%d ms exceeds %d ms; "
+                   "refreshing before biometric READY",
+                   age_us == G_MAXINT64 ? -1 : (int) (age_us / 1000),
+                   (int) (GX_BG_FRESH_MAX_US / 1000));
+
+          if (!gx_warm_validate (self))
+            {
+              fp_warn ("GXFP51A0 AUTH_TRACE stale ImageBase refresh failed; "
+                       "rebuilding cold capture context");
+              gx_warm_abandon (self);
+              gx_gpio_reset (self);
+              if (!gx_cold_prepare (self))
+                return FALSE;
+            }
+          else if (self->bg_last_refresh_us > previous_refresh)
+            fp_warn ("GXFP51A0 AUTH_TRACE fresh ImageBase ready before biometric READY");
+          else
+            fp_warn ("GXFP51A0 AUTH_TRACE ImageBase refresh deferred by touch; "
+                     "using retained reference for this pose");
+        }
+
       fp_info ("GXFP51A0 reusing capture context prepared during device open");
-      return TRUE;
+      return gx_wakeup_mcu (self);
     }
 
   /* Defensive fallback for non-fprintd clients that may reach an operation
@@ -2202,8 +2598,9 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
   if (!gx_prepare_capture_context (self, FALSE))
     return FALSE;
 
+  self->capture_recovery_pending = FALSE;
   self->production_ready = TRUE;
-  return TRUE;
+  return gx_wakeup_mcu (self);
 }
 
 
@@ -2248,11 +2645,107 @@ static gboolean
 gx_finger_present (FpiDeviceGoodix51A0 *self)
 {
   int cur[GXFP_FDT_ZONE_COUNT];
+  guint8 touchflag = 0;
 
-  if (gx_fdt_probe (self, cur) != 0)
+  if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
     return FALSE;
-  return gx_fdt_drop (self->fdt_base, cur) > GOODIX_FDT_DROP ||
+  return gx_fdt_touch_is_finger (touchflag) ||
+         gx_fdt_drop (self->fdt_base, cur) > GOODIX_FDT_DROP ||
          gx_fdt_mean (cur) < self->fdt_abs;
+}
+
+/* Windows OnRetryCaptureIMG keeps the current physical press alive:
+ * FDT-manual first confirms that the finger is still down, then another
+ * image command 0x20 is issued without waiting for a lift/new FDT-down IRQ.
+ * This is deliberately a new biometric image, not the transport-level
+ * resend performed inside gx_send_plain_drain(). */
+static gboolean
+gx_capture_retry_same_press_frame (FpiDeviceGoodix51A0 *self,
+                                   guint16             *px,
+                                   gboolean            *finger_still_down)
+{
+  struct gxfp_target_packet packet;
+  g_autofree guint8 *rec = g_malloc0 (GOODIX_RX_MAX);
+  g_autofree guint8 *plain = g_malloc0 (GOODIX_RX_MAX);
+  int cur[GXFP_FDT_ZONE_COUNT];
+  guint8 touchflag = 0;
+  int raw;
+  gssize got;
+
+  g_return_val_if_fail (finger_still_down != NULL, FALSE);
+  *finger_still_down = FALSE;
+
+  if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
+    {
+      fp_warn ("same-press RetryCaptureIMG FDT-manual failed; stopping retries");
+      return FALSE;
+    }
+
+  {
+    int mean = gx_fdt_mean (cur);
+    int drop = gx_fdt_drop (self->fdt_base, cur);
+
+    fp_warn ("GXFP51A0 VERIFY_TRACE same-press FDT mean=%d drop=%d "
+             "floor=%d threshold_drop=%d touch=0x%02x zones=%u",
+             mean, drop, self->fdt_abs, GOODIX_FDT_DROP,
+             touchflag, gx_fdt_touch_count (touchflag));
+    if (!(gx_fdt_touch_is_finger (touchflag) ||
+          drop > GOODIX_FDT_DROP || mean < self->fdt_abs))
+      {
+        fp_warn ("GXFP51A0 VERIFY_TRACE RetryCaptureIMG stopped: "
+                 "finger not detected on current press");
+        return TRUE;
+      }
+  }
+
+  *finger_still_down = TRUE;
+
+  /* The Windows-style RetryCaptureIMG path is a fresh sensor image request,
+   * not a transport replay.  FDT-manual has just completed a separate MCU
+   * transaction; give the sensor the same session-calibrated inter-command
+   * settling window used by the normal capture recipe before issuing 0x20.
+   *
+   * On the reference MateBook, successful rel56 traces had later same-press
+   * images accepted on their first GET_IMAGE, while failing rel58 traces sent
+   * the retry immediately after FDT and every image needed the no-evidence
+   * transport replay.  This gap is process-local, bounded to 30..90 ms and
+   * never changes biometric scoring. */
+  fp_warn ("GXFP51A0 VERIFY_TRACE RetryCaptureIMG pacing barrier=%u us",
+           gx_capture_gap_us (self));
+  g_usleep (gx_capture_gap_us (self));
+
+  if (!gxfp_build_get_image (&packet))
+    return FALSE;
+
+  self->capture_retry_seen = FALSE;
+  if (!gx_send_plain_drain (self, packet.inner, packet.inner_len, NULL, NULL))
+    return FALSE;
+
+  raw = gx_take_tls_frame (self, rec, GOODIX_RX_MAX);
+  if (raw < 0)
+    raw = gx_fail_get_image_after_tls_timeout (self);
+
+  got = raw > 0
+          ? gx_tls_decrypt_record (self->tls, rec, (gsize) raw,
+                                   plain, GOODIX_RX_MAX)
+          : -1;
+  if (got != (gssize) GXFP_IMAGE_PLAINTEXT_LEN)
+    {
+      fp_warn ("same-press RetryCaptureIMG failed (%d raw, %ld plain); "
+               "forcing full session recovery",
+               raw, (long) got);
+      if (!self->capture_recovery_pending)
+        gx_capture_transport_desync (self);
+      return FALSE;
+    }
+
+  if (!gxfp_decode_image_plaintext (plain, (gsize) got, px))
+    {
+      fp_warn ("same-press RetryCaptureIMG could not decode transport raster");
+      return FALSE;
+    }
+
+  return TRUE;
 }
 
 
@@ -2298,25 +2791,19 @@ gx_dump_capture (FpiDeviceGoodix51A0 *self, const guint16 *px)
 
 #endif
 
-/* Captures one press and extracts its descriptors. */
 static GxSiftFeatures *
-gx_capture_features (FpiDeviceGoodix51A0 *self)
+gx_features_from_pixels (FpiDeviceGoodix51A0 *self, const guint16 *px)
 {
-  guint16 px[GOODIX_IMG_PIXELS];
   g_autofree double *img = NULL;
   double m = 0, v = 0;
   int i;
 
-  if (!gx_capture_frame (self, px, FALSE))
-    return NULL;
   img = gx_preprocess (self, px);
 
   /* This quality gate is ESSENTIAL. The keypoint detector always returns
    * maxima, even on pure noise, so the number of points says nothing about
    * whether a capture is usable. What separates them is contrast: about 5
-   * with no finger against about 200 with one. Without this check a failed
-   * press enters the template and degrades it permanently — observed when a
-   * user lifted between the two views of a press, poisoning every stage. */
+   * with no finger against about 200 with one. */
   for (i = 0; i < GOODIX_IMG_PIXELS; i++)
     m += img[i];
   m /= GOODIX_IMG_PIXELS;
@@ -2328,7 +2815,19 @@ gx_capture_features (FpiDeviceGoodix51A0 *self)
       fp_info ("capture rejected: contrast %.0f (no finger?)", v);
       return NULL;
     }
+
   return gx_sift_extract (img, GOODIX_IMG_WIDTH, GOODIX_IMG_HEIGHT);
+}
+
+/* Captures one press and extracts its descriptors. */
+static GxSiftFeatures *
+gx_capture_features (FpiDeviceGoodix51A0 *self)
+{
+  guint16 px[GOODIX_IMG_PIXELS];
+
+  if (!gx_capture_frame (self, px, FALSE))
+    return NULL;
+  return gx_features_from_pixels (self, px);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2427,6 +2926,8 @@ typedef struct
   gboolean   verifying;       /* verify or identify: capture exactly one usable press */
   gboolean   identifying;     /* one-to-many gallery match */
   gboolean   match_reported;  /* terminal match/no-match already sent early */
+  gboolean   rearm_mcu_before_retry; /* failed usable press: refresh imaging after lift */
+  gboolean   rebase_before_retry; /* finger is off: refresh background/FDT before next pose */
   FpPrint   *identify_match;  /* matched gallery print, owned while the task lives */
 } GxTask;
 
@@ -2442,7 +2943,10 @@ enum {
 #define GX_POLL_MS     100     /* detection polling period */
 #define GX_POLL_MAX    300     /* about 30 s before giving up */
 #define GX_POLL_OFF    100     /* about 10 s to wait for release */
-#define GX_VERIFY_MAX_ATTEMPTS 3 /* fixed budget; never score-proximity conditioned */
+#define GX_RECOVERY_OFF_POLLS 2 /* ~1 s worst-case with failed FDT probes */
+#define GX_VERIFY_MAX_ATTEMPTS 3 /* physical presses; fixed budget */
+#define GX_SAME_PRESS_CAPTURE_ATTEMPTS 3 /* initial image + 2 RetryCaptureIMG */
+#define GX_REPOSE_SCORE_CUTOFF 4 /* very weak first image: reposition immediately */
 
 /* ------------------------------------------------------------------ */
 /*  Off-loading the blocking work                                      */
@@ -2468,13 +2972,24 @@ typedef struct
 {
   FpiSsm         *ssm;
   FpDevice       *dev;
-  GxSiftFeatures *feat;      /* capture result, NULL on failure */
+  FpPrint        *verify_print;    /* worker-owned ref for 1:1 scoring */
+  GPtrArray      *identify_gallery; /* worker-owned FpPrint refs for 1:N */
+  GxSiftFeatures *feat;            /* best capture result, NULL on failure */
+  guint           same_press_images;
   gboolean        ok;
 } GxWork;
+
+static GxSiftFeatures *
+gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
+                            FpPrint              *tmpl,
+                            GPtrArray            *gallery,
+                            guint                *out_images);
 
 static void
 gx_work_free (GxWork *w)
 {
+  g_clear_object (&w->verify_print);
+  g_clear_pointer (&w->identify_gallery, g_ptr_array_unref);
   g_clear_pointer (&w->feat, gx_sift_free);
   g_free (w);
 }
@@ -2484,8 +2999,59 @@ gx_session_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
 {
   GxWork *w = data;
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (w->dev);
+  GxTask *t = fpi_ssm_get_data (w->ssm);
 
-  if (g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY"))
+  if (t && t->rebase_before_retry)
+    {
+      t->rebase_before_retry = FALSE;
+
+      /* A biometric miss does not itself make ImageBase stale. rel71.8 live
+       * traces showed that blindly rebasing after each weak placement wasted
+       * ~1.7-1.9 s and was often contaminated by the user's next placement,
+       * even though the reference had been refreshed only seconds earlier.
+       * Rebase only when ImageBase has actually exceeded the freshness bound;
+       * otherwise rearm immediately for the next physical placement. */
+      if (gx_background_is_fresh (self))
+        {
+          fp_info ("GXFP51A0 AUTH_TRACE retry ImageBase still fresh age=%d ms; "
+                   "rearming MCU immediately for retry %d/%d",
+                   (int) (gx_background_age_us (self) / 1000),
+                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+          w->ok = gx_wakeup_mcu (self);
+        }
+      else
+        {
+          gint64 previous_refresh = self->bg_last_refresh_us;
+
+          fp_warn ("GXFP51A0 AUTH_TRACE refreshing stale background+FDT after "
+                   "failed usable press before retry %d/%d",
+                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+
+          if (gx_warm_validate (self))
+            {
+              if (self->bg_last_refresh_us > previous_refresh)
+                fp_warn ("GXFP51A0 AUTH_TRACE fresh retry background ready; "
+                         "rearming MCU before retry %d/%d",
+                         t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+              else
+                fp_warn ("GXFP51A0 AUTH_TRACE retry ImageBase refresh deferred "
+                         "by touch; rearming with retained reference for retry "
+                         "%d/%d",
+                         t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+              w->ok = gx_wakeup_mcu (self);
+            }
+          else
+            {
+              /* A failed refresh is a transport/lifecycle problem, not
+               * biometric evidence. Let the existing bounded session recovery
+               * decide whether a cold rebuild is required. */
+              fp_warn ("GXFP51A0 AUTH_TRACE retry background refresh failed; "
+                       "using bounded session recovery");
+              w->ok = gx_session_start (self);
+            }
+        }
+    }
+  else if (g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY"))
     w->ok = gx_tls_session (self);
   else
     w->ok = gx_session_start (self);
@@ -2498,7 +3064,12 @@ gx_capture_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
   GxWork *w = data;
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (w->dev);
 
-  w->feat = gx_capture_features (self);
+  if (w->verify_print || w->identify_gallery)
+    w->feat = gx_capture_auth_same_press (self, w->verify_print,
+                                          w->identify_gallery,
+                                          &w->same_press_images);
+  else
+    w->feat = gx_capture_features (self);
   w->ok = (w->feat != NULL);
   g_task_return_boolean (task, TRUE);
 }
@@ -2543,9 +3114,41 @@ gx_run_async (FpiSsm *ssm, FpDevice *dev, GTaskThreadFunc fn,
 {
   GTask *task = g_task_new (dev, NULL, done, NULL);
   GxWork *w = g_new0 (GxWork, 1);
+  GxTask *t = fpi_ssm_get_data (ssm);
 
   w->ssm = ssm;
   w->dev = dev;
+
+  /* fprintd VerifyStart("any") may use libfprint Identify when the driver
+   * advertises it.  Both 1:1 Verify and 1:N Identify therefore need the exact
+   * Windows same-press recapture path. Copy only refs on the main thread; the
+   * worker treats FpPrint objects as immutable. */
+  if (fn == gx_capture_thread && t && t->verifying)
+    {
+      if (t->identifying)
+        {
+          GPtrArray *gallery = NULL;
+
+          fpi_device_get_identify_data (dev, &gallery);
+          if (gallery)
+            {
+              w->identify_gallery =
+                g_ptr_array_new_with_free_func ((GDestroyNotify) g_object_unref);
+              for (guint i = 0; i < gallery->len; i++)
+                g_ptr_array_add (w->identify_gallery,
+                                 g_object_ref (g_ptr_array_index (gallery, i)));
+            }
+        }
+      else
+        {
+          FpPrint *tmpl = NULL;
+
+          fpi_device_get_verify_data (dev, &tmpl);
+          if (tmpl)
+            w->verify_print = g_object_ref (tmpl);
+        }
+    }
+
   g_task_set_task_data (task, w, (GDestroyNotify) gx_work_free);
   g_task_run_in_thread (task, fn);
   g_object_unref (task);
@@ -2582,6 +3185,34 @@ gx_cancelled (FpDevice *dev, FpiSsm *ssm)
   return TRUE;
 }
 
+/* Handle the real desktop failure mode: the lockscreen may Claim/Open the
+ * reader before suspend and keep that same operation alive across S3.  Compare
+ * CLOCK_BOOTTIME with CLOCK_MONOTONIC on every lightweight finger poll; the
+ * delta advances only while suspended.  Recovery stays entirely inside
+ * libfprint, so no systemd/logind/D-Bus helper races the password PAM stack. */
+static gboolean
+gx_active_sleep_recovery (FpDevice *dev, FpiSsm *ssm)
+{
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+
+  if (!gx_warm_crossed_sleep (self))
+    return FALSE;
+
+  fp_warn ("GXFP51A0 active S3 boundary detected during authentication; "
+           "scheduling native cold recovery");
+  self->force_cold_reset = TRUE;
+  self->capture_recovery_pending = FALSE;
+  self->capture_gap_scale = 0;
+  self->capture_clean_streak = 0;
+  self->capture_retry_seen = FALSE;
+  self->capture_pacing_suppressed = TRUE;
+
+  fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NONE);
+  self->poll_id = 0;
+  fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
+  return TRUE;
+}
+
 /* Non-blocking poll, re-armed by timeout until the finger is detected. */
 static gboolean
 gx_poll_on (gpointer user_data)
@@ -2591,11 +3222,15 @@ gx_poll_on (gpointer user_data)
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   GxTask *t = fpi_ssm_get_data (ssm);
   int cur[GXFP_FDT_ZONE_COUNT];
+  guint8 touchflag = 0;
 
   if (gx_cancelled (dev, ssm))
     { self->poll_id = 0; return G_SOURCE_REMOVE; }
 
-  if (gx_fdt_probe (self, cur) != 0)
+  if (gx_active_sleep_recovery (dev, ssm))
+    return G_SOURCE_REMOVE;
+
+  if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
     {
       fp_dbg ("wait-on: detection probe failed");
       goto again;
@@ -2611,7 +3246,8 @@ gx_poll_on (gpointer user_data)
         fp_info ("GXFP51A0 CAPTURE_DIAGNOSTIC_WAITING_FOR_FINGER: PRESS_AND_HOLD_NOW");
     }
 
-  if (gx_fdt_drop (self->fdt_base, cur) > GOODIX_FDT_DROP ||
+  if (gx_fdt_touch_is_finger (touchflag) ||
+      gx_fdt_drop (self->fdt_base, cur) > GOODIX_FDT_DROP ||
       gx_fdt_mean (cur) < self->fdt_abs)
     {
       /* Keep NEEDED asserted: the capture still takes about 1.1 s and the
@@ -2620,6 +3256,13 @@ gx_poll_on (gpointer user_data)
        * early, and spoil the capture. */
       fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NEEDED |
                                             FP_FINGER_STATUS_PRESENT);
+      if (t->verifying)
+        fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d DETECTED_HOLD "
+                 "touch=0x%02x zones=%u mean=%d drop=%d",
+                 t->identifying ? "IDENTIFY" : "VERIFY",
+                 t->tries + 1, GX_VERIFY_MAX_ATTEMPTS,
+                 touchflag, gx_fdt_touch_count (touchflag),
+                 gx_fdt_mean (cur), gx_fdt_drop (self->fdt_base, cur));
       fp_info ("finger status: needed=1 present=1; capture starting");
       self->poll_id = 0;
       fpi_ssm_jump_to_state (ssm, GX_ST_CAPTURE);
@@ -2643,23 +3286,58 @@ gx_poll_off (gpointer user_data)
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   GxTask *t = fpi_ssm_get_data (ssm);
   int cur[GXFP_FDT_ZONE_COUNT];
+  guint8 touchflag = 0;
   gboolean off = FALSE;
 
   if (gx_cancelled (dev, ssm))
     { self->poll_id = 0; return G_SOURCE_REMOVE; }
 
-  if (gx_fdt_probe (self, cur) == 0 &&
+  if (gx_active_sleep_recovery (dev, ssm))
+    return G_SOURCE_REMOVE;
+
+  if (gx_fdt_probe_ex (self, cur, &touchflag) == 0 &&
+      !gx_fdt_touch_is_finger (touchflag) &&
       gx_fdt_drop (self->fdt_base, cur) < GOODIX_FDT_DROP / 2 &&
       gx_fdt_mean (cur) >= self->fdt_abs)
     off = TRUE;
 
-  if (off || ++t->polls > GX_POLL_OFF)
+  if (off || ++t->polls >
+             (self->capture_recovery_pending ? GX_RECOVERY_OFF_POLLS
+                                             : GX_POLL_OFF))
     {
       fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NONE);
-      /* Next enrollment view, fixed-budget verify retry, or finish. */
-      if (t->verifying && !t->identifying && !t->match_reported &&
-          t->tries < GX_VERIFY_MAX_ATTEMPTS)
+      if (t->verifying)
+        fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d RELEASED",
+                 t->identifying ? "IDENTIFY" : "VERIFY",
+                 MAX (t->tries, 1), GX_VERIFY_MAX_ATTEMPTS);
+
+      if (self->capture_recovery_pending)
         {
+          fp_info ("GXFP51A0 finger released/timeout after transport desync; "
+                   "rebuilding session before another biometric press");
+          fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
+        }
+      /* Next enrollment view, fixed-budget verify retry, or finish. */
+      else if (t->verifying && !t->match_reported &&
+               t->tries < GX_VERIFY_MAX_ATTEMPTS)
+        {
+          if (t->rearm_mcu_before_retry)
+            {
+              /* A low-scoring but otherwise valid press can mean the retained
+               * warm background/imaging state drifted.  Historical reference MateBook 13
+               * runs show fresh WARM_REBASE frames restoring scores from 2-4
+               * to 7-20+.  Refresh only now, after release, and do it on the
+               * existing SESSION worker so the fprintd main loop stays live. */
+              t->rearm_mcu_before_retry = FALSE;
+              t->rebase_before_retry = TRUE;
+              fp_warn ("GXFP51A0 AUTH_TRACE scheduling fresh background after "
+                       "failed usable press before retry %d/%d",
+                       t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+              self->poll_id = 0;
+              fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
+              return G_SOURCE_REMOVE;
+            }
+
           fp_info ("verify: finger released; waiting for retry press %d/%d",
                    t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
           fpi_ssm_jump_to_state (ssm, GX_ST_WAIT_ON);
@@ -2682,6 +3360,8 @@ gx_score_probe_against_print (FpPrint *tmpl,
 {
   g_autoptr(GPtrArray) views = gx_views_from_print (tmpl);
   int best = 0;
+  int fused = 0;
+  g_autofree guint8 *fusion_mask = NULL;
   int top[5] = { 0, 0, 0, 0, 0 };
   guint top_idx[5] = { 0, 0, 0, 0, 0 };
 
@@ -2693,12 +3373,22 @@ gx_score_probe_against_print (FpPrint *tmpl,
   if (!probe)
     return 0;
 
-  /* Modern small-sensor SIGFM drivers use the best score against one enrolled
-   * sample.  Fusing evidence across every view inflated the impostor floor in
-   * the previous matcher as galleries became richer. */
+  fusion_mask = g_new0 (guint8, MAX (gx_sift_keypoints (probe), 1u));
+
+  /* Production decision remains the historical best single-view score.
+   *
+   * In parallel, collect a diagnostic UNION of probe keypoints that are
+   * geometrically explained by at least one enrolled view.  This is the
+   * small-sensor view-fusion strategy used by current Goodix work: a partial
+   * press can overlap several enrolled fragments without any single fragment
+   * reaching threshold.  Crucially this does NOT affect authentication in
+   * rel71.16; it only tells us whether distributed template coverage is the
+   * reason a genuine press scores 3-6/7. */
   for (guint i = 0; views && i < views->len; i++)
     {
-      int score = gx_sift_match (probe, g_ptr_array_index (views, i));
+      int score = gx_sift_match_mask (probe,
+                                      g_ptr_array_index (views, i),
+                                      fusion_mask);
 
       if (score > best)
         best = score;
@@ -2716,6 +3406,14 @@ gx_score_probe_against_print (FpPrint *tmpl,
             break;
           }
     }
+
+  for (guint i = 0; i < gx_sift_keypoints (probe); i++)
+    fused += fusion_mask[i] ? 1 : 0;
+
+  fp_warn ("GXFP51A0 MATCH_FUSION baseline=%d fused=%d delta=%+d "
+           "probe_kp=%u views=%u decision=baseline",
+           best, fused, fused - best, gx_sift_keypoints (probe),
+           views ? views->len : 0);
 
   if (g_getenv ("GXFP_MATCH_DIAGNOSTICS"))
     {
@@ -2745,6 +3443,170 @@ gx_score_probe_against_print (FpPrint *tmpl,
   return best;
 }
 
+/* One physical press may yield up to three independent biometric images.
+ * This mirrors Windows/Goodix RetryCaptureIMG: after the initial frame,
+ * FDT-manual confirms the finger is still down and a fresh 0x20 image is
+ * captured without requiring a lift. Every image must independently satisfy
+ * the unchanged matcher threshold; scores are never summed or fused. */
+static int
+gx_score_probe_against_gallery (GPtrArray            *gallery,
+                                const GxSiftFeatures *probe,
+                                guint                *out_candidate)
+{
+  int best = 0;
+  guint best_candidate = 0;
+
+  for (guint i = 0; gallery && i < gallery->len; i++)
+    {
+      FpPrint *candidate = g_ptr_array_index (gallery, i);
+      int score = gx_score_probe_against_print (candidate, probe, NULL, NULL);
+
+      if (score > best)
+        {
+          best = score;
+          best_candidate = i;
+        }
+    }
+
+  if (out_candidate)
+    *out_candidate = best_candidate;
+  return best;
+}
+
+/* One physical press may yield up to three independent biometric images.
+ * Windows/Goodix RetryCaptureIMG keeps the current finger down and requests
+ * another 0x20 frame. Each image independently has to reach threshold 7.
+ * This applies to 1:1 Verify and to fprintd's multi-print Identify path. */
+static GxSiftFeatures *
+gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
+                            FpPrint              *tmpl,
+                            GPtrArray            *gallery,
+                            guint                *out_images)
+{
+  GxSiftFeatures *best_probe = NULL;
+  int best_score = -1;
+  guint images = 0;
+  gboolean cleanup_needed = FALSE;
+  const gchar *mode = gallery ? "identify" : "verify";
+
+  for (guint attempt = 1; attempt <= GX_SAME_PRESS_CAPTURE_ATTEMPTS; attempt++)
+    {
+      guint16 px[GOODIX_IMG_PIXELS];
+      GxSiftFeatures *probe = NULL;
+      gboolean ok;
+      int score;
+      guint candidate = 0;
+
+      if (attempt == 1)
+        {
+          ok = gx_capture_frame_ex (self, px, GX_CAPTURE_FINGER, FALSE);
+          if (!ok)
+            break;
+          cleanup_needed = TRUE;
+        }
+      else
+        {
+          gboolean finger_still_down = FALSE;
+
+          ok = gx_capture_retry_same_press_frame (self, px,
+                                                  &finger_still_down);
+          if (!ok || !finger_still_down)
+            break;
+        }
+
+      /* If this authenticated image needed the safe no-evidence GET_IMAGE
+       * replay, calibrate capture pacing NOW.  Waiting until final cleanup made
+       * images 2/3 reuse the same too-tight timing even though image 1 had
+       * already proved it inadequate.  The next RetryCaptureIMG therefore gets
+       * the calibrated gap on this same physical pose. */
+      if (self->capture_retry_seen)
+        {
+          int before = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
+
+          gx_capture_pacing_success (self);
+          fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press retry-assisted "
+                   "pacing applied before next image: %d%% -> %d%% (%u us)",
+                   mode, before, self->capture_gap_scale,
+                   gx_capture_gap_us (self));
+        }
+
+      images++;
+      probe = gx_features_from_pixels (self, px);
+      if (!probe)
+        {
+          fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
+                   "rejected by quality gate",
+                   mode, attempt, GX_SAME_PRESS_CAPTURE_ATTEMPTS);
+          continue;
+        }
+
+      if (gallery)
+        score = gx_score_probe_against_gallery (gallery, probe, &candidate);
+      else
+        score = gx_score_probe_against_print (tmpl, probe, NULL, NULL);
+
+      fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
+               "score=%d threshold=%d candidate=%u",
+               mode, attempt, GX_SAME_PRESS_CAPTURE_ATTEMPTS, score,
+               GX_MATCH_THRESHOLD, candidate);
+
+      if (!best_probe || score > best_score)
+        {
+          g_clear_pointer (&best_probe, gx_sift_free);
+          best_probe = probe;
+          probe = NULL;
+          best_score = score;
+        }
+
+      g_clear_pointer (&probe, gx_sift_free);
+
+      if (score >= GX_MATCH_THRESHOLD)
+        break;
+
+      /* rel47 runtime already proved that a very weak first image (<=4)
+       * benefits more from a fresh physical placement than from spending two
+       * additional images on the same patch of this partial sensor. Scores
+       * 5-6 remain close enough to threshold to keep Windows-style
+       * RetryCaptureIMG. Every image still independently needs threshold 7. */
+      if (attempt == 1 && score <= GX_REPOSE_SCORE_CUTOFF)
+        {
+          fp_info ("GXFP51A0 AUTH_TRACE mode=%s low-score pose=%d; "
+                   "requesting reposition instead of same-press recapture",
+                   mode, score);
+          break;
+        }
+
+      /* Keep Windows-style RetryCaptureIMG available for non-matching images
+       * that remain close enough to threshold to benefit from same-press
+       * recapture. Scores are never summed or fused, and threshold 7 is
+       * unchanged. */
+    }
+
+  if (cleanup_needed && !self->capture_recovery_pending)
+    {
+      if (!gx_send_capture_cleanup (self))
+        {
+          fp_warn ("GXFP51A0 same-press final cleanup failed");
+          g_clear_pointer (&best_probe, gx_sift_free);
+        }
+      else
+        {
+          /* Any image-level retry evidence was already consumed immediately
+           * above so it could help the SAME press.  Cleanup may itself observe
+           * fresh retry evidence; account for that independently here. */
+          gx_capture_pacing_success (self);
+        }
+    }
+
+  if (out_images)
+    *out_images = images;
+
+  fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press completed "
+           "images=%u best=%d threshold=%d",
+           mode, images, MAX (best_score, 0), GX_MATCH_THRESHOLD);
+  return best_probe;
+}
+
 static void
 gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
 {
@@ -2768,6 +3630,19 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
         FP_DEVICE_ERROR_GENERAL, "capture-only diagnostic complete"));
       return;
     }
+
+      if (!f && self->capture_recovery_pending)
+        {
+          /* No authenticated image exists, so this is transport recovery, not
+           * a biometric no-match and must not consume the fixed verify budget.
+           * Ask for release, rebuild the session, then request a fresh press. */
+          fp_warn ("GXFP51A0 capture transport failed; recovering before "
+                   "another biometric attempt");
+          fpi_device_report_finger_status (dev, FP_FINGER_STATUS_PRESENT);
+          t->polls = 0;
+          self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_off, ssm);
+          return;
+        }
 
       if (!f || gx_sift_keypoints (f) < GX_MIN_CAPTURE_KEYPOINTS)
         {
@@ -2828,19 +3703,39 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
                     }
                 }
 
-              t->best = best;
+              t->best = MAX (t->best, best);
               if (best_print && best >= GX_MATCH_THRESHOLD)
                 {
+                  g_clear_object (&t->identify_match);
                   t->identify_match = g_object_ref (best_print);
-                    }
-
-              fpi_device_identify_report (dev,
-                                          t->identify_match,
-                                          NULL,
-                                          NULL);
-              t->match_reported = TRUE;
-              fp_info ("identify: early result reported best=%d threshold=%d gallery=%u",
-                       best, GX_MATCH_THRESHOLD, gallery ? gallery->len : 0);
+                  fpi_device_identify_report (dev,
+                                              t->identify_match,
+                                              NULL,
+                                              NULL);
+                  t->match_reported = TRUE;
+                  fp_info ("identify: match reported on press %d/%d "
+                           "score=%d threshold=%d gallery=%u",
+                           t->tries, GX_VERIFY_MAX_ATTEMPTS,
+                           best, GX_MATCH_THRESHOLD,
+                           gallery ? gallery->len : 0);
+                }
+              else if (t->tries >= GX_VERIFY_MAX_ATTEMPTS)
+                {
+                  fpi_device_identify_report (dev, NULL, NULL, NULL);
+                  t->match_reported = TRUE;
+                  fp_info ("identify: no-match reported after %d fixed presses "
+                           "(best=%d threshold=%d gallery=%u)",
+                           t->tries, t->best, GX_MATCH_THRESHOLD,
+                           gallery ? gallery->len : 0);
+                }
+              else
+                {
+                  t->rearm_mcu_before_retry = TRUE;
+                  fp_info ("identify: no-match press %d/%d (score=%d best=%d); "
+                           "request another complete press with MCU rearm",
+                           t->tries, GX_VERIFY_MAX_ATTEMPTS,
+                           best, t->best);
+                }
             }
           else
             {
@@ -2873,7 +3768,8 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
                 }
               else
                 {
-                  fp_info ("verify: no-match attempt %d/%d; request another complete press",
+                  t->rearm_mcu_before_retry = TRUE;
+                  fp_info ("verify: no-match attempt %d/%d; request another complete press with MCU rearm",
                            t->tries, GX_VERIFY_MAX_ATTEMPTS);
                 }
             }
@@ -2896,6 +3792,10 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
         }
       /* Capture done: we no longer need the finger, only its release.
        * PRESENT without NEEDED is the "you may lift now" signal. */
+      if (t->verifying)
+        fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d LIFT_NOW",
+                 t->identifying ? "IDENTIFY" : "VERIFY",
+                 MAX (t->tries, 1), GX_VERIFY_MAX_ATTEMPTS);
       fpi_device_report_finger_status (dev, FP_FINGER_STATUS_PRESENT);
       t->polls = 0;
       self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_off, ssm);
@@ -2919,6 +3819,10 @@ gx_run_state (FpiSsm *ssm, FpDevice *dev)
 
         t->polls = 0;
         changed = fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NEEDED);
+        if (t->verifying)
+          fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d READY",
+                   t->identifying ? "IDENTIFY" : "VERIFY",
+                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
         fp_info ("finger status: needed=1 present=0 changed=%d",
                  changed ? 1 : 0);
         self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
@@ -3046,24 +3950,97 @@ gx_transport_open (FpDevice *dev, GError **error)
   return TRUE;
 }
 
-static void
-gx_warm_discard (FpiDeviceGoodix51A0 *self)
+#define GX_SLEEP_DELTA_STALE_US (250 * 1000)
+/* Keep a healthy same-process context across an awake workday.  This is not a
+ * blind lease: every new Claim still performs a cheap FDT liveness probe, and
+ * suspend or any failed liveness check forces the full recovery path. */
+#define GX_WARM_IDLE_TTL_US (G_GINT64_CONSTANT(12) * 60 * 60 * G_USEC_PER_SEC)
+G_STATIC_ASSERT (GX_WARM_IDLE_TTL_US == G_GINT64_CONSTANT(43200000000));
+
+static gboolean
+gx_sleep_delta_us (gint64 *out)
 {
+  struct timespec boot = { 0, }, mono = { 0, };
+
+  g_return_val_if_fail (out != NULL, FALSE);
+
+  if (clock_gettime (CLOCK_BOOTTIME, &boot) != 0 ||
+      clock_gettime (CLOCK_MONOTONIC, &mono) != 0)
+    return FALSE;
+
+  *out = ((gint64) boot.tv_sec - (gint64) mono.tv_sec) * G_USEC_PER_SEC +
+         ((gint64) boot.tv_nsec - (gint64) mono.tv_nsec) / 1000;
+  return TRUE;
+}
+
+static gboolean
+gx_warm_crossed_sleep (FpiDeviceGoodix51A0 *self)
+{
+  gint64 now = 0;
+
+  if (!self->warm_sleep_clock_valid)
+    return FALSE;
+
+  if (!gx_sleep_delta_us (&now))
+    return FALSE;
+
+  if (now - self->warm_sleep_delta_us > GX_SLEEP_DELTA_STALE_US)
+    {
+      fp_info ("GXFP51A0 sleep boundary detected: boottime-monotonic advanced by %d ms",
+               (int) ((now - self->warm_sleep_delta_us) / 1000));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static gboolean
+gx_warm_idle_expired (FpiDeviceGoodix51A0 *self)
+{
+  gint64 now;
+
+  if (!self->warm_valid || self->warm_last_activity_us <= 0)
+    return FALSE;
+
+  now = g_get_monotonic_time ();
+  if (now - self->warm_last_activity_us > GX_WARM_IDLE_TTL_US)
+    {
+      fp_info ("GXFP51A0 warm context idle for %d s; forcing cold rebuild",
+               (int) ((now - self->warm_last_activity_us) / G_USEC_PER_SEC));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static void
+gx_warm_abandon (FpiDeviceGoodix51A0 *self)
+{
+  /* Host-only invalidation.  Use this after suspend or another lifecycle
+   * boundary where sensor-side TLS state cannot be trusted: never send a
+   * close_notify over a session that may no longer exist. */
   self->warm_valid = FALSE;
   self->production_ready = FALSE;
   self->have_fdt = FALSE;
   self->bg_dirty = FALSE;
+  self->bg_last_refresh_us = 0;
   self->tls_rxlen = 0;
   self->tls_rxpos = 0;
-  if (self->tls_up && self->spi_fd >= 0 && self->irq_fd >= 0)
-    gx_tls_teardown (self);
-  else
-    {
-      self->tls_up = FALSE;
-      g_clear_pointer (&self->tls, gx_tls_free);
-    }
+  self->tls_up = FALSE;
+  self->warm_last_activity_us = 0;
+  self->warm_sleep_delta_us = 0;
+  self->warm_sleep_clock_valid = FALSE;
+  g_clear_pointer (&self->tls, gx_tls_free);
   gx_pmk_clear (self);
   g_clear_pointer (&self->bg_frame, g_free);
+}
+
+static void
+gx_warm_discard (FpiDeviceGoodix51A0 *self)
+{
+  if (self->tls_up && self->spi_fd >= 0 && self->irq_fd >= 0)
+    gx_tls_teardown (self);
+  gx_warm_abandon (self);
 }
 
 static gboolean
@@ -3074,18 +4051,121 @@ gx_warm_available (FpiDeviceGoodix51A0 *self)
 }
 
 static gboolean
-gx_warm_validate (FpiDeviceGoodix51A0 *self)
+gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
 {
   int cur[GXFP_FDT_ZONE_COUNT];
+  guint8 touchflag = 0;
+  int mean;
   gint64 t0 = g_get_monotonic_time ();
 
-  if (gx_fdt_probe (self, cur) != 0)
+  /* Fast path for an already prepared sensor: prove only that the FDT path is
+   * alive.  Do not take a new background image before telling the desktop the
+   * reader is ready; that old rebase made every normal lock pay 1-20 seconds
+   * before the user could even be detected.  Sleep is rejected before this
+   * function and any failed FDT probe falls back to the full validated path. */
+  if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
     return FALSE;
 
-  fp_info ("GXFP51A0 warm context validated in %d ms (FDT mean=%d drop=%d)",
-           (int) ((g_get_monotonic_time () - t0) / 1000),
-           gx_fdt_mean (cur), gx_fdt_drop (self->fdt_base, cur));
+  mean = gx_fdt_mean (cur);
+  self->warm_last_activity_us = g_get_monotonic_time ();
+
+  if (!gx_fdt_touch_is_finger (touchflag) && mean >= GOODIX_FDT_ABS)
+    {
+      memcpy (self->fdt_base, cur, sizeof self->fdt_base);
+      self->fdt_abs = mean - GOODIX_FDT_ABS_MARGIN;
+      self->have_fdt = TRUE;
+    }
+
+  fp_warn ("GXFP51A0 FAST_READY in %d ms: FDT alive touch=0x%02x mean=%d "
+           "floor=%d; reusing prepared TLS/background",
+           (int) ((self->warm_last_activity_us - t0) / 1000),
+           touchflag, mean, self->fdt_abs);
   return TRUE;
+}
+
+static gboolean
+gx_warm_validate (FpiDeviceGoodix51A0 *self)
+{
+  g_autofree guint16 *fresh_bg = g_new (guint16, GOODIX_IMG_PIXELS);
+  gboolean previous_pacing_suppression = self->capture_pacing_suppressed;
+  gboolean ok = FALSE;
+  int cur[GXFP_FDT_ZONE_COUNT];
+  int after[GXFP_FDT_ZONE_COUNT];
+  guint8 before_touchflag = 0;
+  guint8 after_touchflag = 0;
+  int before_mean;
+  int after_mean;
+  gint64 t0 = g_get_monotonic_time ();
+
+  /* Failure while validating a retained lifecycle context is evidence that the
+   * session went stale, not that steady-state capture pacing is too fast. */
+  self->capture_pacing_suppressed = TRUE;
+
+  if (gx_fdt_probe_ex (self, cur, &before_touchflag) != 0)
+    goto out;
+
+  before_mean = gx_fdt_mean (cur);
+
+  /* A user may already be holding the power-button sensor when Claim/Open runs.
+   * Never overwrite ImageBase/background with a finger frame.  Sleep and idle
+   * boundaries were handled before this function, so an otherwise warm
+   * context with a responsive FDT may proceed and let the real Verify capture
+   * exercise TLS.  The previous clean background is retained for this press. */
+  if (gx_fdt_touch_is_finger (before_touchflag) ||
+      before_mean < GOODIX_FDT_ABS)
+    {
+      self->warm_last_activity_us = g_get_monotonic_time ();
+      fp_warn ("GXFP51A0 WARM_REBASE deferred: finger already present "
+               "(FDT mean=%d floor=%d); retaining previous background",
+               before_mean, GOODIX_FDT_ABS);
+      ok = TRUE;
+      goto out;
+    }
+
+  /* Exact-target imaging depends on a no-finger background. Refresh only
+   * the ImageBase plane here: cold preparation owns OTP-derived DAC writes.
+   * Rewriting those DACs during a warm NeedUpdateImageBase-style transition
+   * conflates calibration with baseline refresh and can reset useful sensor
+   * state. Reuse the warm T0 validation image as the new background, then
+   * prove the sensor stayed clear before adopting it. */
+  if (!gx_capture_warm_background_frame (self, fresh_bg))
+    {
+      fp_warn ("GXFP51A0 warm FDT answered but GET_IMAGE/TLS validation failed");
+      goto out;
+    }
+
+  if (gx_fdt_probe_ex (self, after, &after_touchflag) != 0)
+    goto out;
+
+  after_mean = gx_fdt_mean (after);
+  if (gx_fdt_touch_is_finger (after_touchflag) ||
+      after_mean < GOODIX_FDT_ABS)
+    {
+      self->warm_last_activity_us = g_get_monotonic_time ();
+      fp_warn ("GXFP51A0 WARM_REBASE discarded: finger landed during "
+               "background capture (FDT mean=%d floor=%d)",
+               after_mean, GOODIX_FDT_ABS);
+      ok = TRUE;
+      goto out;
+    }
+
+  memcpy (self->bg_frame, fresh_bg,
+          sizeof (guint16) * GOODIX_IMG_PIXELS);
+  self->bg_last_refresh_us = g_get_monotonic_time ();
+  memcpy (self->fdt_base, after, sizeof self->fdt_base);
+  self->fdt_abs = after_mean - GOODIX_FDT_ABS_MARGIN;
+  self->have_fdt = TRUE;
+  self->warm_last_activity_us = g_get_monotonic_time ();
+
+  fp_warn ("GXFP51A0 WARM_REBASE refreshed background+FDT in %d ms "
+           "(idle=%d floor=%d)",
+           (int) ((self->warm_last_activity_us - t0) / 1000),
+           after_mean, self->fdt_abs);
+  ok = TRUE;
+
+out:
+  self->capture_pacing_suppressed = previous_pacing_suppression;
+  return ok;
 }
 
 static gboolean
@@ -3094,8 +4174,15 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
   gchar fw[64] = "";
 
   self->fdt_abs = GOODIX_FDT_ABS;
-  self->timing_scale = gx_timing_load ();
-  self->timing_saved = self->timing_scale;
+
+  /* A fresh fprintd process starts at nominal timing, but a same-process cold
+   * recovery keeps any protocol timing already proven necessary by missed
+   * ACK/FDT responses. This is RAM-only and therefore cannot ratchet across
+   * boots. Capture pacing remains an independent biometric-path setting. */
+  if (self->timing_scale < GX_TIMING_SCALE_MIN)
+    self->timing_scale = GX_TIMING_SCALE_MIN;
+  if (self->capture_gap_scale < GX_CAPTURE_SCALE_MIN)
+    self->capture_gap_scale = GX_CAPTURE_SCALE_MIN;
 
   if (!gx_driverstate_install_windows (self))
     {
@@ -3123,9 +4210,12 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
       g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY"))
     return FALSE;
 
-  if (!gx_prepare_capture_context_once (self, FALSE))
+  /* Claim/open is the authoritative preparation boundary.  Unlike rel24/25
+   * probe prewarm, this uses the bounded recovery wrapper, including a fresh
+   * MCU boundary between attempts and the production PMK fallback. */
+  if (!gx_prepare_capture_context (self, FALSE))
     {
-      fp_warn ("GXFP51A0 probe prewarm preparation failed; deferring bounded recovery to the biometric action");
+      fp_warn ("GXFP51A0 cold preparation failed after bounded recovery");
       gx_invalidate_capture_context (self);
       gx_tls_teardown (self);
       gx_pmk_clear (self);
@@ -3133,71 +4223,59 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
       return FALSE;
     }
 
+  /* Protocol ACK/FDT misses measured during this cold preparation are useful
+   * controller-speed evidence before the user ever touches the sensor.  Seed
+   * the capture gap conservatively from that evidence so the first biometric
+   * GET_IMAGE does not have to fail once merely to learn the same fact.
+   * 300% protocol -> 250% capture on the reference MateBook; a nominal/fast
+   * controller stays at 100%.  This remains process-local and non-persistent. */
+  {
+    int protocol_floor =
+      CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
+             GX_CAPTURE_SCALE_MIN, 250);
+    int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
+
+    if (protocol_floor > previous)
+      {
+        self->capture_gap_scale = protocol_floor;
+        fp_info ("GXFP51A0 capture pacing seeded from protocol calibration: "
+                 "%d%% -> %d%% (%u us gap, protocol=%d%%); not persisted",
+                 previous, self->capture_gap_scale,
+                 gx_capture_gap_us (self), self->timing_scale);
+      }
+  }
+
+  self->capture_recovery_pending = FALSE;
+  self->capture_pacing_suppressed = FALSE;
   self->production_ready = TRUE;
   self->warm_valid = TRUE;
-  fp_info ("GXFP51A0 production capture context ready; native warm state armed");
+  self->warm_last_activity_us = g_get_monotonic_time ();
+  self->warm_sleep_clock_valid =
+    gx_sleep_delta_us (&self->warm_sleep_delta_us);
+  fp_info ("GXFP51A0 production capture context ready; native warm state armed "
+           "(capture pacing=%d%% gap=%u us)",
+           self->capture_gap_scale, gx_capture_gap_us (self));
   return TRUE;
 }
-
-#define GX_PROBE_PREWARM_ATTEMPTS 2
 
 static void
 gx_dev_probe (FpDevice *dev)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   GError *err = NULL;
-  gint64 t0 = g_get_monotonic_time ();
-  gboolean prewarmed = FALSE;
-  gboolean diagnostic =
-    g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") ||
-    g_getenv ("GXFP_DIAGNOSTIC_ONESHOT") ||
-    g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY");
 
+  /* Enumeration must be passive.  rel24/25 performed a complete TLS +
+   * background GET_IMAGE transaction here, before any biometric Claim.  A
+   * transport miss could therefore desynchronise the MCU before the greeter
+   * ever asked for a fingerprint.  Validate only host-side transport
+   * availability in probe(); the real Claim/open owns sensor initialisation. */
   if (!gx_transport_open (dev, &err))
     {
       fpi_device_probe_complete (dev, NULL, NULL, err);
       return;
     }
 
-  if (!diagnostic)
-    {
-      for (int attempt = 1; attempt <= GX_PROBE_PREWARM_ATTEMPTS; attempt++)
-        {
-          /* probe() is an enumeration-time optimization, not an authentication
-           * operation. Every attempt starts from a deterministic MCU boundary;
-           * this prevents stale TLS state from a crashed/restarted daemon from
-           * leaking into the next preparation. */
-          gx_gpio_reset (self);
-
-          if (gx_cold_prepare (self))
-            {
-              prewarmed = TRUE;
-              self->production_ready = FALSE;
-              gx_pmk_clear (self);
-              fp_info ("GXFP51A0 native prewarm completed during libfprint probe "
-                       "in %d ms (attempt %d/%d)",
-                       (int) ((g_get_monotonic_time () - t0) / 1000),
-                       attempt, GX_PROBE_PREWARM_ATTEMPTS);
-              break;
-            }
-
-          fp_warn ("GXFP51A0 probe prewarm attempt %d/%d failed",
-                   attempt, GX_PROBE_PREWARM_ATTEMPTS);
-          gx_warm_discard (self);
-          if (attempt < GX_PROBE_PREWARM_ATTEMPTS)
-            g_usleep (250 * 1000);
-        }
-    }
-
-  if (!prewarmed)
-    {
-      gx_warm_discard (self);
-      if (!diagnostic)
-        fp_warn ("GXFP51A0 probe prewarm unavailable; device remains usable through the cold open path");
-    }
-
   gx_transport_close (self);
-  /* Keep the historical libfprint device ID so existing fprintd templates remain visible. */
   fpi_device_probe_complete (dev, NULL, NULL, NULL);
 }
 
@@ -3206,7 +4284,50 @@ gx_dev_open (FpDevice *dev)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   GError *err = NULL;
+  gboolean slept = gx_warm_crossed_sleep (self);
+  gboolean expired = gx_warm_idle_expired (self);
   gboolean had_warm = self->warm_valid || self->tls != NULL || self->tls_up;
+  gboolean warm_candidate;
+
+  /* An idle libfprint device may not receive the driver suspend vfunc. Detect
+   * that case before touching hardware, while stale TLS can still be discarded
+   * host-side without sending anything to the sensor. */
+  if (slept || expired || self->force_cold_reset)
+    {
+      fp_info ("GXFP51A0 lifecycle/idle boundary detected; invalidating warm state");
+      gx_warm_abandon (self);
+      self->capture_recovery_pending = FALSE;
+      self->capture_gap_scale = 0;
+      self->capture_clean_streak = 0;
+      self->capture_retry_seen = FALSE;
+      self->capture_pacing_suppressed = TRUE;
+      had_warm = FALSE;
+    }
+
+  warm_candidate = gx_warm_available (self);
+
+  /* A real cold boundary must occur BEFORE spidev is opened. rel71.16 did the
+   * opposite (open -> GPIO reset) and a daemon restart could leave the MCU in
+   * a persistent TLS digest-failure state. A fresh process, stale/incomplete
+   * warm context, or pending transport recovery therefore gets:
+   *
+   *   closed transport -> GPIO264 HIGH300/LOW600 -> fresh spidev open
+   *
+   * Healthy same-process warm state is the only case that skips this reset,
+   * because FAST_READY intentionally preserves the live TLS/background state. */
+  if (!warm_candidate || self->capture_recovery_pending)
+    {
+      if (had_warm)
+        {
+          fp_info ("GXFP51A0 incomplete warm context; returning to detached cold boundary");
+          gx_warm_discard (self);
+        }
+
+      fp_warn ("GXFP51A0 RESET_TRACE cold boundary before spidev open");
+      gx_transport_close (self);
+      gx_gpio_reset (self);
+      self->force_cold_reset = FALSE;
+    }
 
   if (!gx_transport_open (dev, &err))
     {
@@ -3214,28 +4335,50 @@ gx_dev_open (FpDevice *dev)
       return;
     }
 
-  if (gx_warm_available (self))
+  if (warm_candidate && !self->capture_recovery_pending)
     {
-      if (gx_warm_validate (self))
+      if (gx_warm_fast_ready (self))
         {
           self->production_ready = TRUE;
-          fp_info ("GXFP51A0 reusing native libfprint warm context");
+          fp_info ("GXFP51A0 reusing native warm context without blocking background recapture");
           fpi_device_open_complete (dev, NULL);
           return;
         }
 
-      fp_warn ("GXFP51A0 warm context did not answer; falling back to cold preparation");
-      gx_warm_discard (self);
+      fp_warn ("GXFP51A0 fast FDT readiness probe failed; trying full warm validation");
+      if (gx_warm_validate (self))
+        {
+          self->production_ready = TRUE;
+          fp_info ("GXFP51A0 full warm fallback recovered the native context");
+          fpi_device_open_complete (dev, NULL);
+          return;
+        }
+
+      /* Warm validation itself touched SPI and failed. Re-establish the same
+       * detached cold boundary before cold preparation; never reset while the
+       * failed transport remains open. */
+      fp_warn ("GXFP51A0 warm context failed readiness validation; using detached cold recovery");
+      gx_warm_abandon (self);
+      gx_transport_close (self);
       gx_gpio_reset (self);
-    }
-  else if (had_warm)
-    {
-      fp_info ("GXFP51A0 incomplete warm context; returning to cold preparation");
-      gx_warm_discard (self);
-      gx_gpio_reset (self);
+      err = NULL;
+      if (!gx_transport_open (dev, &err))
+        {
+          fpi_device_open_complete (dev, err);
+          return;
+        }
     }
 
-  (void) gx_cold_prepare (self);
+  if (!gx_cold_prepare (self))
+    {
+      gx_warm_abandon (self);
+      gx_transport_close (self);
+      fpi_device_open_complete (
+        dev, fpi_device_error_new_msg (FP_DEVICE_ERROR_PROTO,
+                                       "GXFP51A0 cold preparation failed"));
+      return;
+    }
+
   fpi_device_open_complete (dev, NULL);
 }
 
@@ -3246,21 +4389,65 @@ gx_dev_close (FpDevice *dev)
 
   g_clear_handle_id (&self->poll_id, g_source_remove);
 
-  if (self->production_ready && self->warm_valid && self->tls_up &&
-      self->tls && self->have_fdt && self->bg_frame)
+  /* Close may be requested more than once around a short-lived fprintd Claim:
+   * the first close marks production_ready=FALSE, while later cleanup can call
+   * close again on the same still-valid FpDevice.  Requiring production_ready
+   * here made that second close tear down an otherwise complete TLS/background
+   * context, so FAST_READY only survived a very narrow handoff window.
+   *
+   * Make warm close idempotent: if the retained context is complete and no
+   * real cold boundary was requested, keep it regardless of the UI/action
+   * readiness flag. Host SPI/GPIO FDs are still closed, so this adds no polling
+   * or periodic I/O while idle. */
+  if (!self->force_cold_reset && gx_warm_available (self))
     {
+      gboolean was_ready = self->production_ready;
+
       self->production_ready = FALSE;
       gx_pmk_clear (self);
       gx_transport_close (self);
-      fp_info ("GXFP51A0 stashed native warm context across fp_device close");
+      fp_warn ("GXFP51A0 CLOSE_TRACE retained complete warm context "
+               "(production_ready=%d); next open uses FDT-only FAST_READY",
+               was_ready ? 1 : 0);
       fpi_device_close_complete (dev, NULL);
       return;
     }
 
-  gx_warm_discard (self);
+  if (self->force_cold_reset)
+    gx_warm_abandon (self);
+  else
+    gx_warm_discard (self);
   gx_transport_close (self);
   fpi_device_close_complete (dev, NULL);
 }
+
+static void
+gx_dev_suspend (FpDevice *dev)
+{
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+
+  /* The ST411 does not preserve TLS/FDT state across S3, so an interactive
+   * action cannot safely continue after resume.  libfprint explicitly asks
+   * such drivers to return NOT_SUPPORTED: it cancels the current action before
+   * forwarding the suspend result to fprintd, which accepts this condition. */
+  self->force_cold_reset = TRUE;
+  self->warm_valid = FALSE;
+  self->production_ready = FALSE;
+  fp_info ("GXFP51A0 suspend: cancelling active action; cold reset required after resume");
+  fpi_device_suspend_complete (
+    dev, fpi_device_error_new (FP_DEVICE_ERROR_NOT_SUPPORTED));
+}
+
+static void
+gx_dev_resume (FpDevice *dev)
+{
+  /* If libfprint cancelled the action, the following Claim/Open sees
+   * force_cold_reset. If a desktop kept an already-open action alive, the
+   * BOOTTIME-vs-MONOTONIC poll guard detects the same S3 boundary and jumps
+   * through GX_ST_SESSION for an in-operation cold rebuild. */
+  fpi_device_resume_complete (dev, NULL);
+}
+
 
 
 /* --- verification completion --------------------------------------- */
@@ -3420,6 +4607,16 @@ fpi_device_goodix51a0_init (FpiDeviceGoodix51A0 *self)
 {
   self->spi_fd = -1;
   self->irq_fd = -1;
+  self->capture_gap_scale = 0; /* starts nominal at first cold preparation */
+  self->capture_clean_streak = 0;
+  self->capture_retry_seen = FALSE;
+  self->capture_pacing_suppressed = FALSE;
+  self->capture_recovery_pending = FALSE;
+  self->warm_last_activity_us = 0;
+  self->bg_last_refresh_us = 0;
+  self->warm_sleep_delta_us = 0;
+  self->warm_sleep_clock_valid = FALSE;
+  self->force_cold_reset = FALSE;
 }
 
 
@@ -3428,7 +4625,26 @@ fpi_device_goodix51a0_finalize (GObject *object)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (object);
 
-  gx_warm_discard (self);
+  /*
+   * A daemon exit is a process-lifecycle boundary, not another in-process
+   * Claim/Release.  Do not reopen SPI just to send TLS close_notify here.
+   *
+   * reference MateBook 13 rel71.11/71.13 showed that this finalize-only close_notify path can
+   * leave ST411 in a persistent half-open TLS state: the next fprintd process
+   * then hits repeated digest-check failures until staging or a true power
+   * cycle recovers it.  Earlier rel26 deliberately abandoned the stale host
+   * TLS state at lifecycle boundaries, and the next real open already owns the
+   * deterministic GPIO264 cold reset before starting a fresh handshake.
+   *
+   * This also matches current Goodix TLS work: a close_notify is not assumed to
+   * have cleared MCU session state.  D5 force-unlock remains research-only on
+   * GXFP51A0 because our one-shot ST411 experiment received no ACK.
+   */
+  if (self->tls_up || self->tls || self->warm_valid)
+    fp_warn ("GXFP51A0 FINALIZE_TRACE abandoning host warm TLS context; "
+             "next process performs native cold reset");
+
+  gx_warm_abandon (self);
   gx_transport_close (self);
   G_OBJECT_CLASS (fpi_device_goodix51a0_parent_class)->finalize (object);
 }
@@ -3451,6 +4667,8 @@ fpi_device_goodix51a0_class_init (FpiDeviceGoodix51A0Class *klass)
   dev_class->probe = gx_dev_probe;
   dev_class->open = gx_dev_open;
   dev_class->close = gx_dev_close;
+  dev_class->suspend = gx_dev_suspend;
+  dev_class->resume = gx_dev_resume;
   dev_class->enroll = gx_dev_enroll;
   dev_class->verify = gx_dev_verify;
   dev_class->identify = gx_dev_identify;

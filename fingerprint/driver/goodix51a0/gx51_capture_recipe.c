@@ -53,6 +53,30 @@ bool gxfp_build_background_capture_recipe(
            push(r, gxfp_build_get_image(&p), &p);
 }
 
+bool gxfp_build_warm_background_capture_recipe(
+    struct gxfp_capture_recipe *r)
+{
+    struct gxfp_target_packet p;
+
+    if (r == NULL)
+        return false;
+    memset(r, 0, sizeof(*r));
+
+    /*
+     * Warm ImageBase refresh is not a cold calibration pass.  Keep the
+     * exact-target FDT/NAV/T0 ordering already validated on GXFP51A0, but do
+     * not re-read or rewrite OTP-derived DAC registers here.  ChicagoHS
+     * NeedUpdateImageBase preserves calibration state while replacing the
+     * no-finger base plane.
+     */
+    return push(r, gxfp_build_nop(&p), &p) &&
+           push(r, gxfp_build_query_mcu_state(0x55u, &p), &p) &&
+           push(r, gxfp_build_fdt_command(0x0du, FDT_BOOT, &p), &p) &&
+           push(r, gxfp_build_nav(&p), &p) &&
+           push(r, gxfp_build_fdt_command(0x0du, FDT_BACKGROUND, &p), &p) &&
+           push(r, gxfp_build_get_image(&p), &p);
+}
+
 bool gxfp_build_fdt_probe(struct gxfp_target_packet *packet)
 {
     return packet != NULL &&

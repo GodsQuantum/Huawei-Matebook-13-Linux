@@ -1,12 +1,12 @@
 pkgname=libfprint-goodix51a0
 pkgver=1.94.100.goodix51a0
-pkgrel=23
+pkgrel=71.18
 pkgdesc="libfprint 1.94.100 with experimental Goodix GXFP51A0 SPI driver"
 arch=('x86_64')
 url="https://fprint.freedesktop.org/"
 install=libfprint-goodix51a0.install
 license=('LGPL-2.1-or-later')
-depends=('glib2' 'glibc' 'libgcc' 'libgudev' 'libgusb' 'openssl' 'pixman' 'kmod' 'systemd')
+depends=('bash' 'glib2' 'glibc' 'libgcc' 'libgudev' 'libgusb' 'openssl' 'pixman' 'kmod' 'systemd')
 makedepends=('git' 'python' 'pkgconf' 'cairo')
 provides=('libfprint=1.94.100' 'libfprint-2.so')
 conflicts=('libfprint')
@@ -20,6 +20,15 @@ build() {
   GXFP51A0_BUILD_ROOT="$build_root" \
   GXFP51A0_MESON_PREFIX=/usr \
     "$_fp_root/scripts/build-libfprint-v1.94.100.sh"
+
+  # Build the pre-enumeration recovery helper from the exact same reviewed
+  # GPIO264 implementation as the libfprint driver. It has no libgpiod/runtime
+  # dependency and performs no biometric or firmware operation.
+  cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+    -I"$_fp_root/driver/goodix51a0" \
+    "$_fp_root/integration/prestart-recover/gxfp51a0-prestart-recover.c" \
+    "$_fp_root/driver/goodix51a0/gx51_transport.c" \
+    -o "$srcdir/gxfp51a0-prestart-recover"
 }
 
 package() {
@@ -30,14 +39,27 @@ package() {
 
   install -Dm644 "$startdir/fprintd-goodix51a0.conf" \
     "$pkgdir/usr/lib/systemd/system/fprintd.service.d/50-goodix51a0-runtime.conf"
+  install -Dm755 "$srcdir/gxfp51a0-prestart-recover" \
+    "$pkgdir/usr/libexec/gxfp51a0-prestart-recover"
 
-  # Start the standard fprintd daemon as part of the graphical boot transaction.
-  # The drop-in orders it before the display manager; libfprint probe() performs
-  # the native libfprint prewarm. This is a static package-owned enablement, not a custom
-  # GXFP service.
+  # Keep the core driver desktop-agnostic. libfprint/fprintd is the stable
+  # cross-distro boundary; KDE/GNOME/display managers consume it through their
+  # native PAM/fprintd integration. Historical Plasma/QML compatibility helpers
+  # remain in the repository as explicit opt-in tooling only.
+
+  # Prime the sensor exactly once before graphical login, then keep standard
+  # fprintd resident. There is deliberately no periodic keepalive and no
+  # external suspend/resume hook.
+  install -Dm755 "$_fp_root/integration/boot-prewarm/gxfp51a0-boot-prewarm" \
+    "$pkgdir/usr/libexec/gxfp51a0-boot-prewarm"
+  install -Dm644 "$_fp_root/integration/boot-prewarm/gxfp51a0-boot-prewarm.service" \
+    "$pkgdir/usr/lib/systemd/system/gxfp51a0-boot-prewarm.service"
+
   install -d "$pkgdir/usr/lib/systemd/system/graphical.target.wants"
   ln -s ../fprintd.service \
     "$pkgdir/usr/lib/systemd/system/graphical.target.wants/fprintd.service"
+  ln -s ../gxfp51a0-boot-prewarm.service \
+    "$pkgdir/usr/lib/systemd/system/graphical.target.wants/gxfp51a0-boot-prewarm.service"
 
   if [[ -f "$build_root/libfprint-v1.94.100/COPYING" ]]; then
     install -Dm644 "$build_root/libfprint-v1.94.100/COPYING" \

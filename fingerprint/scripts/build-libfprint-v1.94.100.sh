@@ -94,7 +94,7 @@ required_pc=(
   cairo
   gudev-1.0
   openssl
-  udev
+  libudev
 )
 missing=()
 for dep in "${required_pc[@]}"; do
@@ -114,6 +114,22 @@ EOF
   exit 3
 fi
 say "PKG_CONFIG_DEPENDENCIES=PASS"
+
+# libfprint v1.94.100 queries pkg-config "udev" only to discover the udev
+# rules directory when the Meson option is left on auto. Debian exposes only
+# libudev.pc, so resolve the standard rules directory ourselves and pass it
+# explicitly. No distro files or pkg-config metadata are modified.
+if pkg-config --exists udev; then
+  UDEV_BASE_DIR="$(pkg-config --variable=udevdir udev)"
+elif [[ -d /usr/lib/udev ]]; then
+  UDEV_BASE_DIR=/usr/lib/udev
+elif [[ -d /lib/udev ]]; then
+  UDEV_BASE_DIR=/lib/udev
+else
+  UDEV_BASE_DIR=/usr/lib/udev
+fi
+UDEV_RULES_DIR="$UDEV_BASE_DIR/rules.d"
+say "UDEV_RULES_DIR=$UDEV_RULES_DIR"
 
 say ""
 say "===== 3. PINNED MESON / NINJA TOOL ENV ====="
@@ -191,6 +207,8 @@ say "===== 7. MESON CONFIGURE ====="
 "$MESON" setup "$BUILD_DIR" "$SRC_DIR" \
   --prefix="$MESON_PREFIX" \
   -Ddrivers=goodix51a0 \
+  -Dudev_rules_dir="$UDEV_RULES_DIR" \
+  -Dudev_hwdb=disabled \
   -Dintrospection=false \
   -Ddoc=false \
   -Dinstalled-tests=false
@@ -248,7 +266,10 @@ say "$dump_gate_marker"
 # behavior marker. This remains valid with Arch/CachyOS LTO builds.
 grep -Fq 'fpi_device_get_identify_data' "$object_nm_dump"   || die "GOODIX51A0_IDENTIFY_API_NOT_FOUND_IN_OBJECT"
 grep -Fq 'fpi_device_identify_report' "$object_nm_dump"   || die "GOODIX51A0_IDENTIFY_REPORT_NOT_FOUND_IN_OBJECT"
-grep -Fq 'identify: early result reported' "$shared_strings_dump"   || die "GOODIX51A0_IDENTIFY_PATH_NOT_FOUND_IN_LIBRARY"
+grep -Fq 'identify: match reported on press' "$shared_strings_dump" \
+  || die "GOODIX51A0_IDENTIFY_SUCCESS_PATH_NOT_FOUND_IN_LIBRARY"
+grep -Fq 'identify: no-match reported after' "$shared_strings_dump" \
+  || die "GOODIX51A0_IDENTIFY_FAILURE_PATH_NOT_FOUND_IN_LIBRARY"
 say "GOODIX51A0_IDENTIFY_PATH_IN_OBJECT=YES"
 say "GOODIX51A0_IDENTIFY_PATH_IN_LIBRARY=YES"
 

@@ -1,134 +1,108 @@
 # Huawei MateBook 13 sous Linux
 
-> Notes pratiques, correctifs et rétro-ingénierie pour rendre les Huawei MateBook 13 pleinement exploitables sous Linux.
+> Onboarding Linux en une commande, avec priorité aux mécanismes natifs, pour la famille Huawei MateBook 13.
 >
-> **English: [README.md](README.md)** · **简体中文：[README.ZH-CN.md](README.ZH-CN.md)**
+> **English: [README.md](README.md)** · **简体中文: [README.ZH-CN.md](README.ZH-CN.md)**
 
-Le MateBook 13 est déjà très utilisable sous Linux, mais sur les modèles testés avec Intel + NVIDIA MX250, deux points concentrent l'essentiel des difficultés lors du passage depuis Windows :
+## Objectif
 
-1. **Gestion GPU et alimentation** — utiliser la NVIDIA MX250 uniquement quand une application en a besoin, sans laisser le GPU dédié consommer en permanence et sans déconnexion/reconnexion pour changer de mode.
-2. **Capteur d'empreinte** — le dépôt inclut maintenant un pilote libfprint natif expérimental pour la cible validée Goodix GXFP51A0 / GF3658 ST411.
+Un MateBook 13 pris en charge doit pouvoir repartir d'une installation Linux neuve ou changer de distribution et retrouver l'état matériel validé avec une seule commande :
 
-Le dépôt est désormais organisé autour de ces deux écueils.
+```bash
+git clone https://github.com/GodsQuantum/huawei-matebook-13-linux.git
+cd huawei-matebook-13-linux
+./install.sh
+```
 
-## État en un coup d'œil
+Règle du projet : **native first**. Si Linux gère déjà correctement un composant, le dépôt le vérifie et laisse la distribution, le kernel et le bureau l'administrer. Le dépôt n'installe du code que pour les vrais manques matériels spécifiques.
 
-| Domaine | État | Ce que fournit le dépôt |
-| --- | --- | --- |
-| **GPU & alimentation — NVIDIA MX250** | **Fonctionnel sur la configuration validée** | Vrai état Integrated au repos, activation à la volée par application, PRIME Render Offload, déchargement/retrait PCI automatique, isolation Plasma/KWin, gestion Desktop et Steam |
-| **Empreinte — Goodix GXFP51A0 / GF3658** | **Pilote natif expérimental fonctionnel sur la cible validée** | Chemin libfprint/fprintd/KDE natif, TLS/PMK, capture 80×64, matching FAST/BRIEF/RANSAC, enrollment 20 vues et retries bornés |
+Voir [`docs/ONE_COMMAND_ONBOARDING.md`](docs/ONE_COMMAND_ONBOARDING.md).
 
-### Configuration GPU validée
+## Matériel de référence
 
-Le mécanisme GPU à la demande a été validé sur un Huawei MateBook 13 avec :
+Profil validé : Huawei `WRTB-WXX9` / MateBook 13 avec :
 
-- iGPU Intel ;
+- Intel UHD Comet Lake-U ;
 - NVIDIA GeForce MX250 / GP108M (`10de:1d13`) ;
-- KDE Plasma Wayland ;
-- pilote propriétaire NVIDIA de branche **R580**.
+- Wi-Fi + Bluetooth Intel CNVi ;
+- audio Intel HDA ;
+- caméra UVC IMC Networks (`13d3:56c6`) ;
+- touchpad / touch / stylet ELAN ;
+- `huawei_wmi` mainline ;
+- lecteur d'empreintes Goodix `GXFP51A0` / GF3658 ST411.
 
-Le script détecte le matériel dynamiquement et contient des chemins d'installation pour les familles Arch/CachyOS, Fedora et Debian/Ubuntu. **Plasma Wayland est le chemin validé ; les autres compositeurs sont volontairement bloqués si le script détecte qu'ils accrochent la NVIDIA.**
+Les autres révisions MateBook 13 sont détectées par identifiants matériels et ne sont jamais supposées identiques.
 
-Les branches NVIDIA 590+ ne prennent plus en charge les GPU Pascal comme la MX250 ; le projet cible donc explicitement la branche legacy R580.
+## État
 
-## 1. GPU & alimentation — MX250 à la demande
+| Domaine | État | Politique du projet |
+| --- | --- | --- |
+| **Empreinte — GXFP51A0 / GF3658** | **Checkpoint 71.18 validé** | Pilote libfprint/fprintd natif géré par le repo ; seuil fixe 7 ; recovery spidev ciblé avant énumération ; 3 locks KDE consécutifs réussis à la 1re pose |
+| **GPU — NVIDIA MX250** | **PRIME standard fonctionnel** | Branche legacy NVIDIA R580 de la distro + PRIME Render Offload ; ancien gestionnaire PCI-remove non installé par défaut |
+| **Touches Huawei / Fn lock / seuils batterie** | **Kernel mainline** | Utiliser `huawei_wmi`, ne pas dupliquer le pilote |
+| **Caméra / Wi-Fi / Bluetooth / touchpad / stylet / audio** | **Natifs sur la machine de référence** | Valider uniquement |
+| **Profils d'énergie / suspend** | **Gérés par la distribution** | Ne pas empiler plusieurs gestionnaires d'énergie |
 
-**Commencer ici :** [`gpu-power/`](gpu-power/)
+## Checkpoint fingerprint 71.18
 
-Le but n'est pas de simuler un mode Hybrid permanent. Au repos, la MX250 est retirée du bus PCI et la machine fonctionne uniquement sur l'Intel. Lorsqu'une application gérée démarre :
+71.18 est figée comme version connue bonne avant toute optimisation supplémentaire.
 
-```text
-vrai Integrated au repos
-        ↓
-PCI rescan
-        ↓
-chargement NVIDIA R580
-        ↓
-PRIME Render Offload pour l'application
-        ↓
-fermeture de l'application
-        ↓
-déchargement NVIDIA
-        ↓
-PCI remove
-        ↓
-vrai Integrated à nouveau
-```
-
-KWin est verrouillé sur l'iGPU Intel afin qu'il n'ouvre pas le render node NVIDIA ajouté à chaud et ne maintienne pas la MX250 éveillée.
-
-### Démarrage rapide
-
-```bash
-cd gpu-power
-chmod +x huawei-matebook-13-gpu-manager.sh
-./huawei-matebook-13-gpu-manager.sh --lang fr install
-```
-
-Après le redémarrage demandé, l'installateur fournit une commande terminal courte :
-
-```bash
-# dashboard sans réveiller la dGPU : état GPU/alimentation + applications autorisées à utiliser la MX250
-GPU-control
-
-# gestion
-GPU-control add
-GPU-control steam-all-on
-GPU-control status
-GPU-control doctor
-GPU-control test
-```
-
-Tout ce qui n'est pas listé par `GPU-control` reste sur Intel ; le client Steam lui-même reste également sur Intel.
-
-Voir [`gpu-power/README.FR.md`](gpu-power/README.FR.md) pour l'architecture, les distributions, Steam, le rollback et le dépannage.
-
-## 2. Capteur d'empreinte — Goodix GXFP51A0 / GF3658 Milan
-
-**rel22 prête à installer :** [télécharger la release GitHub](https://github.com/GodsQuantum/huawei-matebook-13-linux/releases/tag/fingerprint-gxfp51a0-rel22) — paquet natif Arch/CachyOS, bundle source Linux portable, guide d'installation et manifeste SHA-256. rel22 prépare aussi le transport SPI avant le démarrage de fprintd afin que le gestionnaire de connexion initial puisse utiliser l'empreinte après un cold boot.
-
-**Documentation/source :** [`fingerprint/`](fingerprint/)
-
-Tout le projet de recherche initial sur le capteur d'empreinte est conservé dans ce dossier : protocole, ressources ACPI/SPI/GPIO, probes supervisées, cross-checks du pilote Windows et documentation de sécurité.
-
-État actuel : **un pilote Linux natif expérimental fonctionne sur la cible MateBook 13 2021 GXFP51A0/GF3658/ST411 validée.** Il compile de manière reproductible contre libfprint v1.94.100 et utilise la pile biométrique Linux standard :
+Recovery :
 
 ```text
-GXFP51A0
--> libfprint
--> fprintd
--> KDE/GNOME/PAM/CLI
+démarrage/restart fprintd
+→ unbind uniquement spi-GXFP51A0:00 de spidev
+→ reset GPIO264 actif-HIGH
+→ settle
+→ rebind uniquement spi-GXFP51A0:00
+→ udev settle
+→ libfprint/fprintd
 ```
 
-Le chemin validé couvre l'établissement TLS/PMK, la capture 80×64 côté hôte, l'enrollment 20 vues, le matching FAST/BRIEF/RANSAC et des retries fixes/bornés pour les erreurs de placement sur ce petit capteur partiel. Il ne flashe pas le firmware et n'impose aucune UI desktop spécifique. Voir [`fingerprint/README.FR.md`](fingerprint/README.FR.md) pour le périmètre matériel/firmware exact, l'installation et les limites de sécurité.
+Un capteur volontairement laissé dans un état TLS dégradé a été récupéré sans reboot ni power-cycle. Les Claims warm sont revenus à environ **82–83 ms FAST_READY**, puis trois locks KDE consécutifs ont réussi à la 1re pose avec des scores baseline **8/7, 11/7 et 12/7**.
 
-## Matériel pris en charge et périmètre
+Documentation : [`fingerprint/docs/validated-checkpoint-71.18.md`](fingerprint/docs/validated-checkpoint-71.18.md).
 
-Huawei a commercialisé plusieurs révisions sous le nom MateBook 13. Elles ne partagent pas nécessairement le même GPU NVIDIA, le même ACPI ni le même capteur biométrique.
+Installation fingerprint seule :
 
-L'outil GPU exige une MX250 avec l'identifiant PCI `10de:1d13` et refuse par défaut le matériel non reconnu. La recherche fingerprint vise spécifiquement `ACPI\GXFP51A0` / GF3658 Milan.
+```bash
+./fingerprint/install.sh
+```
 
-Si votre révision diffère, ouvrez une issue avec uniquement des **identifiants matériels génériques**. Ne publiez pas de numéro de série ni de données de sécurité propres à votre machine.
+## Politique GPU
 
-## Vie privée et sécurité
+Le MX250 de référence utilise le chemin PRIME standard de la distribution :
 
-Ne publiez pas dans ce dépôt public :
+```text
+bureau → Intel UHD
+charge GPU → prime-run → NVIDIA MX250
+repos → gestion runtime NVIDIA/PCIe standard
+```
 
-- noms d'utilisateur, chemins de dossier personnel ou hostnames ;
-- numéros de série ou UUID propres à la machine ;
-- adresses IP privées/publiques non nécessaires à la reproduction ;
-- mots de passe, tokens API, clés privées ou identifiants ;
-- payloads `_DSM` Goodix bruts, PSK ou autre matériel biométrique propre à la machine ;
-- binaires Windows propriétaires, firmwares ou désassemblage brut.
+L'ancien gestionnaire [`gpu-power/`](gpu-power/) qui retirait le GPU du PCI est conservé pour l'historique/recherche uniquement.
 
-Préférez les hashes, identifiants PCI/ACPI et extraits minimaux reproductibles. Toute expérimentation fingerprint doit également respecter [`fingerprint/docs/safety.md`](fingerprint/docs/safety.md).
+## Doctor matériel
+
+Validation en lecture seule :
+
+```bash
+./matebook13-doctor.sh
+# ou
+./install.sh --doctor-only
+```
+
+Le doctor vérifie Huawei WMI, PRIME/NVIDIA, GXFP51A0, caméra, hotkeys, touchpad, Wi-Fi, Bluetooth, vidéo et audio sans choisir de politique utilisateur.
+
+## Sécurité et vie privée
+
+L'onboarding par défaut ne flashe aucun firmware, ne change pas silencieusement les seuils de charge, ne pin/downgrade pas le kernel pour le fingerprint et n'installe pas plusieurs gestionnaires d'énergie concurrents.
+
+Ne publiez pas de nom d'utilisateur, chemin personnel, hostname, numéro de série, UUID, credential, capture/template d'empreinte, PMK/PSK, firmware propriétaire ou binaire Windows.
 
 ## Contribuer
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md). Les résultats doivent distinguer **CONFIRMED**, **INFERRED** et **HYPOTHESIS** et fournir un contexte système générique suffisant pour la reproduction.
-
-Pour les problèmes de sécurité, voir [SECURITY.md](SECURITY.md).
+Voir [CONTRIBUTING.md](CONTRIBUTING.md) et [SECURITY.md](SECURITY.md).
 
 ## Licence
 
-GPL-2.0-only. Voir [LICENSE](LICENSE).
+GPL-2.0-only à la racine ; les fichiers du pilote fingerprint conservent leurs licences SPDX.

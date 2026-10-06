@@ -134,6 +134,19 @@ gx_sift_match (const GxSiftFeatures *a, const GxSiftFeatures *b)
                                     (GxSiftFeatures *) b));
 }
 
+int
+gx_sift_match_mask (const GxSiftFeatures *probe,
+                    const GxSiftFeatures *enrolled,
+                    guint8 *probe_mask)
+{
+  if (!probe || !enrolled || !probe_mask)
+    return 0;
+
+  return MAX (0, sigfm_match_score_mask ((GxSiftFeatures *) probe,
+                                         (GxSiftFeatures *) enrolled,
+                                         probe_mask));
+}
+
 GxSiftFeatures *
 gx_sift_copy (const GxSiftFeatures *features)
 {

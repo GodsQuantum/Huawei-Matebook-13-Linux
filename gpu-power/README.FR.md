@@ -2,6 +2,13 @@
 
 > **English: [README.md](README.md)** · **简体中文：[README.ZH-CN.md](README.ZH-CN.md)**
 
+> **Déprécié sur le MateBook 13 de référence validé.** Ce gestionnaire custom
+> qui blacklist/décharge NVIDIA et retire la MX250 du bus PCI peut laisser le
+> GPU absent et casser des applications comme DaVinci Resolve. La configuration
+> actuellement validée utilise NVIDIA R580 + PRIME Render Offload standard et la
+> gestion d'énergie runtime normale. Conserver ce dossier pour recherche/historique ;
+> ne pas l'installer sur la configuration de référence.
+
 Cette section résout un problème précis des Huawei MateBook 13 équipés d'un iGPU Intel et d'une NVIDIA GeForce MX250 : **garder réellement le GPU dédié hors circuit au repos tout en lançant certaines applications sur NVIDIA, sans déconnexion ni redémarrage.**
 
 ## Pourquoi ne pas rester en Hybrid ?
