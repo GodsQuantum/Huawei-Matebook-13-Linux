@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+FP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd -- "$FP_DIR/.." && pwd)"
+DRIVER_DIR="$FP_DIR/driver/goodix51a0"
+
+LIBFPRINT_TAG="v1.94.100"
+MESON_VERSION="1.12.0"
+NINJA_VERSION="1.13.2"
+
+BUILD_ROOT="${GXFP51A0_BUILD_ROOT:-$REPO_ROOT/../temp/gxfp51a0-public-build}"
+TOOLS_VENV="$BUILD_ROOT/build-tools-venv"
+SRC_DIR="$BUILD_ROOT/libfprint-$LIBFPRINT_TAG"
+BUILD_DIR="$BUILD_ROOT/libfprint-build"
+MESON_PREFIX="${GXFP51A0_MESON_PREFIX:-/usr/local}"
+
+KEEP_BUILD=1
+CLEAN_FIRST=1
+
+usage() {
+  cat <<'EOF'
+Usage: build-libfprint-v1.94.100.sh [--no-clean] [--clean-after]
+
+Builds the public GXFP51A0 candidate against libfprint v1.94.100.
+This script performs no fingerprint hardware I/O, no GPIO writes and no
+firmware operation.
+
+Environment:
+  GXFP51A0_BUILD_ROOT  Override the build workspace. By default it is created
+                       outside the repository under ../temp/.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --no-clean) CLEAN_FIRST=0 ;;
+    --clean-after) KEEP_BUILD=0 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR=UNKNOWN_ARGUMENT:$1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+say() { printf '%s\n' "$*"; }
+die() { say "ERROR=$*" >&2; exit 1; }
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "MISSING_COMMAND:$1"
+}
+
+say "========================================================================"
+say " GXFP51A0 — REPRODUCIBLE LIBFPRINT BUILD"
+say " NO SENSOR I/O / NO GPIO WRITE / NO FIRMWARE ACTION"
+say "========================================================================"
+
+for cmd in git python3 cc pkg-config sha256sum nm strings ar; do
+  require_cmd "$cmd"
+done
+
+[[ -d "$DRIVER_DIR" ]] || die "DRIVER_DIRECTORY_NOT_FOUND:$DRIVER_DIR"
+[[ -f "$DRIVER_DIR/libfprint-v1.94.100.patch" ]] || die "INTEGRATION_PATCH_MISSING"
+[[ -f "$DRIVER_DIR/SOURCE_MANIFEST.sha256" ]] || die "SOURCE_MANIFEST_MISSING"
+
+say "REPO_ROOT=$REPO_ROOT"
+say "BUILD_ROOT=$BUILD_ROOT"
+say "LIBFPRINT_TAG=$LIBFPRINT_TAG"
+say "MESON_VERSION=$MESON_VERSION"
+say "NINJA_VERSION=$NINJA_VERSION"
+
+mkdir -p "$BUILD_ROOT"
+
+if ((CLEAN_FIRST)); then
+  rm -rf -- "$SRC_DIR" "$BUILD_DIR"
+fi
+
+say ""
+say "===== 1. SOURCE MANIFEST ====="
+(
+  cd "$DRIVER_DIR"
+  sha256sum -c SOURCE_MANIFEST.sha256
+)
+say "SOURCE_MANIFEST=PASS"
+
+say ""
+say "===== 2. BUILD DEPENDENCIES ====="
+required_pc=(
+  glib-2.0
+  gio-unix-2.0
+  gobject-2.0
+  gmodule-2.0
+  gusb
+  cairo
+  gudev-1.0
+  openssl
+  libudev
+)
+missing=()
+for dep in "${required_pc[@]}"; do
+  if ! pkg-config --exists "$dep"; then
+    missing+=("$dep")
+  fi
+done
+if ((${#missing[@]})); then
+  printf 'MISSING_PKG_CONFIG_DEPENDENCIES=%s\n' "${missing[*]}" >&2
+  cat >&2 <<'EOF'
+Install the development packages for the missing pkg-config modules.
+Typical Debian/Ubuntu packages:
+  build-essential git python3 python3-venv pkg-config
+  libglib2.0-dev libgusb-dev libcairo2-dev libgudev-1.0-dev
+  libssl-dev libudev-dev
+EOF
+  exit 3
+fi
+say "PKG_CONFIG_DEPENDENCIES=PASS"
+
+# libfprint v1.94.100 queries pkg-config "udev" only to discover the udev
+# rules directory when the Meson option is left on auto. Debian exposes only
+# libudev.pc, so resolve the standard rules directory ourselves and pass it
+# explicitly. No distro files or pkg-config metadata are modified.
+if pkg-config --exists udev; then
+  UDEV_BASE_DIR="$(pkg-config --variable=udevdir udev)"
+elif [[ -d /usr/lib/udev ]]; then
+  UDEV_BASE_DIR=/usr/lib/udev
+elif [[ -d /lib/udev ]]; then
+  UDEV_BASE_DIR=/lib/udev
+else
+  UDEV_BASE_DIR=/usr/lib/udev
+fi
+UDEV_RULES_DIR="$UDEV_BASE_DIR/rules.d"
+say "UDEV_RULES_DIR=$UDEV_RULES_DIR"
+
+say ""
+say "===== 3. PINNED MESON / NINJA TOOL ENV ====="
+venv_stale=0
+if [[ -x "$TOOLS_VENV/bin/meson" ]]; then
+  expected_shebang="#!$TOOLS_VENV/bin/python3"
+  actual_shebang="$(head -n 1 "$TOOLS_VENV/bin/meson" 2>/dev/null || true)"
+  [[ "$actual_shebang" == "$expected_shebang" ]] || venv_stale=1
+fi
+if [[ ! -x "$TOOLS_VENV/bin/python3" || "$venv_stale" -eq 1 ]]; then
+  rm -rf -- "$TOOLS_VENV"
+  python3 -m venv "$TOOLS_VENV"
+fi
+"$TOOLS_VENV/bin/python3" -m pip install \
+  --disable-pip-version-check --no-input \
+  "meson==$MESON_VERSION" "ninja==$NINJA_VERSION"
+
+MESON="$TOOLS_VENV/bin/meson"
+NINJA="$TOOLS_VENV/bin/ninja"
+export PATH="$TOOLS_VENV/bin:$PATH"
+export NINJA
+
+say "MESON=$("$MESON" --version)"
+say "NINJA=$("$NINJA" --version)"
+say "BUILD_TOOLS=PASS"
+
+say ""
+say "===== 4. FETCH EXACT LIBFPRINT TAG ====="
+git clone --depth 1 --branch "$LIBFPRINT_TAG" \
+  https://gitlab.freedesktop.org/libfprint/libfprint.git "$SRC_DIR"
+
+actual_tag="$(git -C "$SRC_DIR" describe --tags --exact-match HEAD 2>/dev/null || true)"
+[[ "$actual_tag" == "$LIBFPRINT_TAG" ]] || die "LIBFPRINT_TAG_MISMATCH:$actual_tag"
+say "LIBFPRINT_SOURCE_TAG=$actual_tag"
+
+say ""
+say "===== 5. APPLY INTEGRATION PATCH ====="
+git -C "$SRC_DIR" apply --check "$DRIVER_DIR/libfprint-v1.94.100.patch"
+git -C "$SRC_DIR" apply "$DRIVER_DIR/libfprint-v1.94.100.patch"
+say "LIBFPRINT_PATCH=PASS"
+
+say ""
+say "===== 6. INJECT REVIEWED CANDIDATE SOURCES ====="
+target="$SRC_DIR/libfprint/drivers/goodix51a0"
+mkdir -p "$target/fastbrief"
+
+sources=(
+  goodix51a0.c
+  goodix51a0.h
+  goodix_tls.c
+  goodix_tls.h
+  goodix_sift.c
+  goodix_sift.h
+  fastbrief/sigfm.c
+  fastbrief/sigfm.h
+  gx51_transport.c
+  gx51_transport.h
+  gx51_target.c
+  gx51_target.h
+  gx51_factory_pmk.c
+  gx51_factory_pmk.h
+  gx51_image.c
+  gx51_image.h
+  gx51_capture_recipe.c
+  gx51_capture_recipe.h
+)
+for file in "${sources[@]}"; do
+  [[ -f "$DRIVER_DIR/$file" ]] || die "CANDIDATE_SOURCE_MISSING:$file"
+  install -m 0644 "$DRIVER_DIR/$file" "$target/$file"
+done
+say "CANDIDATE_SOURCE_INJECTION=PASS"
+
+say ""
+say "===== 7. MESON CONFIGURE ====="
+"$MESON" setup "$BUILD_DIR" "$SRC_DIR" \
+  --prefix="$MESON_PREFIX" \
+  -Ddrivers=goodix51a0 \
+  -Dudev_rules_dir="$UDEV_RULES_DIR" \
+  -Dudev_hwdb=disabled \
+  -Dintrospection=false \
+  -Ddoc=false \
+  -Dinstalled-tests=false
+say "MESON_CONFIGURE=PASS"
+
+say ""
+say "===== 8. NINJA BUILD ====="
+"$NINJA" -C "$BUILD_DIR"
+say "LIBFPRINT_BUILD=PASS"
+
+say ""
+say "===== 9. ARTIFACT GATES ====="
+driver_obj="$(find "$BUILD_DIR/libfprint" -type f -name '*drivers_goodix51a0_goodix51a0.c.o' -print -quit)"
+[[ -n "$driver_obj" ]] || die "GOODIX51A0_OBJECT_NOT_FOUND"
+archive="$BUILD_DIR/libfprint/libfprint-drivers.a"
+[[ -f "$archive" ]] || die "LIBFPRINT_DRIVER_ARCHIVE_NOT_FOUND"
+
+object_nm_dump="$BUILD_ROOT/goodix51a0-object.nm.txt"
+object_strings_dump="$BUILD_ROOT/goodix51a0-object.strings.txt"
+archive_nm_dump="$BUILD_ROOT/libfprint-drivers.nm.txt"
+archive_members_dump="$BUILD_ROOT/libfprint-drivers.members.txt"
+
+# Validate the exact compiled object first. This proves both the GObject type
+# and the ACPI target literal survived compilation.
+nm "$driver_obj" >"$object_nm_dump"
+grep -Fq 'fpi_device_goodix51a0_get_type' "$object_nm_dump" \
+  || die "GOODIX51A0_TYPE_SYMBOL_NOT_FOUND_IN_OBJECT"
+
+strings "$driver_obj" >"$object_strings_dump"
+shared_lib="$BUILD_DIR/libfprint/libfprint-2.so.2.0.0"
+[[ -f "$shared_lib" ]] || die "LIBFPRINT_SHARED_LIBRARY_NOT_FOUND"
+shared_strings_dump="$BUILD_ROOT/libfprint-shared.strings.txt"
+strings "$shared_lib" >"$shared_strings_dump"
+
+# Release and explicit developer builds have opposite privacy invariants.
+# Release is the default and MUST NOT contain the biometric writer.
+# GXFP51A0_DEVELOPER_BUILD=1 is intentionally opt-in and MUST contain it.
+if [[ "${GXFP51A0_DEVELOPER_BUILD:-0}" == "1" ]]; then
+  if ! grep -Fq '/run/goodix51a0/dump' "$shared_strings_dump" || \
+     ! grep -Fq 'capture saved:' "$shared_strings_dump"; then
+    die "BIOMETRIC_DUMP_HOOK_MISSING_IN_DEVELOPER_LIBRARY"
+  fi
+  dump_gate_marker="DEVELOPER_BIOMETRIC_DUMP_HOOK=PRESENT"
+else
+  if grep -Fq '/run/goodix51a0/dump' "$shared_strings_dump" || \
+     grep -Fq 'capture saved:' "$shared_strings_dump"; then
+    die "BIOMETRIC_DUMP_HOOK_PRESENT_IN_RELEASE_LIBRARY"
+  fi
+  dump_gate_marker="RELEASE_BIOMETRIC_DUMP_HOOK=ABSENT"
+fi
+say "$dump_gate_marker"
+
+# Multiple enrolled fingers require the standard libfprint identify vfunc.
+# Prove both the API references in the compiled object and the final linked
+# behavior marker. This remains valid with Arch/CachyOS LTO builds.
+grep -Fq 'fpi_device_get_identify_data' "$object_nm_dump"   || die "GOODIX51A0_IDENTIFY_API_NOT_FOUND_IN_OBJECT"
+grep -Fq 'fpi_device_identify_report' "$object_nm_dump"   || die "GOODIX51A0_IDENTIFY_REPORT_NOT_FOUND_IN_OBJECT"
+grep -Fq 'identify: match reported on press' "$shared_strings_dump" \
+  || die "GOODIX51A0_IDENTIFY_SUCCESS_PATH_NOT_FOUND_IN_LIBRARY"
+grep -Fq 'identify: no-match reported after' "$shared_strings_dump" \
+  || die "GOODIX51A0_IDENTIFY_FAILURE_PATH_NOT_FOUND_IN_LIBRARY"
+say "GOODIX51A0_IDENTIFY_PATH_IN_OBJECT=YES"
+say "GOODIX51A0_IDENTIFY_PATH_IN_LIBRARY=YES"
+
+if grep -Fq 'GXFP51A0' "$object_strings_dump"; then
+  acpi_gate="OBJECT"
+elif [[ -f "$BUILD_DIR/libfprint/70-libfprint-2.rules" ]] && \
+     grep -Fq 'ENV{MODALIAS}=="acpi:GXFP51A0:*"' "$BUILD_DIR/libfprint/70-libfprint-2.rules"; then
+  # LTO builds may keep the ID only in compiler IR, so strings(1) on the
+  # intermediate object is not authoritative. The generated udev rule is
+  # produced from the linked driver's ID table and is a stronger final-build
+  # proof that the ACPI target is registered.
+  acpi_gate="GENERATED_UDEV_RULE"
+else
+  die "GOODIX51A0_ACPI_ID_NOT_FOUND_IN_BUILD"
+fi
+
+# Then prove the same driver is integrated into libfprint-drivers.a.
+# Do not use strings(1) on the archive itself: archive formats (especially
+# thin archives) need not expose member literals to strings.
+nm "$archive" >"$archive_nm_dump"
+grep -Fq 'fpi_device_goodix51a0_get_type' "$archive_nm_dump" \
+  || die "GOODIX51A0_TYPE_SYMBOL_NOT_FOUND_IN_ARCHIVE"
+grep -Fq 'sigfm_match_score' "$archive_nm_dump" \
+  || die "GOODIX51A0_SIGFM_SYMBOL_NOT_FOUND_IN_ARCHIVE"
+if grep -Fq 'gx_sift_island_' "$archive_nm_dump"; then
+  die "LEGACY_MATCHER_ISLAND_PRESENT_IN_ARCHIVE"
+fi
+
+ar t "$archive" >"$archive_members_dump"
+grep -Fq 'drivers_goodix51a0_goodix51a0.c.o' "$archive_members_dump" \
+  || die "GOODIX51A0_OBJECT_NOT_LISTED_IN_ARCHIVE"
+grep -Fq 'drivers_goodix51a0_fastbrief_sigfm.c.o' "$archive_members_dump" || die "GOODIX51A0_FASTBRIEF_OBJECT_NOT_LISTED_IN_ARCHIVE"
+
+say "GOODIX51A0_OBJECT_COMPILED=YES"
+say "GOODIX51A0_TYPE_SYMBOL_IN_OBJECT=YES"
+say "GOODIX51A0_ACPI_ID_IN_BUILD=YES"
+say "GOODIX51A0_ACPI_ID_GATE=$acpi_gate"
+grep -Fq 'ENV{MODALIAS}=="acpi:GXFP51A0:*"' "$BUILD_DIR/libfprint/70-libfprint-2.rules" \
+  || die "GOODIX51A0_UDEV_MODALIAS_GLOB_MISSING"
+say "GOODIX51A0_UDEV_MODALIAS_GLOB=PASS"
+say "GOODIX51A0_OBJECT_IN_DRIVER_ARCHIVE=YES"
+say "GOODIX51A0_TYPE_SYMBOL_IN_DRIVER_ARCHIVE=YES"
+say "GOODIX51A0_FASTBRIEF_RANSAC_IN_LIBRARY=YES"
+say "GOODIX51A0_IDENTIFY_PATH_IN_OBJECT=YES"
+say "GOODIX51A0_IDENTIFY_PATH_IN_LIBRARY=YES"
+say "$dump_gate_marker"
+say "SOFTWARE_BUILD_READY=YES"
+
+say ""
+say "========================================================================"
+say " FINAL STATE"
+say "========================================================================"
+say "LIBFPRINT_TAG=$LIBFPRINT_TAG"
+say "SOURCE_MANIFEST=PASS"
+say "LIBFPRINT_PATCH=PASS"
+say "MESON_CONFIGURE=PASS"
+say "LIBFPRINT_BUILD=PASS"
+say "GOODIX51A0_OBJECT_COMPILED=YES"
+say "GOODIX51A0_ACPI_ID_IN_BUILD=YES"
+say "GOODIX51A0_ACPI_ID_GATE=$acpi_gate"
+say "GOODIX51A0_UDEV_MODALIAS_GLOB=PASS"
+say "GOODIX51A0_OBJECT_IN_DRIVER_ARCHIVE=YES"
+say "GOODIX51A0_TYPE_SYMBOL_IN_DRIVER_ARCHIVE=YES"
+say "GOODIX51A0_FASTBRIEF_RANSAC_IN_LIBRARY=YES"
+say "GOODIX51A0_IDENTIFY_PATH_IN_LIBRARY=YES"
+say "$dump_gate_marker"
+say "SOFTWARE_BUILD_READY=YES"
+say "ACTIVE_SENSOR_IO=NONE"
+say "GPIO_WRITES=NONE"
+say "MMIO_WRITES=NONE"
+say "FIRMWARE_ACTIONS=NONE"
+say "BUILD_DIR=$BUILD_DIR"
+
+if ((!KEEP_BUILD)); then
+  rm -rf -- "$SRC_DIR" "$BUILD_DIR"
+  say "BUILD_ARTIFACTS_REMOVED=YES"
+fi
