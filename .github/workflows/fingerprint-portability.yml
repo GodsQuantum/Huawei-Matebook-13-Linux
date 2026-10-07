@@ -1,0 +1,53 @@
+name: Fingerprint distro portability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'fingerprint/**'
+      - '.github/workflows/fingerprint-portability.yml'
+  pull_request:
+    paths:
+      - 'fingerprint/**'
+      - '.github/workflows/fingerprint-portability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian stable
+            image: debian:stable
+          - name: Fedora current
+            image: fedora:latest
+          - name: openSUSE Tumbleweed
+            image: opensuse/tumbleweed:latest
+          - name: Arch Linux
+            image: archlinux:latest
+          - name: Alpine edge
+            image: alpine:edge
+
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build pinned GXFP51A0 libfprint candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "${{ matrix.image }}"
+          docker run --rm \
+            -v "$PWD:/repo:ro" \
+            -w /repo \
+            "${{ matrix.image }}" \
+            /bin/sh -lc './fingerprint/install.sh --build-only'
+
+      - name: Confirm checkout stayed clean
+        run: git diff --exit-code
