@@ -1,0 +1,72 @@
+name: Fingerprint candidate build
+
+on:
+  push:
+    paths:
+      - 'fingerprint/**'
+      - 'tests/test-goodix51a0-first-contact.py'
+      - 'tests/test-goodix51a0-boot-binding.py'
+      - 'tests/test-fingerprint-tooling.py'
+      - '.github/workflows/fingerprint-build.yml'
+  pull_request:
+    paths:
+      - 'fingerprint/**'
+      - 'tests/test-goodix51a0-first-contact.py'
+      - 'tests/test-goodix51a0-boot-binding.py'
+      - 'tests/test-fingerprint-tooling.py'
+      - '.github/workflows/fingerprint-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  software-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libfprint build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git python3 python3-venv pkg-config \
+            libglib2.0-dev libgusb-dev libcairo2-dev libgudev-1.0-dev \
+            libssl-dev libudev-dev
+
+      - name: Fingerprint tooling regression
+        run: python3 tests/test-fingerprint-tooling.py
+
+      - name: Guided diagnostic syntax
+        run: |
+          python3 -m py_compile fingerprint/tools/*.py
+
+      - name: Bash syntax
+        run: |
+          bash -n fingerprint/install-arch.sh
+          bash -n fingerprint/install-linux.sh
+          bash -n fingerprint/uninstall-linux-source.sh
+          find fingerprint/scripts fingerprint/research -type f -name '*.sh' -print0 \
+            | xargs -0 -n1 bash -n
+
+      - name: Reject private fingerprint material
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE --exclude-dir=.git \
+            '(/home/[A-Za-z0-9._-]+|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})' \
+            fingerprint
+          ! find fingerprint -type f \
+            \( -name '*.raw' -o -name '*.pgm' -o -name '*.npy' -o -name '*.pkg.tar.*' \) \
+            -print -quit | grep -q .
+
+      - name: Software tests and reproducible libfprint build
+        run: make -C fingerprint verify
+
+      - name: Prove public scripts contain no active hardware action
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE \
+            '(/sys/.*/(bind|unbind)|modprobe|rmmod|SPI_IOC_MESSAGE|gpiod_line_request_output|gpioset)' \
+            fingerprint/scripts
