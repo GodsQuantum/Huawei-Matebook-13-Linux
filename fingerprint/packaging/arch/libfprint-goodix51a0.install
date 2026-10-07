@@ -1,0 +1,28 @@
+post_install() {
+  udevadm control --reload || true
+  udevadm trigger --subsystem-match=spi || true
+  udevadm settle --timeout=3 || true
+  # rel37 removes the rel35/36 periodic synthetic Claim loop.
+  systemctl stop gxfp51a0-warm-keepalive.timer gxfp51a0-warm-keepalive.service 2>/dev/null || true
+  # rel42 replaces rel24-rel40 disk timing learning with session-local adaptation.
+  # These files contain no biometric/secret material and are obsolete.
+  rm -f /var/lib/fprint/.goodix51a0-timing         /var/lib/fprint/.goodix51a0-capture-timing
+  systemctl daemon-reload || true
+  # Fast-ready production: prime exactly once at boot before the greeter.
+  # This is not a heartbeat: there is no timer and no periodic synthetic Claim.
+  systemctl enable gxfp51a0-boot-prewarm.service 2>/dev/null || true
+  # rel73: suspend belongs to the native libfprint/fprintd lifecycle only.
+  # Explicitly keep the obsolete external system-sleep helper disabled.
+  systemctl disable --now gxfp51a0-fprintd-suspend.service 2>/dev/null || true
+  systemctl restart --no-block fprintd.service || true
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  udevadm control --reload || true
+  systemctl daemon-reload || true
+  systemctl try-restart fprintd.service || true
+}
