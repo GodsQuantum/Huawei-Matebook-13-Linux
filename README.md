@@ -16,7 +16,7 @@ cd huawei-matebook-13-linux
 
 Run it as your normal desktop user, not with `sudo`.
 
-With no arguments in an interactive terminal, `./install.sh` first performs a read-only hardware audit and opens a **Whiptail** menu. It shows whether the GXFP51A0 driver and MX250 GPU Manager are missing, current, or need an update, then lets you apply only the recommended changes, either component individually, or both.
+With no arguments in an interactive terminal, `./install.sh` first performs a read-only hardware audit and opens a **Whiptail** menu. The UI auto-sizes to the current terminal; `Esc`/Cancel exits without changes. **RECOMMENDED** checks the native platform baseline and applies only missing/outdated repository components, while **FINGERPRINT** and **GPU** are strictly component-only actions.
 
 After a successful install/update, the checkout installs a user launcher:
 

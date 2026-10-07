@@ -5,11 +5,16 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 ROOT="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 DO_FINGERPRINT=1
 DO_GPU=1
+DO_PLATFORM=1
 DOCTOR_ONLY=0
 GPU_DRIVER_PREINSTALLED=0
 FORCE_MENU=0
 ARGS_PROVIDED=$#
+MENU_TMP_DIR=""
 AUDIT_FILE=""
+SHORTCUTS_FILE=""
+CHOICE_FILE=""
+TUI_BACKTITLE="Huawei MateBook 13 Linux"
 
 usage() {
   cat <<'EOF'
@@ -244,13 +249,22 @@ install_user_launcher() {
   fi
 }
 
-prepare_menu_audit() {
-  AUDIT_FILE="$(mktemp)"
+prepare_menu_files() {
+  MENU_TMP_DIR="$(mktemp -d)"
+  AUDIT_FILE="$MENU_TMP_DIR/audit.txt"
+  SHORTCUTS_FILE="$MENU_TMP_DIR/shortcuts.txt"
+  CHOICE_FILE="$MENU_TMP_DIR/choice"
   "$ROOT/matebook13-doctor.sh" >"$AUDIT_FILE" 2>&1 || true
 }
 
-cleanup_menu_audit() {
-  [[ -n "${AUDIT_FILE:-}" ]] && rm -f "$AUDIT_FILE"
+cleanup_menu_files() {
+  if [[ -n "${MENU_TMP_DIR:-}" && -d "$MENU_TMP_DIR" ]]; then
+    rm -rf -- "$MENU_TMP_DIR"
+  fi
+  MENU_TMP_DIR=""
+  AUDIT_FILE=""
+  SHORTCUTS_FILE=""
+  CHOICE_FILE=""
 }
 
 audit_summary() {
@@ -266,18 +280,34 @@ MX250 / GPU Manager: $gpu
 Hardware doctor: ${summary:-see detailed audit}
 
 The menu is read-only until you choose an install/update action.
+Esc/Cancel always exits without making changes.
 EOF
 }
 
 show_audit_box() {
-  whiptail --title "Huawei MateBook 13 — hardware audit"     --scrolltext --textbox "$AUDIT_FILE" 28 100
+  local rc=0
+  whiptail \
+    --backtitle "$TUI_BACKTITLE" \
+    --title "Hardware audit" \
+    --ok-button "Back" \
+    --scrolltext \
+    --textbox "$AUDIT_FILE" 0 0 || rc=$?
+  case "$rc" in
+    0|1|255) return 0 ;;
+    *) return "$rc" ;;
+  esac
 }
 
 show_shortcuts_box() {
-  local help_file
-  help_file="$(mktemp)"
-  cat >"$help_file" <<'EOF'
+  local rc=0
+  cat >"$SHORTCUTS_FILE" <<'EOF'
 HUAWEI MATEBOOK 13 LINUX — COMMANDS / SHORTCUTS
+
+KEYS
+  ↑ / ↓       Move through menus.
+  Enter       Select the highlighted action.
+  Esc/Cancel  Return or exit without changing the system.
+  PgUp/PgDn   Scroll long audit/help pages.
 
 MAIN CONTROL CENTER
   HUAWEI
@@ -397,8 +427,16 @@ CURRENT RECOMMENDATION FOR HANDY
 
 All GPU Manager application changes are reversible.
 EOF
-  whiptail --title "Huawei MateBook 13 — help / shortcuts"     --scrolltext --textbox "$help_file" 30 108
-  rm -f "$help_file"
+  whiptail \
+    --backtitle "$TUI_BACKTITLE" \
+    --title "Help / shortcuts" \
+    --ok-button "Back" \
+    --scrolltext \
+    --textbox "$SHORTCUTS_FILE" 0 0 || rc=$?
+  case "$rc" in
+    0|1|255) return 0 ;;
+    *) return "$rc" ;;
+  esac
 }
 
 interactive_menu() {
@@ -407,16 +445,50 @@ interactive_menu() {
     exit 4
   }
 
-  prepare_menu_audit
-  trap cleanup_menu_audit EXIT
+  prepare_menu_files
+  trap 'cleanup_menu_files' EXIT
 
-  whiptail --title "Huawei MateBook 13 Linux"     --msgbox "$(audit_summary)" 20 100
+  local rc=0
+  whiptail \
+    --backtitle "$TUI_BACKTITLE" \
+    --title "Hardware audit" \
+    --ok-button "Continue" \
+    --msgbox "$(audit_summary)" 0 0 || rc=$?
+  case "$rc" in
+    0) ;;
+    1|255) exit 0 ;;
+    *) exit "$rc" ;;
+  esac
 
   while true; do
     local choice fp gpu
     fp="$(fingerprint_status_text)"
     gpu="$(gpu_status_text)"
-    choice="$(whiptail --title "Huawei MateBook 13 Linux"       --menu "Audit complete. Choose what to install, update or repair."       23 110 8       "RECOMMENDED" "Apply only missing/outdated detected components"       "FINGERPRINT" "Fingerprint — $fp"       "GPU" "MX250 — $gpu"       "ALL" "Install/update/repair all detected repository components"       "AUDIT" "Show the detailed read-only hardware audit"       "SHORTCUTS" "Explain HUAWEI and GPU-control commands with examples"       "EXIT" "Quit without changing the system"       3>&1 1>&2 2>&3)" || exit 0
+    rc=0
+    : >"$CHOICE_FILE"
+    whiptail \
+      --backtitle "$TUI_BACKTITLE" \
+      --title "Huawei MateBook 13 Linux" \
+      --ok-button "Select" \
+      --cancel-button "Exit" \
+      --default-item "RECOMMENDED" \
+      --output-fd 3 \
+      --menu "↑/↓ navigate · Enter selects · Esc/Cancel exits without changes.\n\nChoose what to install, update or repair." 0 0 0 \
+      "RECOMMENDED" "Baseline + only missing/outdated repository components" \
+      "FINGERPRINT" "Fingerprint only — $fp" \
+      "GPU" "MX250 only — $gpu" \
+      "ALL" "Install/update/repair all detected repository components" \
+      "AUDIT" "Show the detailed read-only hardware audit" \
+      "SHORTCUTS" "Explain HUAWEI and GPU-control commands with examples" \
+      "EXIT" "Quit without changing the system" \
+      3>"$CHOICE_FILE" || rc=$?
+    choice="$(<"$CHOICE_FILE")"
+
+    case "$rc" in
+      0) ;;
+      1|255) exit 0 ;;
+      *) exit "$rc" ;;
+    esac
 
     case "$choice" in
       AUDIT)
@@ -429,35 +501,53 @@ interactive_menu() {
         exit 0
         ;;
       RECOMMENDED)
+        DO_PLATFORM=1
         DO_FINGERPRINT=0
         DO_GPU=0
         case "$(fingerprint_status_code)" in missing|outdated) DO_FINGERPRINT=1 ;; esac
         case "$(gpu_status_code)" in missing|outdated) DO_GPU=1 ;; esac
-        if (( ! DO_FINGERPRINT && ! DO_GPU )); then
-          whiptail --title "Huawei MateBook 13 Linux"             --msgbox "Everything managed by this repository is already current.\n\nUse Fingerprint or GPU explicitly if you want to run a repair/idempotence pass." 12 82
-          continue
-        fi
         break
         ;;
       FINGERPRINT)
         if ! fingerprint_present; then
-          whiptail --title "Fingerprint" --msgbox "GXFP51A0 is not detected on this machine." 10 70
+          rc=0
+          whiptail \
+            --backtitle "$TUI_BACKTITLE" \
+            --title "Fingerprint" \
+            --ok-button "Back" \
+            --msgbox "GXFP51A0 is not detected on this machine." 0 0 || rc=$?
+          case "$rc" in
+            0|1|255) ;;
+            *) exit "$rc" ;;
+          esac
           continue
         fi
+        DO_PLATFORM=0
         DO_FINGERPRINT=1
         DO_GPU=0
         break
         ;;
       GPU)
         if ! mx250_present; then
-          whiptail --title "GPU" --msgbox "The reference MX250 (10de:1d13) is not detected on this machine." 10 76
+          rc=0
+          whiptail \
+            --backtitle "$TUI_BACKTITLE" \
+            --title "GPU" \
+            --ok-button "Back" \
+            --msgbox "The reference MX250 (10de:1d13) is not detected on this machine." 0 0 || rc=$?
+          case "$rc" in
+            0|1|255) ;;
+            *) exit "$rc" ;;
+          esac
           continue
         fi
+        DO_PLATFORM=0
         DO_FINGERPRINT=0
         DO_GPU=1
         break
         ;;
       ALL)
+        DO_PLATFORM=1
         DO_FINGERPRINT=1
         DO_GPU=1
         break
@@ -465,13 +555,17 @@ interactive_menu() {
     esac
   done
 
-  cleanup_menu_audit
+  cleanup_menu_files
   trap - EXIT
 }
 
 perform_selected_actions() {
-  ensure_huawei_wmi
-  ensure_power_profile_api
+  if (( DO_PLATFORM )); then
+    ensure_huawei_wmi
+    ensure_power_profile_api
+  else
+    printf '==> Platform baseline skipped (component-only action)\n'
+  fi
 
   if (( DO_FINGERPRINT )) && fingerprint_present; then
     printf '==> Installing/upgrading GXFP51A0 fingerprint support\n'
