@@ -16,7 +16,7 @@ cd huawei-matebook-13-linux
 
 À lancer avec l'utilisateur normal du bureau, **pas avec sudo**.
 
-Sans argument dans un terminal interactif, `./install.sh` commence par un audit matériel en lecture seule puis ouvre un menu **Whiptail**. Il indique si le pilote GXFP51A0 et le GPU Manager MX250 sont absents, à jour ou à mettre à jour, puis permet d'appliquer uniquement les corrections recommandées, chaque composant séparément, ou les deux.
+Sans argument dans un terminal interactif, `./install.sh` commence par un audit matériel en lecture seule puis ouvre un menu **Whiptail**. L’interface s’adapte automatiquement à la taille du terminal ; `Esc`/Annuler quitte sans modification. **RECOMMENDED** vérifie le baseline natif et n’applique que les composants du dépôt manquants/obsolètes, tandis que **FINGERPRINT** et **GPU** restent strictement limités au composant choisi.
 
 Après une installation/mise à jour réussie, le checkout installe le raccourci utilisateur :
 
