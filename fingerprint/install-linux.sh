@@ -5,7 +5,7 @@ ORIGINAL_ARGS=("$@")
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/gxfp51a0-libfprint-build"
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.24-portable2"
+PORTABLE_RELEASE="rel71.30-portable1"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -28,10 +28,6 @@ INSTALL_DEPS=1
 BUILD_ONLY=0
 NO_DESKTOP_INTEGRATION=0
 LEGACY_KDE_HELPER=0
-DO_ENROLL=1
-DO_VERIFY=1
-FINGER="right-index-finger"
-
 usage() {
   cat <<'EOF'
 Usage: ./fingerprint/install-linux.sh [OPTIONS]
@@ -57,11 +53,11 @@ Options:
       Not needed on current Plasma 6 lock screens; native fprintd/PAM is the
       default and preferred cross-distro integration.
   --no-enroll
-      Do not start interactive fingerprint enrollment at the end.
+      Compatibility option; enrollment always happens through your desktop GUI.
   --no-verify
-      Do not run interactive fprintd verification at the end.
+      Compatibility option; verification always happens through your desktop GUI.
   --finger NAME
-      Finger to enroll (default: right-index-finger).
+      Deprecated compatibility argument; does not start CLI enrollment.
   -h, --help
       Show this help.
 
@@ -87,12 +83,11 @@ while (($#)); do
     --no-install-deps) INSTALL_DEPS=0 ;;
     --no-desktop-integration) NO_DESKTOP_INTEGRATION=1 ;;
     --legacy-kde-helper) LEGACY_KDE_HELPER=1 ;;
-    --no-enroll) DO_ENROLL=0 ;;
-    --no-verify) DO_VERIFY=0 ;;
+    --no-enroll|--no-verify) : ;;
     --finger)
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --finger needs a value" >&2; exit 2; }
-      FINGER="$1"
+      # Legacy option accepted; enrollment remains native-GUI-only.
       ;;
     -h|--help) usage; exit 0 ;;
     *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -624,32 +619,8 @@ fi
 
 "$DOCTOR_FILE" --pre-enroll
 
-if (( DO_ENROLL )); then
-  if [[ -t 0 && -t 1 ]]; then
-    if ! fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
-      echo
-      echo "==> No enrolled fingerprint found. Starting enrollment for $FINGER."
-      echo "    Follow the standard fprintd prompts until enrollment completes."
-      fprintd-enroll -f "$FINGER" "$USER"
-    else
-      echo "==> Existing enrollment found; keeping it unchanged."
-    fi
-  else
-    echo "INFO: non-interactive terminal; enrollment skipped. Run:"
-    echo "      fprintd-enroll -f $FINGER $USER"
-  fi
-fi
-
-if (( DO_VERIFY )) && [[ -t 0 && -t 1 ]]; then
-  if fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
-    echo
-    echo "==> Final live fingerprint verification"
-    fprintd-verify "$USER" || {
-      echo "ERROR: fprintd verification failed; installation is not validated." >&2
-      exit 8
-    }
-  fi
-fi
+echo "==> Fingerprint enrollment and unlock tests: use the distribution native graphical Settings (KDE/GNOME)."
+echo "    Existing templates are preserved; no CLI biometric enrollment or verification is launched."
 
 if fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
   "$DOCTOR_FILE"

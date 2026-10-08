@@ -49,7 +49,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.24 validée · rel71.30 candidate** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrollment connecté et un rescue conservateur par vue |
+| **Fingerprint** | **rel71.30 préversion recommandée · rel71.24 rollback S3 validé** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrollment connecté et un rescue conservateur par vue |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -58,7 +58,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-Checkpoint validé : **rel71.24**. Candidate de développement active : **rel71.30**.
+**Installation par défaut : rel71.30.** Après réenrôlement par l'interface native KDE, 8/8 captures de vérification ont réussi sur le MateBook 13 de référence (seuil 7). rel71.24 reste le dernier rollback intégralement validé après démarrage à froid/deep-S3. Les essais mauvais doigt et sur un autre matériel restent nécessaires.
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;
@@ -70,7 +70,7 @@ Checkpoint validé : **rel71.24**. Candidate de développement active : **rel71.
 
 Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 candidate](fingerprint/docs/candidate-71.30.md)
 
-Installation seule :
+Installation du pilote seul, sans GPU Manager/HUAWEI (voir [guide autonome](fingerprint/DRIVER_ONLY.md)) :
 
 ```bash
 ./fingerprint/install.sh

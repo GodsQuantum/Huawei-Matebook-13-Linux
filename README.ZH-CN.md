@@ -49,7 +49,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **rel71.24 已验证 · rel71.30 候选版** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
+| **指纹** | **rel71.30 推荐预览版 · rel71.24 S3 验证回退** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |
@@ -58,7 +58,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-已验证 checkpoint：**rel71.24**。当前开发候选版：**rel71.30**。
+**默认指纹安装版本：rel71.30**。在 MateBook 13 参考机通过 KDE 原生界面重新录入后，8/8 次校验捕获达到固定阈值 7。rel71.24 仍是最近通过冷启动/deep-S3 全面验证的回退版本；其他硬件与错误手指测试仍未完成。
 
 - 参考机 warm FAST_READY 约 **82–83 ms**
 - GPIO264 active-HIGH 短脉冲 recovery

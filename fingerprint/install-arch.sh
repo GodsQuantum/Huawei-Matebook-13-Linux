@@ -7,41 +7,36 @@ KSCREEN_DIR="$ROOT/integration/kscreenlocker-upstream-s3"
 PLM_DIR="$ROOT/integration/plasma-login-manager-6.7-pam-messages"
 DOCTOR="$ROOT/gxfp51a0-doctor.sh"
 
-DO_ENROLL=1
-DO_VERIFY=1
 DESKTOP_INTEGRATION=1
 LEGACY_PLASMA_PATCHES=0
-FINGER="right-index-finger"
-
 usage() {
   cat <<'USAGE'
 Usage: ./fingerprint/install-arch.sh [OPTIONS]
 
-Zero-to-working installer for the validated Huawei MateBook 13
+Driver-only installer for the Huawei MateBook 13
 Goodix GXFP51A0 / GF3658 ST411 fingerprint reader.
 
 Options:
-  --no-enroll                 Do not launch interactive enrollment.
-  --no-verify                 Do not launch interactive verification.
+  --no-enroll                 Deprecated compatibility flag (GUI enrollment is always used).
+  --no-verify                 Deprecated compatibility flag (GUI verification is always used).
   --no-desktop-integration    Skip desktop integration checks.
   --legacy-plasma-patches     Explicitly build/apply the validated Plasma 6.7.5
                               compatibility packages/helpers. Native Plasma
                               fprintd/PAM integration is preferred by default.
-  --finger NAME               Finger to enroll (default: right-index-finger).
+  --finger NAME               Deprecated compatibility argument (never initiates CLI enrollment).
   -h, --help                  Show this help.
 USAGE
 }
 
 while (($#)); do
   case "$1" in
-    --no-enroll) DO_ENROLL=0 ;;
-    --no-verify) DO_VERIFY=0 ;;
+    --no-enroll|--no-verify) : ;;
     --no-desktop-integration) DESKTOP_INTEGRATION=0 ;;
     --legacy-plasma-patches) LEGACY_PLASMA_PATCHES=1 ;;
     --finger)
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --finger needs a value" >&2; exit 2; }
-      FINGER="$1"
+      # Legacy argument accepted but enrollment is intentionally GUI-only.
       ;;
     -h|--help) usage; exit 0 ;;
     *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -215,32 +210,8 @@ if [[ -x "$DOCTOR" ]]; then
   "$DOCTOR" --pre-enroll
 fi
 
-if (( DO_ENROLL )); then
-  if [[ -t 0 && -t 1 ]]; then
-    if ! fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
-      echo
-      echo "==> No enrolled fingerprint found. Starting enrollment for $FINGER."
-      echo "    Follow the fprintd prompts until enrollment completes."
-      fprintd-enroll -f "$FINGER" "$USER"
-    else
-      echo "==> Existing enrollment found; keeping it unchanged."
-    fi
-  else
-    echo "INFO: non-interactive terminal; skipping enrollment. Run:"
-    echo "      fprintd-enroll -f $FINGER $USER"
-  fi
-fi
-
-if (( DO_VERIFY )) && [[ -t 0 && -t 1 ]]; then
-  if fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
-    echo
-    echo "==> Final live fingerprint verification"
-    fprintd-verify "$USER" || {
-      echo "ERROR: fprintd verification failed; installation is not validated." >&2
-      exit 8
-    }
-  fi
-fi
+echo "==> Fingerprint enrollment and unlock tests: use the distribution native graphical Settings (KDE/GNOME)."
+echo "    Existing templates are preserved; no CLI biometric enrollment or verification is launched."
 
 if [[ -x "$DOCTOR" ]]; then
   "$DOCTOR"

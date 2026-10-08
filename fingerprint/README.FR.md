@@ -7,11 +7,11 @@ famille Huawei MateBook 13 2021.
 
 > English: [README.md](README.md) · 简体中文: [README.ZH-CN.md](README.ZH-CN.md)
 
-## État actuel — 7 octobre 2026
+## État actuel — 8 octobre 2026
 
-### Checkpoint validé 71.24
+### Préversion recommandée rel71.30
 
-71.24 est le checkpoint production validé actuel ; 71.18 reste le rollback immuable.
+rel71.30 est désormais installée par défaut. Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; rel71.30 attend les contrôles mauvais doigt et sur d'autres machines. rel71.18 reste le rollback historique.
 
 Le recovery décisif s'exécute avant l'énumération libfprint :
 
@@ -169,13 +169,7 @@ Depuis la racine du dépôt :
 
 L'installateur vérifie la présence du `GXFP51A0`, compile le patch libfprint, installe `libfprint-goodix51a0` et `fprintd`, ajoute uniquement l'accès gpiochip nécessaire et installe un prime boot one-shot. Il n'installe ni keepalive périodique ni hook externe de reprise S3. Sur Plasma 6.7.5 uniquement, il applique aussi les intégrations KDE/Plasma Login Manager package-managed, idempotentes et réversibles ; les autres bureaux gardent leur intégration fprintd/PAM native.
 
-Ensuite utilise les réglages standards du bureau ou :
-
-```bash
-fprintd-enroll -f right-index-finger
-fprintd-verify
-fprintd-list "$USER"
-```
+Ensuite utilise uniquement l'interface graphique native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**). Le programme d'installation n'exécute pas de commande d'enrôlement ou de vérification biométrique.
 
 Le pilote demande 20 poses. Déplace légèrement le doigt entre les poses afin de
 couvrir plusieurs zones du doigt.
