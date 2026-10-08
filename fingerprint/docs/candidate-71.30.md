@@ -111,6 +111,18 @@ The package installs as:
 libfprint-goodix51a0 1.94.100.goodix51a0-71.30
 ```
 
+### Native Ubuntu 26.04.1 build and ABI validation (2026-10-08)
+
+The **exact release tag** `matebook13-rel71.30` (source commit `67e515b`) was cloned locally and built natively in an Ubuntu 26.04.1 LTS development environment using `./fingerprint/install.sh --build-only --no-install-deps`. This was an additional test beyond the seven-distribution GitHub Actions build matrix.
+
+- Source SHA-256 manifest, pinned libfprint v1.94.100 build, compiled GXFP51A0 driver and final build artifact gates: **PASS**.
+- Ubuntu distribution `fprintd` 1.94.5-4 staged binary compatibility check (`ldd -r` plus executable loader check): **PASS**.
+- Release biometric dump writer: **ABSENT**.
+- Ubuntu-built `libfprint-2.so.2.0.0` SHA-256: `8f8508632c161d0f3a23521431db6a8112bbb6efc0af761b0b869ad030259ef5`.
+- Build-only: **no system driver installation, no hardware sensor, no runtime GUI/PAM validation**. This `.so` is retained privately as build evidence and is **not an installable Ubuntu `.deb`**. The published Ubuntu installation path remains the driver-only **source installer**.
+
+This demonstrates a native Ubuntu compilation and compatibility with the selected Ubuntu `fprintd`, but **does not demonstrate fingerprint authentication or MX250 management on actual Ubuntu hardware**.
+
 ## Native KDE field results on reference MateBook 13 (2026-10-08)
 
 A fresh **right-index-only** template was created through the KDE graphical interface at 15:02:01 CEST. In the following live period, **8/8 logged verify captures** scored at or above the unchanged threshold 7 (scores: 7, 10, 7, 13, 9, 11, 11, 19); no GET_IMAGE/FDT ACK retry was logged in that period. No biometric material is distributed in the repository. Two previously enrolled fingers are not present in the live fprintd database after the operator's GUI actions; no automatic deletion/restoration was performed by project tooling.
