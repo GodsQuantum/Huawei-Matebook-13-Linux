@@ -1,26 +1,19 @@
-# Public handoff — GXFP51A0 rel71.24
+# Public status — GXFP51A0 / ST411 fingerprint driver
 
-Current public production checkpoint: **rel71.24**.
+**Default:** [rel71.30 recommended preview](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30).
 
-- target: Huawei MateBook 13 / GXFP51A0 / GF3658 ST411
-- libfprint base: `v1.94.100`
-- threshold: **7**
-- template: v4, 20 views
-- warm readiness: ~82–83 ms on the validated reference unit
-- recovery: target-only spidev unbind/rebind + short active-HIGH GPIO264 pulse + complete GPIO request release
-- deep-S3 transport: validated
-- firmware flashing: none
-- GPIO112: never touched
-- PMK/templates: preserved
-- score fusion: disabled / absent
-- score-conditioned same-placement retry: absent
+**Last fully cold-boot/deep-S3 validated rollback:** [rel71.24](docs/validated-checkpoint-71.24.md).
 
-rel71.18 remains the immutable rollback reference.
+On the reference MateBook 13, rel71.30 completed enrollment using the **native KDE graphical interface**; eight observed verification captures passed at the unchanged threshold 7. A separate wrong-finger control rejected an unenrolled finger (scores 2, 3, 4) before the enrolled right index succeeded (16). These are **single-machine results**, not a population-level false-acceptance measurement.
 
-See:
-- `docs/validated-checkpoint-71.24.md`
-- `docs/validated-checkpoint-71.18.md`
-- `docs/recovery-architecture-2026-10-06.md`
-- `README.md`
+Ubuntu 24.04/26.04 source builds pass; Ubuntu 26.04.1 native build and fprintd ABI compatibility also pass. A real Ubuntu fingerprint unlock and MX250 GPU test have **not** yet been completed. Cold-boot/deep-S3 testing of rel71.30 and testing on an independent GXFP51A0 device remain open.
 
-Do not publish fingerprint captures/templates, PMK/PSK material, serials, hostnames, usernames or private filesystem paths.
+## Start here
+
+- [Driver-only installation, all supported distributions](DRIVER_ONLY.md)
+- [Current driver README](README.md)
+- [Technical evidence and remaining acceptance criteria](docs/candidate-71.30.md)
+- [Hardware safety and privacy requirements](docs/safety.md)
+- [Previous investigations](docs/history/)
+
+There is no firmware flashing, automatic enrollment, or redistribution of fingerprint templates or machine-specific keys. Internal personal handoffs and development materials are excluded from the public repository.

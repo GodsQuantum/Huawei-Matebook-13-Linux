@@ -1,8 +1,26 @@
-# Huawei MateBook 13 Linux 支持
+<div align="center">
 
-> 面向参考 Huawei MateBook 13 的“一条命令 + native first”Linux 硬件 onboarding。
->
-> **English: [README.md](README.md)** · **Français: [README.FR.md](README.FR.md)**
+# Huawei MateBook 13 · Linux
+
+**补齐 MateBook 13 在 Linux 下缺失的硬件支持。**
+
+Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源管理 · 面向 MateBook 13 **2020 / 2021**（`WRTB-WXX9`）
+
+[![Quality](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml)
+[![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
+[![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
+[![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+
+[**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
+
+</div>
+
+## 选择安装方式
+
+**仅安装指纹驱动：** `./fingerprint/install.sh`（[独立源码包](fingerprint/DRIVER_ONLY.md)）。**完整 MateBook 13 配置（指纹 + MX250）：** `./install.sh`。**只读硬件检查：** `./install.sh --doctor-only`。
+
+请以**普通桌面用户**身份执行，不要直接使用 root。指纹的录入和删除仅通过 **KDE/GNOME 原生图形设置**完成，不使用自定义录入工具。
 
 ## 一条命令
 
@@ -16,7 +34,7 @@ cd huawei-matebook-13-linux
 
 请以普通桌面用户运行，不要直接使用 `sudo`。
 
-在交互式终端中不带参数运行 `./install.sh` 时，脚本会先执行只读硬件审计，然后打开 **Whiptail** 菜单。界面会根据当前终端自动调整大小；按 `Esc`/Cancel 可直接退出且不做任何修改。**RECOMMENDED** 会检查原生平台 baseline，并只应用缺失/过期的仓库组件；**FINGERPRINT** 和 **GPU** 则严格只处理所选组件。
+在交互式终端中不带参数运行 `./install.sh` 时，脚本会先执行只读硬件审计，然后打开 **Whiptail** 菜单。界面会根据当前终端自动调整大小；按 `Esc`/Cancel 可直接退出且不做任何修改。**RECOMMENDED** 会检查原生系统组件，并只应用缺失/过期的仓库组件；**FINGERPRINT** 和 **GPU** 则严格只处理所选组件。
 
 成功安装或更新后，会创建用户命令：
 
@@ -26,7 +44,7 @@ HUAWEI
 
 `HUAWEI` 会打开同一个审计菜单；`HUAWEI --doctor-only` 等显式参数仍可用于脚本和自动化。
 
-重复运行当前已精确安装的 fingerprint release 是安全的：安装器会保留当前 fprintd/TLS 会话，不会重新 build 或 restart 传感器。真正的驱动升级必须通过新的 `PREWARM_RESULT=READY` 语义 gate 后才报告成功。
+重复运行已经安装的相同指纹驱动版本 是安全的：安装器会保留当前 fprintd/TLS 会话，不会重新编译驱动或重启传感器。真正的驱动升级必须通过新的 `PREWARM_RESULT=READY` 语义 gate 后才报告成功。
 
 仓库只补齐 Linux 尚未正确支持的硬件缺口；已经由 kernel / distro / desktop 正常支持的部分保持原生管理。
 
@@ -58,7 +76,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-**默认指纹安装版本：rel71.30**。在 MateBook 13 参考机通过 KDE 原生界面重新录入后，8/8 次校验捕获达到固定阈值 7。rel71.24 仍是最近通过冷启动/deep-S3 全面验证的回退版本；其他硬件与错误手指测试仍未完成。
+**默认指纹安装版本：rel71.30**。在 MateBook 13 参考机通过 KDE 原生界面重新录入后，8/8 次校验捕获达到固定阈值 7。rel71.24 仍是最近通过冷启动/deep-S3 全面验证的回退版本；已在参考机上完成未录入手指的初步拒绝测试，但其他设备、冷启动与 deep-S3 仍需验证。
 
 - 参考机 warm FAST_READY 约 **82–83 ms**
 - GPIO264 active-HIGH 短脉冲 recovery
@@ -66,7 +84,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 - 手动 deep-S3 transport 已验证
 - 固定阈值 **7**
 - 不融合分数
-- template-v4 enrollment 保持兼容
+- 保留与 v4 版指纹模板的兼容性
 
 技术记录：[已验证 rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [推荐预览版 rel71.30](fingerprint/docs/candidate-71.30.md)
 

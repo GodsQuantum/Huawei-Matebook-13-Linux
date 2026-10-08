@@ -73,4 +73,4 @@ Use the pull-request template and do not mark a hardware result as generally sup
 
 ## License
 
-Contributions are accepted under the repository's GPL-2.0-only license.
+Contributions to the original project scripts and documentation use **GPL-2.0-only**. Changes to libfprint-derived driver files retain **LGPL-2.1-or-later**, as stated in their SPDX headers; imported patches preserve their upstream licenses. See [LICENSES.md](LICENSES.md).

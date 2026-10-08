@@ -31,69 +31,6 @@ restart fprintd
 
 详见 [`docs/validated-checkpoint-71.24.md`](docs/validated-checkpoint-71.24.md) 与 [`docs/recovery-architecture-2026-10-06.md`](docs/recovery-architecture-2026-10-06.md)。
 
-## 技术历史 — 2026-09-24
-
-已验证硬件目标：
-
-- ACPI HID：`GXFP51A0`
-- Goodix GF3658 / ST411，chip ID `0x2504`
-- 已验证固件：`GF_ST411SEC_APP_14115`
-- SPI mode 0 + `SPI_CS_HIGH`，1 MHz
-- GPIO48 readiness/IRQ，GPIO264 active-HIGH MCU reset
-- TLS 1.2 `PSK-AES128-GCM-SHA256`
-- 80×64 有效指纹图像
-- 固定 libfprint 基线：`v1.94.100`
-
-生产路径：
-
-```text
-GXFP51A0 → libfprint → fprintd → desktop PAM / CLI
-```
-
-### 已完成人工冷启动验证：rel40
-
-在 MateBook 13 2021 参考机上，使用原有 enrollment 的真实 cold-boot 图形
-登录已经成功。Plasma Login Manager 走的是 `Identify`：第一轮同一手指图像
-分数为 `2/3/3`；下一次按压的第一张图像被 quality gate 拒绝，而**同一次
-物理按压的第二张图像得到 7/7**，随后成功进入会话。
-
-rel40 因此同时验证了：
-
-- Windows 精确 `WakeupMCU`：原始 SPI `0f 00 00 0e` + 5 ms；
-- warm context 硬件重验证与 `WARM_REBASE`；
-- `Verify` 和多模板 `Identify`；
-- 每次物理按压最多 3 张独立图像（`RetryCaptureIMG`）；
-- 固定阈值 **7**，绝不累加或融合多个弱分数；
-- 最多 3 次物理按压后才终止拒绝；
-- 20-view enrollment 与 template-v4/SIGFM-v3 兼容；
-- 有界 transport recovery、boot prewarm 和 deep-sleep resume prewarm；
-- 不再使用周期性 synthetic Claim keepalive；
-- release build 不含生物特征 dump writer。
-
-### rel43 候选：协议时序自动校准 + 跨发行版安装
-
-rel43 完整保留 rel40 已实机验证成功的生物识别路径：Windows 目标设备的 `WakeupMCU`、`WARM_REBASE`、Verify/Identify same-press、阈值 7、模板格式以及现有 enrollment 均不改变。
-
-rel42 正确移除了持久化 timing 状态，但 cold boot 暴露了回归：每次 cold preparation 都把 protocol timing 强制回到 100%，会连续触发无 IRQ 的 ACK/FDT retry，greeter 到达 `IDENTIFY ... READY` 后却无法检测手指。rel43 继续让 capture pacing 只存在于 RAM；protocol timing 则仅在真实 ACK/FDT/TLS miss 后以有界 50 点步长自动校准，同一进程内 recovery 保留已证明需要的 timing，并且不跨 reboot 持久化。
-
-rel43 完整软件测试和可重复 build 已通过；实际 rel43 source 也已在 Debian stable、Fedora current、openSUSE Tumbleweed、Arch Linux 与 Alpine edge/musl 上通过 build + fprintd ABI gate。rel40 仍是最后一次人工成功登录基线，直到 rel43 完成自己的 cold-boot 验收。
-
-### rel42 候选：仅会话内自适应 + 跨发行版安装
-
-rel42 不改变 rel40 已验证的生物识别路径。它移除了 rel24–rel40 的持久化
-timing 文件，因为 lifecycle/prewarm 失败可能把 pacing 永久推高。每个新
-lifecycle 都从已验证的 100% 名义 timing 开始，只在 RAM 中自适应：
-
-- lifecycle/prewarm 失败绝不改变 capture pacing；
-- 连续 3 次“靠第二次 GET_IMAGE retry 才成功”的完整采集，提高当前
-  daemon 的 capture pacing 一个 50 点步长；
-- 8 次 clean capture 后向 100% 回落一个步长；
-- 真正的生物识别 transport desync 可以提高当前 session pacing，并触发
-  已验证的完整 session recovery；
-- protocol/TLS timing 也只在当前 session 中自适应，绝不写盘。
-
-rel42 软件测试和可重复 libfprint build 已通过；portable build/ABI gate 也已在干净的 Debian stable、Fedora current、openSUSE Tumbleweed、Arch Linux 与 Alpine edge/musl 容器中通过。在 rel42 自己的 cold-boot 人工验证完成前，rel40 仍然是 runtime 基准。
-
 ## 安装
 
 重复运行是幂等的：已精确安装的 release 不会重新 build/restart 传感器；真正的驱动更新必须得到新的 `PREWARM_RESULT=READY`。
@@ -143,20 +80,9 @@ fprintd/PAM 集成。
 
 Benjamin Allègre（Sigfrodr）在 Sigfrodr/libfprint-goodixtls 中发布了 tools/eval/fp_eval.py，作为 Milan-SPI 系列的本地统一评估工具。它使用互不重叠的 enrol/probe 划分，只输出 EER、FAR/FRR、分数分布和 d-prime 等聚合统计；原始指纹图像和模板始终留在测试者自己的机器上。该工具适合为 SIGFM 提供可用于 upstream 的多用户验证，但不是驱动的运行时依赖；release build 仍不包含生物特征 capture dump 功能。
 
-## 历史演进
+## 各发行版安装说明
 
-### rel24-rc1：慢速传输兼容候选版
-
-首个确认的 MateBook 13 2020 ST411/14115 用户报告表明：rel23 在该机型上可以正确认证，但传输层有时会进入非常慢的 GET_IMAGE/FDT 重试状态。rel24-rc1 仍以已验证的 30 ms 采集间隔为默认值；只有在 GET_IMAGE 完整失败后，才独立学习 100–300% 的采集 pacing。该值与 TLS/初始化 timing scale 完全分离，并且只有在一次完整指纹采集成功后才持久化。`no ACK/TLS` 与“收到 ACK 但重试后仍无 TLS 图像”都会触发完整 MCU/session 恢复；传输失败不会消耗三次固定生物识别尝试中的任何一次。
-
-枚举阶段的 prewarm 也被刻意限制为短路径：一次外层尝试、最多两次 cached-PMK TLS 尝试，并且不执行 fresh-staging fallback。即使该优化失败，fprintd 仍会正常可用，真正的生物识别 open 路径仍保留完整的有界恢复。rel24-rc1 不改变 template v4、SIGFM v3、RANSAC 阈值 7、20 个 enrollment view 或最多三次独立验证按压。
-
-Release 包含：
-
-- Arch/CachyOS 原生安装包；
-- 可移植 Linux 源码 bundle；
-- 安装说明；
-- SHA-256 校验。
+rel24–rel61 的旧测试记录保存在[技术历史](docs/history/)、[研究日志](docs/research-log.md)以及 Git 历史中，它们不是当前的安装步骤。推荐使用 rel71.30 预览版；rel71.24 是最近通过完整冷启动和 deep-S3 验证的回退版本。
 
 ### Arch / CachyOS
 

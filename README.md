@@ -1,8 +1,26 @@
-# Huawei MateBook 13 on Linux
+<div align="center">
 
-> One-command, native-first Linux onboarding for the Huawei MateBook 13 reference platform.
->
-> **Français: [README.FR.md](README.FR.md)** · **简体中文: [README.ZH-CN.md](README.ZH-CN.md)**
+# Huawei MateBook 13 · Linux
+
+**Bring missing Linux hardware support to your MateBook 13.**
+
+Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand power · native-first setup for MateBook 13 **2020 / 2021** (`WRTB-WXX9`)
+
+[![Quality](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml)
+[![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
+[![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
+[![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+
+[**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
+
+</div>
+
+## Choose your install
+
+**Fingerprint driver only:** `./fingerprint/install.sh` ([standalone archive](fingerprint/DRIVER_ONLY.md)). **Full MateBook 13 setup (fingerprint + MX250):** `./install.sh`. **Read-only compatibility check:** `./install.sh --doctor-only`.
+
+Run everything as your regular desktop user, **not root**. Enroll or remove fingerprints using **KDE/GNOME's native graphical settings**, never a custom enrollment tool.
 
 ## One command
 
@@ -68,7 +86,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 - no score fusion;
 - existing template-v4 enrollments remain compatible.
 
-Technical records: [validated rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [candidate rel71.30](fingerprint/docs/candidate-71.30.md)
+Technical records: [validated rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [recommended preview rel71.30](fingerprint/docs/candidate-71.30.md)
 
 Driver-only install (no Huawei/GPU Manager). See [standalone guide](fingerprint/DRIVER_ONLY.md):
 

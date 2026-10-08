@@ -43,7 +43,7 @@ Every feature belongs to one of four classes:
 
 | Component | Reference-machine status | Repository action |
 | --- | --- | --- |
-| Goodix GXFP51A0 fingerprint | Missing from upstream libfprint | Install the repository-native libfprint/fprintd driver, current checkpoint **rel71.24** |
+| Goodix GXFP51A0 fingerprint | Missing from upstream libfprint | Install the native libfprint/fprintd driver: **rel71.30 recommended preview**, with **rel71.24** as the last S3-validated rollback |
 | MX250 / GP108M Pascal | PRIME works, but NVIDIA PCIe RTD3 requires Turing+ | Install the reviewed on-demand PCI power-gating manager v3.2 |
 | Intel UHD | Mainline i915 | Verify only |
 | Huawei hotkeys / Fn-lock / mic-mute LED | Mainline `huawei_wmi` | Load/verify only |
@@ -58,7 +58,7 @@ Every feature belongs to one of four classes:
 
 ## Fingerprint
 
-Current public checkpoint: **rel71.24**.
+**Current default: rel71.30 recommended preview.** Native KDE enrollment, positive matches and a negative-finger check passed on the reference unit; cold-boot/deep-S3 and Ubuntu native-login acceptance remain pending for this release. **rel71.24** is the last fully cold-boot/deep-S3 validated rollback.
 
 Key properties:
 
@@ -180,7 +180,7 @@ If `fwupd` exposes an update, the user remains responsible for reviewing and app
 7. does not install competing CPU power managers;
 8. finishes with the read-only root doctor.
 
-The installer is convergent rather than destructive. On Arch/CachyOS, an exact rel71.24 package match skips the fingerprint build and preserves the live sensor/TLS session. The portable Debian/Ubuntu, Fedora/RHEL, openSUSE and Alpine path records its installed release and does the same. When the fingerprint implementation actually changes, installation is not considered successful until a fresh bounded recovery produces a new semantic `PREWARM_RESULT=READY`.
+The installer is convergent rather than destructive. On Arch/CachyOS, an exact selected rel71.30 package match skips the fingerprint build and preserves the live sensor/TLS session. The portable Debian/Ubuntu, Fedora/RHEL, openSUSE and Alpine path records its installed release and does the same. When the fingerprint implementation actually changes, installation is not considered successful until a fresh bounded recovery produces a new semantic `PREWARM_RESULT=READY`.
 
 Useful modes:
 
