@@ -23,6 +23,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: Ubuntu 24.04 LTS
+            image: ubuntu:24.04
+          - name: Ubuntu 26.04 LTS
+            image: ubuntu:26.04
           - name: Debian stable
             image: debian:stable
           - name: Fedora current

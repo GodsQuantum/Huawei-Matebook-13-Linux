@@ -15,7 +15,7 @@ rel71.30 is the default install. Native KDE enrollment followed by eight success
 
 rel71.30 keeps the fixed authentication threshold at 7 and adds two narrowly scoped changes: a conservative per-view photometric rescue for genuine near misses, plus connected enrollment that builds a redundant five-view anchor before controlled coverage expansion. It deliberately does **not** restore the rejected multi-view score fusion.
 
-GUI re-enrollment and routine KDE lock/unlock have been successful on the reference machine. Wrong-finger negative controls, independent hardware, cold boot and deep-S3 remain necessary before full validation. See [`docs/candidate-71.30.md`](docs/candidate-71.30.md).
+GUI re-enrollment and routine KDE lock/unlock have been successful on the reference machine. A user-reported **unenrolled right-middle rejection followed by immediate right-index acceptance** was also observed as scores 2/3/4 rejected then 16 accepted (threshold 7) in the reference machine's fprintd logs. Broader wrong-finger testing, independent hardware, cold boot and deep-S3 remain necessary before full validation. See [`docs/candidate-71.30.md`](docs/candidate-71.30.md).
 
 Hardware-validated target:
 

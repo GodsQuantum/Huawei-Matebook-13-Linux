@@ -6,11 +6,11 @@
 
 > **English: [README.md](README.md)** · **Français : [README.FR.md](README.FR.md)**
 
-## 当前状态 — 2026-10-07
+## 当前状态 — 2026-10-08
 
-### 已验证 checkpoint 71.24
+### 推荐预览版 rel71.30；已完整验证的回退版本 rel71.24
 
-71.24 是当前 production checkpoint；71.18 保留为不可变 rollback 基线。
+默认安装 rel71.30。在 MateBook 13 参考机通过 KDE 图形界面完成指纹录入后，8/8 次正确指纹验证达到阈值 7。之后的人工负面测试中，未注册手指连续获得 2/3/4 分并被拒绝，已注册右手食指获得 16 分并成功解锁。此结果并非对所有设备的安全性统计证明。独立机器、Ubuntu/GNOME、冷启动和 deep-S3 测试尚未完成。rel71.24 是最近完整验证过的 cold-boot/deep-S3 回退版本；rel71.18 保留为更早的不可变回退基线。
 
 关键 recovery 在 libfprint 枚举之前执行：
 

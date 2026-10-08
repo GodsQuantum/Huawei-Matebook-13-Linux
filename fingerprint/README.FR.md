@@ -11,7 +11,7 @@ famille Huawei MateBook 13 2021.
 
 ### Préversion recommandée rel71.30
 
-rel71.30 est désormais installée par défaut. Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; rel71.30 attend les contrôles mauvais doigt et sur d'autres machines. rel71.18 reste le rollback historique.
+rel71.30 est désormais installée par défaut. Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
 
 Le recovery décisif s'exécute avant l'énumération libfprint :
 

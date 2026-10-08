@@ -58,7 +58,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 ## Fingerprint
 
-**Default fingerprint install: rel71.30.** After KDE-native re-enrollment, eight post-enrollment verification captures passed on the Huawei MateBook 13 reference machine at threshold 7 (scores 7, 10, 7, 13, 9, 11, 11, 19). rel71.24 remains the last fully cold-boot/deep-S3 validated rollback. Wrong-finger and other-hardware results are still needed.
+**Default fingerprint install: rel71.30.** After KDE-native re-enrollment, eight post-enrollment verification captures passed on the Huawei MateBook 13 reference machine at threshold 7 (scores 7, 10, 7, 13, 9, 11, 11, 19). rel71.24 remains the last fully cold-boot/deep-S3 validated rollback. An initial wrong-finger check on the reference unit also rejected three unenrolled-finger placements (scores 2, 3, 4) and then accepted the enrolled finger at score 16. Broader cross-finger and other-machine evidence is still required.
 
 - warm readiness around **82–83 ms** on the validated reference unit;
 - short active-HIGH GPIO264 recovery;
@@ -76,7 +76,7 @@ Driver-only install (no Huawei/GPU Manager). See [standalone guide](fingerprint/
 ./fingerprint/install.sh
 ```
 
-Fingerprint installer coverage: **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE and Alpine**.
+Fingerprint source installers support **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE and Alpine**. **Ubuntu compatibility is a build/installation design target, not yet a runtime validation.** On a similar Ubuntu MateBook, the **driver-only** installer is `./fingerprint/install.sh`; the **full HUAWEI + GPU** installer is `./install.sh` after its read-only `--doctor-only` audit. The GPU path additionally requires the exact MX250 `10de:1d13` and compatible NVIDIA R580 (available in Ubuntu 24.04/26.04 repositories); Secure Boot/DKMS, fingerprint D-Bus ABI and native desktop PAM must be verified locally.
 
 ## Why the MX250 needs repository power management
 
