@@ -1687,11 +1687,49 @@ gx_fdt_drop (const int *base, const int *cur)
 #define GX_MATCH_THRESHOLD            7
 #define GX_MIN_CAPTURE_KEYPOINTS     25
 
+/* rel71.30 candidate: conservative per-view photometric rescue.
+ *
+ * The primary SIGFM acceptance threshold remains 7.  Only a weak-but-usable
+ * per-view score in [3,6] may be promoted, and only when the already-enrolled
+ * normalized raster independently clears every strict alignment gate below.
+ * This is not score fusion and does not add another biometric draw: one
+ * physical pose still produces exactly one authentication decision.
+ *
+ * Gate A from the local aggregate screen remains selected for rel71.30:
+ *   genuine enrolled-view pairs rescued: 5
+ *   inter-finger enrolled-view pairs rescued: 0 / 1200
+ * The primary candidate's best SIGFM score must still be at least 4, so a
+ * photometric match can never promote a completely weak gallery result.
+ * Historical inter-finger maxima were ZNCC=.634 and agreement=.800 versus
+ * the rescue minima .750/.845.  This remains local validation evidence,
+ * not a population FAR claim, so rel71.30 stays private until field-tested. */
+#define GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN 4
+#define GX_PIXEL_RESCUE_SCORE_MIN       3
+#define GX_PIXEL_RESCUE_SCORE_MAX       6
+#define GX_PIXEL_RESCUE_MIN_OVERLAP  1500
+#define GX_PIXEL_RESCUE_MIN_ZNCC_MILLI 750
+#define GX_PIXEL_RESCUE_MIN_AGREE_PERMILLE 845
+
 /* One user-visible press is one biometric sample.  Hidden second captures made
  * the previous enrollment slow and did not add controlled diversity. */
 #define GX_ENROLL_STAGES             20
 #define GX_VIEWS_PER_STAGE            1
 #define GX_ENROLL_VIEWS              GX_ENROLL_STAGES
+
+/* Enrollment topology policy for a tiny partial sensor.
+ *
+ * The first five accepted views form a redundant anchor around the user's
+ * natural placement. Later views may extend coverage, but must remain connected
+ * to the accepted template graph. This prevents a valid-looking yet effectively
+ * isolated capture from consuming one of the fixed 20 enrollment slots.
+ *
+ * Authentication threshold remains independent at 7; these much lower scores
+ * are used only while the user is deliberately enrolling the same finger. */
+#define GX_ENROLL_ANCHOR_STAGES              5
+#define GX_ENROLL_ANCHOR_MIN_SCORE           3
+#define GX_ENROLL_EXTENSION_MIN_SCORE        3
+#define GX_ENROLL_EXTENSION_WEAK_SCORE       2
+#define GX_ENROLL_EXTENSION_WEAK_LINKS       2
 
 /* Reads the firmware version, which also proves the SPI dialogue works. */
 static gboolean
@@ -3351,6 +3389,41 @@ gx_poll_off (gpointer user_data)
   return G_SOURCE_CONTINUE;
 }
 
+static gboolean
+gx_pixel_rescue_view_pass (const GxSiftFeatures *probe,
+                           const GxSiftFeatures *enrolled,
+                           int                   score,
+                           int                  *out_inliers,
+                           int                  *out_overlap,
+                           int                  *out_zncc,
+                           int                  *out_agree)
+{
+  int inliers = 0, overlap = 0, zncc = 0, agree = 0;
+
+  if (!probe || !enrolled ||
+      score < GX_PIXEL_RESCUE_SCORE_MIN ||
+      score > GX_PIXEL_RESCUE_SCORE_MAX)
+    return FALSE;
+
+  if (!gx_sift_pixel_overlap_metrics (probe, enrolled,
+                                      &inliers, &overlap,
+                                      &zncc, &agree))
+    return FALSE;
+
+  if (out_inliers)
+    *out_inliers = inliers;
+  if (out_overlap)
+    *out_overlap = overlap;
+  if (out_zncc)
+    *out_zncc = zncc;
+  if (out_agree)
+    *out_agree = agree;
+
+  return overlap >= GX_PIXEL_RESCUE_MIN_OVERLAP &&
+         zncc >= GX_PIXEL_RESCUE_MIN_ZNCC_MILLI &&
+         agree >= GX_PIXEL_RESCUE_MIN_AGREE_PERMILLE;
+}
+
 static int
 gx_score_probe_against_print (FpPrint *tmpl,
                               const GxSiftFeatures *probe,
@@ -3358,9 +3431,23 @@ gx_score_probe_against_print (FpPrint *tmpl,
                               guint *out_adapt_views)
 {
   g_autoptr(GPtrArray) views = gx_views_from_print (tmpl);
+  g_autofree int *view_scores = NULL;
   int best = 0;
   int top[5] = { 0, 0, 0, 0, 0 };
   guint top_idx[5] = { 0, 0, 0, 0, 0 };
+  gboolean rescued = FALSE;
+  guint rescue_idx = 0;
+  int rescue_inliers = 0;
+  int rescue_overlap = 0;
+  int rescue_zncc = 0;
+  int rescue_agree = 0;
+  gboolean near_valid = FALSE;
+  guint near_idx = 0;
+  int near_score = 0;
+  int near_inliers = 0;
+  int near_overlap = 0;
+  int near_zncc = 0;
+  int near_agree = 0;
 
   if (out_base_views)
     *out_base_views = views ? views->len : 0;
@@ -3370,19 +3457,24 @@ gx_score_probe_against_print (FpPrint *tmpl,
   if (!probe)
     return 0;
 
+  if (views && views->len > 0)
+    view_scores = g_new0 (int, views->len);
+
   /*
-   * Production authentication is intentionally the historical best
-   * single-enrolled-view SIGFM score.  rel71.18 proved that the experimental
-   * cross-view union diagnostic can inflate wrong-finger candidates, so the
-   * production hot path no longer computes it at all.
+   * Primary authentication remains the historical best single-enrolled-view
+   * SIGFM score.  rel71.18 rejected cross-view union/fusion because it could
+   * inflate wrong-finger candidates.
    *
-   * The mask-capable matcher primitive remains available to offline research
-   * tools only; it must not participate in a live authentication decision.
+   * rel71.28 adds one deliberately narrow SECONDARY decision only when the
+   * primary best score is still below threshold.  It evaluates the normalized
+   * raster already serialized in the SAME enrolled view and requires all
+   * strict photometric gates to pass.  No scores are summed across views.
    */
   for (guint i = 0; views && i < views->len; i++)
     {
       int score = gx_sift_match (probe, g_ptr_array_index (views, i));
 
+      view_scores[i] = score;
       if (score > best)
         best = score;
 
@@ -3399,6 +3491,44 @@ gx_score_probe_against_print (FpPrint *tmpl,
             break;
           }
     }
+
+  if (best >= GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN &&
+      best < GX_MATCH_THRESHOLD && views)
+    for (guint i = 0; i < views->len; i++)
+      {
+        int score = view_scores[i];
+        int inliers = 0, overlap = 0, zncc = 0, agree = 0;
+
+        gboolean pass = gx_pixel_rescue_view_pass (probe,
+                                                   g_ptr_array_index (views, i),
+                                                   score,
+                                                   &inliers, &overlap,
+                                                   &zncc, &agree);
+
+        if (overlap > 0 &&
+            (!near_valid || agree > near_agree ||
+             (agree == near_agree && zncc > near_zncc)))
+          {
+            near_valid = TRUE;
+            near_idx = i;
+            near_score = score;
+            near_inliers = inliers;
+            near_overlap = overlap;
+            near_zncc = zncc;
+            near_agree = agree;
+          }
+
+        if (pass)
+          {
+            rescued = TRUE;
+            rescue_idx = i;
+            rescue_inliers = inliers;
+            rescue_overlap = overlap;
+            rescue_zncc = zncc;
+            rescue_agree = agree;
+            break;
+          }
+      }
 
   if (g_getenv ("GXFP_MATCH_DIAGNOSTICS"))
     {
@@ -3424,7 +3554,23 @@ gx_score_probe_against_print (FpPrint *tmpl,
           }
     }
 
-  /* Pixel metrics are research-only and MUST NOT affect authentication. */
+  if (!rescued && near_valid &&
+      best >= GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN &&
+      best < GX_MATCH_THRESHOLD)
+    fp_info ("GXFP51A0 PIXEL_NEARMISS baseline=%d view=%u view_score=%d "
+             "inliers=%d overlap=%d zncc_milli=%d agree_permille=%d",
+             best, near_idx, near_score, near_inliers, near_overlap,
+             near_zncc, near_agree);
+
+  if (rescued)
+    {
+      fp_warn ("GXFP51A0 PIXEL_RESCUE baseline=%d view=%u inliers=%d "
+               "overlap=%d zncc_milli=%d agree_permille=%d effective=%d",
+               best, rescue_idx, rescue_inliers, rescue_overlap,
+               rescue_zncc, rescue_agree, GX_MATCH_THRESHOLD);
+      return GX_MATCH_THRESHOLD;
+    }
+
   return best;
 }
 
@@ -3594,6 +3740,48 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
            "images=%u best=%d threshold=%d",
            mode, images, MAX (best_score, 0), GX_MATCH_THRESHOLD);
   return best_probe;
+}
+
+static gboolean
+gx_enroll_view_connected (GPtrArray             *accepted,
+                          const GxSiftFeatures  *candidate,
+                          int                    stage,
+                          int                   *out_best,
+                          guint                 *out_weak_links)
+{
+  int best = 0;
+  guint weak_links = 0;
+
+  if (out_best)
+    *out_best = 0;
+  if (out_weak_links)
+    *out_weak_links = 0;
+
+  if (!candidate)
+    return FALSE;
+
+  if (!accepted || accepted->len == 0)
+    return TRUE;
+
+  for (guint i = 0; i < accepted->len; i++)
+    {
+      int score = gx_sift_match (candidate, g_ptr_array_index (accepted, i));
+
+      best = MAX (best, score);
+      if (score >= GX_ENROLL_EXTENSION_WEAK_SCORE)
+        weak_links++;
+    }
+
+  if (out_best)
+    *out_best = best;
+  if (out_weak_links)
+    *out_weak_links = weak_links;
+
+  if (stage < GX_ENROLL_ANCHOR_STAGES)
+    return best >= GX_ENROLL_ANCHOR_MIN_SCORE;
+
+  return best >= GX_ENROLL_EXTENSION_MIN_SCORE ||
+         weak_links >= GX_ENROLL_EXTENSION_WEAK_LINKS;
 }
 
 static void
@@ -3767,17 +3955,38 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
       else
         {
           guint keypoints = gx_sift_keypoints (f);
+          int enroll_best = 0;
+          guint weak_links = 0;
 
-          /* On an 80x64 partial sensor, two valid presses of the same finger
-           * may cover disjoint patches and legitimately score zero pairwise.
-           * Rejecting those samples traps enrollment and destroys coverage.
-           * Quality is gated above by contrast and keypoint count; biometric
-           * discrimination is evaluated later against the complete gallery. */
-          g_ptr_array_add (t->views, f);
-          t->stage++;
-          fp_info ("enroll: stage=%d/%d keypoints=%u",
-                   t->stage, GX_ENROLL_STAGES, keypoints);
-          fpi_device_enroll_progress (dev, t->stage, NULL, NULL);
+          /* A partial sensor needs diversity, but unconstrained diversity made
+           * the rel71.24-era enrollment consume slots with views that had
+           * almost no relation to the rest of the template.  Build a small
+           * redundant anchor first, then permit connected expansion.
+           *
+           * These low scores are enrollment-topology evidence only.  They do
+           * not alter the authentication threshold or accept a login. */
+          if (!gx_enroll_view_connected (t->views, f, t->stage,
+                                         &enroll_best, &weak_links))
+            {
+              fp_info ("enroll: rejected disconnected view stage=%d/%d "
+                       "keypoints=%u best_link=%d weak_links=%u; retry",
+                       t->stage + 1, GX_ENROLL_STAGES, keypoints,
+                       enroll_best, weak_links);
+              g_clear_pointer (&f, gx_sift_free);
+              fpi_device_enroll_progress (
+                dev, t->stage, NULL,
+                fpi_device_retry_new (FP_DEVICE_RETRY_CENTER_FINGER));
+            }
+          else
+            {
+              g_ptr_array_add (t->views, f);
+              t->stage++;
+              fp_info ("enroll: accepted stage=%d/%d keypoints=%u "
+                       "best_link=%d weak_links=%u",
+                       t->stage, GX_ENROLL_STAGES, keypoints,
+                       enroll_best, weak_links);
+              fpi_device_enroll_progress (dev, t->stage, NULL, NULL);
+            }
         }
       /* Capture done: we no longer need the finger, only its release.
        * PRESENT without NEEDED is the "you may lift now" signal. */

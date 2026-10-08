@@ -92,7 +92,7 @@ assert "ReadWritePaths=-/sys/bus/spi/devices/spi-GXFP51A0:00" in dropin
 
 pkgbuild = PKGBUILD.read_text()
 pkginstall = PKGINSTALL.read_text()
-assert "pkgrel=71.24" in pkgbuild
+assert "pkgrel=71.30" in pkgbuild
 assert "install=libfprint-goodix51a0.install" in pkgbuild
 assert "graphical.target.wants/fprintd.service" in pkgbuild
 assert "graphical.target.wants/gxfp51a0-boot-prewarm.service" in pkgbuild

@@ -5,11 +5,17 @@ GXFP51A0 found in the Huawei MateBook 13 2021 family.
 
 > Français: [README.FR.md](README.FR.md) · 简体中文: [README.ZH-CN.md](README.ZH-CN.md)
 
-## Status — 2026-10-07
+## Status — 2026-10-08
 
 ### Validated checkpoint: 71.24
 
 rel71.24 is the current validated production checkpoint. rel71.18 remains the immutable rollback reference.
+
+### Active candidate: 71.30
+
+rel71.30 keeps the fixed authentication threshold at 7 and adds two narrowly scoped changes: a conservative per-view photometric rescue for genuine near misses, plus connected enrollment that builds a redundant five-view anchor before controlled coverage expansion. It deliberately does **not** restore the rejected multi-view score fusion.
+
+The candidate is built and installed for validation, but it is not promoted until a fresh rel71.30 enrollment passes repeated first-placement login, cross-finger negative controls, cold boot and deep-S3 checks. See [`docs/candidate-71.30.md`](docs/candidate-71.30.md).
 
 Hardware-validated target:
 

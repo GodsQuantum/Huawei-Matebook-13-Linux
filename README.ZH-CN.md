@@ -26,7 +26,7 @@ HUAWEI
 
 `HUAWEI` 会打开同一个审计菜单；`HUAWEI --doctor-only` 等显式参数仍可用于脚本和自动化。
 
-重复运行同一 release 是安全的：当 rel71.24 已精确安装时，fingerprint 路径会保留当前 fprintd/TLS 会话，不会重新 build 或 restart 传感器。真正的驱动升级必须通过新的 `PREWARM_RESULT=READY` 语义 gate 后才报告成功。
+重复运行当前已精确安装的 fingerprint release 是安全的：安装器会保留当前 fprintd/TLS 会话，不会重新 build 或 restart 传感器。真正的驱动升级必须通过新的 `PREWARM_RESULT=READY` 语义 gate 后才报告成功。
 
 仓库只补齐 Linux 尚未正确支持的硬件缺口；已经由 kernel / distro / desktop 正常支持的部分保持原生管理。
 
@@ -49,7 +49,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **rel71.24 已验证** | 仓库原生 libfprint/fprintd；固定阈值 7；deep-S3 / TLS recovery 已验证 |
+| **指纹** | **rel71.24 已验证 · rel71.30 候选版** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |
@@ -58,7 +58,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-当前 checkpoint：**rel71.24**。
+已验证 checkpoint：**rel71.24**。当前开发候选版：**rel71.30**。
 
 - 参考机 warm FAST_READY 约 **82–83 ms**
 - GPIO264 active-HIGH 短脉冲 recovery
@@ -68,7 +68,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 - 不融合分数
 - template-v4 enrollment 保持兼容
 
-技术记录：[fingerprint/docs/validated-checkpoint-71.24.md](fingerprint/docs/validated-checkpoint-71.24.md)
+技术记录：[已验证 rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [候选 rel71.30](fingerprint/docs/candidate-71.30.md)
 
 指纹安装器支持 **Arch/CachyOS、Debian/Ubuntu、Fedora/RHEL-family、openSUSE、Alpine**。
 

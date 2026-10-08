@@ -26,7 +26,7 @@ HUAWEI
 
 `HUAWEI` opens the same audited menu. Explicit flags such as `HUAWEI --doctor-only` remain available for scripting.
 
-Re-running the same release is safe: when rel71.24 is already installed exactly, the fingerprint path preserves the live fprintd/TLS session instead of rebuilding or restarting the sensor. A real driver upgrade must complete a new semantic `PREWARM_RESULT=READY` gate before the installer reports success.
+Re-running the exact installed fingerprint release is safe: the installer preserves the live fprintd/TLS session instead of rebuilding or restarting the sensor. A real driver upgrade must complete a new semantic `PREWARM_RESULT=READY` gate before the installer reports success.
 
 The project fixes only the hardware gaps that Linux does not already handle correctly. Native kernel/distro support remains native.
 
@@ -49,7 +49,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 | Area | Status | Policy |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.24 validated** | Repository-native libfprint/fprintd driver; threshold 7; deep-S3 and deep-TLS recovery validated |
+| **Fingerprint** | **rel71.24 validated · rel71.30 candidate** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
 | **MX250 power** | **GPU Manager v3.2** | Intel-first session; MX250 PCI-off while idle; R580 + PRIME only for managed dGPU apps |
 | **Huawei hotkeys / Fn-lock / battery interfaces** | **Mainline Linux** | Use `huawei_wmi`; do not duplicate it |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **Native Linux** | Verify only |
@@ -58,7 +58,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 ## Fingerprint
 
-Current checkpoint: **rel71.24**.
+Validated checkpoint: **rel71.24**. Active development candidate: **rel71.30**.
 
 - warm readiness around **82–83 ms** on the validated reference unit;
 - short active-HIGH GPIO264 recovery;
@@ -68,7 +68,7 @@ Current checkpoint: **rel71.24**.
 - no score fusion;
 - existing template-v4 enrollments remain compatible.
 
-Technical record: [fingerprint/docs/validated-checkpoint-71.24.md](fingerprint/docs/validated-checkpoint-71.24.md)
+Technical records: [validated rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [candidate rel71.30](fingerprint/docs/candidate-71.30.md)
 
 Standalone install:
 

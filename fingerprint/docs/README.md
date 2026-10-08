@@ -9,6 +9,7 @@
 - [Native desktop integration](native-desktop-integration.md)
 - [Recovery architecture](recovery-architecture-2026-10-06.md)
 - [Validated checkpoint rel71.24](validated-checkpoint-71.24.md)
+- [Candidate rel71.30 — connected enrollment + conservative rescue](candidate-71.30.md)
 - [Immutable rollback rel71.18](validated-checkpoint-71.18.md)
 - [Research log](research-log.md)
 
