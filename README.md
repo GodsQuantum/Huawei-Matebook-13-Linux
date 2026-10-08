@@ -76,7 +76,7 @@ Driver-only install (no Huawei/GPU Manager). See [standalone guide](fingerprint/
 ./fingerprint/install.sh
 ```
 
-Fingerprint source installers support **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE and Alpine**. **Ubuntu compatibility is a build/installation design target, not yet a runtime validation.** On a similar Ubuntu MateBook, the **driver-only** installer is `./fingerprint/install.sh`; the **full HUAWEI + GPU** installer is `./install.sh` after its read-only `--doctor-only` audit. The GPU path additionally requires the exact MX250 `10de:1d13` and compatible NVIDIA R580 (available in Ubuntu 24.04/26.04 repositories); Secure Boot/DKMS, fingerprint D-Bus ABI and native desktop PAM must be verified locally.
+Fingerprint source installers support **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE and Alpine**. **Ubuntu 24.04 LTS and 26.04 LTS both PASS the complete source-build-only GitHub CI**, alongside Debian, Fedora, openSUSE, Arch and Alpine (7/7). Ubuntu hardware enrollment, unlock and MX250 runtime remain **untested**, so compilation success is not a functional guarantee. On a similar Ubuntu MateBook, the **driver-only** installer is `./fingerprint/install.sh`; the **full HUAWEI + GPU** installer is `./install.sh` after its read-only `--doctor-only` audit. The GPU path additionally requires the exact MX250 `10de:1d13` and compatible NVIDIA R580 (available in Ubuntu 24.04/26.04 repositories); Secure Boot/DKMS, fingerprint D-Bus ABI and native desktop PAM must be verified locally.
 
 ## Why the MX250 needs repository power management
 

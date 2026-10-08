@@ -70,7 +70,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 recommandée en préversion](fingerprint/docs/candidate-71.30.md)
 
-**Ubuntu :** les installateurs prévoient le pilote seul (`./fingerprint/install.sh`) ou l'ensemble HUAWEI/GPU (`./install.sh` après `./install.sh --doctor-only`). Il faut le capteur exact `GXFP51A0` ; la gestion du GPU nécessite une MX250 `10de:1d13` et NVIDIA R580 adapté au noyau. Les essais réels du capteur sous Ubuntu, Secure Boot/DKMS et l'intégration PAM graphique restent à vérifier.
+**Ubuntu :** les installateurs prévoient le pilote seul (`./fingerprint/install.sh`) ou l'ensemble HUAWEI/GPU (`./install.sh` après `./install.sh --doctor-only`). Il faut le capteur exact `GXFP51A0` ; la gestion du GPU nécessite une MX250 `10de:1d13` et NVIDIA R580 adapté au noyau. La compilation du pilote en CI est désormais **validée sur Ubuntu 24.04 et 26.04 LTS** (matrice complète : 7/7). Les essais réels du capteur sous Ubuntu, Secure Boot/DKMS, GPU MX250 et l'intégration PAM graphique restent à vérifier.
 
 Installation du pilote seul, sans GPU Manager/HUAWEI (voir [guide autonome](fingerprint/DRIVER_ONLY.md)) :
 

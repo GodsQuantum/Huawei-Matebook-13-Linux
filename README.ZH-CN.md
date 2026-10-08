@@ -70,7 +70,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 技术记录：[已验证 rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [推荐预览版 rel71.30](fingerprint/docs/candidate-71.30.md)
 
-在参考 MateBook 13 上又完成了负面测试：未录入手指的 2/3/4 分均被拒绝，已录入右手食指获得 16 分并成功解锁（阈值保持 7）。Ubuntu 可选择仅安装指纹驱动 `./fingerprint/install.sh`，或完整 HUAWEI/GPU 安装 `./install.sh`；必须匹配 `GXFP51A0` 与显卡 `10de:1d13`，Ubuntu 真实硬件与 GUI/PAM 运行仍未验证。
+在参考 MateBook 13 上又完成了负面测试：未录入手指的 2/3/4 分均被拒绝，已录入右手食指获得 16 分并成功解锁（阈值保持 7）。Ubuntu 可选择仅安装指纹驱动 `./fingerprint/install.sh`，或完整 HUAWEI/GPU 安装 `./install.sh`；必须匹配 `GXFP51A0` 与显卡 `10de:1d13`，Ubuntu 24.04/26.04 LTS 的源码编译 CI 全部通过（7/7 发行版矩阵），但 Ubuntu 真实指纹硬件、GPU 和 GUI/PAM 运行仍未验证。
 
 指纹安装器支持 **Arch/CachyOS、Debian/Ubuntu、Fedora/RHEL-family、openSUSE、Alpine**。
 
