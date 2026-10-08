@@ -26,7 +26,7 @@ HUAWEI
 
 `HUAWEI` ouvre le même menu audité. Les flags explicites comme `HUAWEI --doctor-only` restent disponibles pour les scripts.
 
-La réexécution de la même release est sûre : si rel71.24 est déjà exactement installée, le chemin fingerprint conserve la session fprintd/TLS active au lieu de rebuild/restart le capteur. Une vraie mise à jour du pilote doit obtenir un nouveau `PREWARM_RESULT=READY` avant que l'installation soit déclarée réussie.
+La réexécution de la release fingerprint exactement installée est sûre : l’installeur conserve la session fprintd/TLS active au lieu de rebuild/restart le capteur. Une vraie mise à jour du pilote doit obtenir un nouveau `PREWARM_RESULT=READY` avant que l'installation soit déclarée réussie.
 
 Le dépôt ne corrige que les manques matériels que Linux ne gère pas correctement ; tout ce qui est déjà natif reste géré par le kernel, la distribution et le bureau.
 
@@ -49,7 +49,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.24 validée** | Pilote libfprint/fprintd natif du dépôt ; seuil 7 ; deep-S3 et recovery TLS validés |
+| **Fingerprint** | **rel71.24 validée · rel71.30 candidate** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrollment connecté et un rescue conservateur par vue |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -58,7 +58,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-Checkpoint actuel : **rel71.24**.
+Checkpoint validé : **rel71.24**. Candidate de développement active : **rel71.30**.
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;
@@ -68,7 +68,7 @@ Checkpoint actuel : **rel71.24**.
 - aucune fusion de scores ;
 - enrollments template-v4 conservés.
 
-Documentation : [fingerprint/docs/validated-checkpoint-71.24.md](fingerprint/docs/validated-checkpoint-71.24.md)
+Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 candidate](fingerprint/docs/candidate-71.30.md)
 
 Installation seule :
 
