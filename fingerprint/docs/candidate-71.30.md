@@ -91,10 +91,18 @@ rel71.30 was built and verified away from the target sensor:
 - MMIO writes during build: NONE;
 - firmware actions during build: NONE.
 
-Arch package SHA-256:
+Reference Arch package build (isolated development LXC, ephemeral `archlinux:base-devel`, GCC 16.2.1, pinned Meson 1.12.0 / Ninja 1.13.2):
+
+Package SHA-256:
 
 ```text
-3320f65f58003d00e6fac624e4a1888e1658fe64f865de0858feff0f3ac9866c
+4d8065f9e55dafe7e8dd38d7687b33c8b14199498d59acd99f99523389037aef
+```
+
+Packaged `/usr/lib/libfprint-2.so.2.0.0` SHA-256:
+
+```text
+efa5d5bda4e15c22336ab76c0e69294bf6da303e5d42277128fb808397b60297
 ```
 
 The package installs as:
