@@ -115,16 +115,19 @@ libfprint-goodix51a0 1.94.100.goodix51a0-71.30
 
 A fresh **right-index-only** template was created through the KDE graphical interface at 15:02:01 CEST. In the following live period, **8/8 logged verify captures** scored at or above the unchanged threshold 7 (scores: 7, 10, 7, 13, 9, 11, 11, 19); no GET_IMAGE/FDT ACK retry was logged in that period. No biometric material is distributed in the repository. Two previously enrolled fingers are not present in the live fprintd database after the operator's GUI actions; no automatic deletion/restoration was performed by project tooling.
 
-These results establish a positive single-machine field test, **not** a universal false-accept rate, cross-hardware reliability result, or proof of cold-boot/deep-S3 compatibility with rel71.30. Treat rel71.30 as the recommended public preview for controlled community testing, with rel71.24 retained for fully validated rollback.
+### New native KDE wrong-finger check (2026-10-08, 15:31–15:32 CEST)
+
+The operator reported repeatedly presenting the **unenrolled right-middle finger**, which never unlocked the KDE session, then presenting the enrolled **right-index finger**, which unlocked immediately. The contiguous `fprintd` verification log contains primary scores **2, 3, 4** (all refused below threshold **7**) followed by score **16** (accepted above threshold). Attribution of the rejected placements to the right-middle finger comes from the human operator, not fingerprint identities exposed by the driver. A single bounded `FDT probe retry: stage=ack attempt=1/3` occurred before this sequence; it did not prevent the reported correct-finger unlock. The acceptance threshold remained 7, with no MATCH_FUSION. **No biometric images/templates or sensor secrets are published.**
+
+This adds positive evidence of a targeted wrong-finger rejection on the reference machine; it is **not** a statistically measured false-accept rate, a cross-hardware reliability result, or proof of cold-boot/deep-S3 compatibility with rel71.30. Treat rel71.30 as the recommended public preview for controlled community testing, with rel71.24 retained as the fully validated rollback.
 
 ## Validation still required
 
-Before tagging rel71.30 as validated:
+Completed on the reference machine: native KDE re-enrollment, repeated routine lock/unlock, and an initial negative control (unenrolled right-middle scored 2/3/4, then right-index scored 16). The following gates **remain open** before a fully validated release:
 
-1. re-enroll at least the main login finger with rel71.30 so the connected-enrollment policy is actually used;
-2. validate repeated ordinary lock/unlock attempts, emphasizing first-placement success;
-3. run cross-finger negative controls;
-4. validate one cold boot and one deep-S3 resume;
-5. confirm no regression in prewarm / TLS recovery.
+1. repeat cross-finger negative controls with a broader set of fingers and test on an independent GXFP51A0 machine;
+2. validate one cold boot and one deep-S3 resume **on rel71.30**;
+3. confirm recovery from a degraded TLS/FDT transport state on other board revisions, especially the MateBook 13 2020;
+4. test real native GUI enrollment and lock/unlock on Ubuntu, GNOME and other distributions.
 
 Until those gates pass, rel71.24 remains the public validated checkpoint.

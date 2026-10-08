@@ -2,7 +2,7 @@
 
 This is the **driver-only** distribution. It does not install Huawei GPU Manager, a custom GUI, or the HUAWEI control center.
 
-**Default: rel71.30 public preview (2026-10-08).** The current reference machine (Huawei MateBook 13 / GXFP51A0 / ST411) completed native KDE enrollment; eight subsequent verification captures scored 7/7 or higher. This is a **single-machine field test**, not proof that other models, firmwares, or distributions are compatible. **rel71.24** is still the fully cold-boot/deep-S3-validated rollback.
+**Default: rel71.30 public preview (2026-10-08).** The reference machine (Huawei MateBook 13 / GXFP51A0 / ST411) completed native KDE enrollment; eight subsequent verification captures scored 7/7 or higher. In a later operator-confirmed wrong-finger check, three attempts with an unenrolled finger scored 2, 3 and 4 (rejected), then the enrolled index scored 16 (accepted). This is a **single-machine field test**, not proof that other models, firmwares, or distributions are compatible. **rel71.24** is still the fully cold-boot/deep-S3-validated rollback.
 
 ## Supported hardware and limitations
 
@@ -12,6 +12,8 @@ This is the **driver-only** distribution. It does not install Huawei GPU Manager
 - The native libfprint driver uses standard fprintd (D-Bus) and the desktop's existing fingerprint PAM integration.
 - Arch/CachyOS binary is x86_64-specific. Linux source building targets Arch, Debian/Ubuntu, Fedora, openSUSE and Alpine, but hardware/runtime checks on those distros need community validation.
 - No firmware flashing, no GPIO112 writes, no global PAM override, no biometric capture export.
+- **Ubuntu installation uses this SOURCE archive, not the Arch .pkg.tar.zst binary.** In Ubuntu 24.04/26.04, the script selects `apt-get`, builds pinned libfprint 1.94.100 under an isolated `/usr/local` scope, and performs a staged ABI check against the Ubuntu `fprintd` executable before installation. Installation still requires working SPI/ACPI and an intact distribution PAM/GNOME/KDE environment; Ubuntu sensor/runtime success has **not** been measured on a real Ubuntu laptop.
+- **Full Huawei/GPU installer is separate** (the complete repository's `./install.sh`): it requires Huawei DMI, the actual MX250 PCI ID `10de:1d13` for dGPU setup, systemd and a working proprietary NVIDIA R580 kernel module for the running kernel. Ubuntu 24.04 and 26.04 provide `nvidia-driver-580` packages, but available repository components, Secure Boot/DKMS and PRIME operation must be checked per machine. The driver-only archive does not include that installer.
 
 ## Option A — GitHub driver-only source archive (all supported distros)
 

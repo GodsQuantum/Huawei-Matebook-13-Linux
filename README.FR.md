@@ -58,7 +58,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-**Installation par défaut : rel71.30.** Après réenrôlement par l'interface native KDE, 8/8 captures de vérification ont réussi sur le MateBook 13 de référence (seuil 7). rel71.24 reste le dernier rollback intégralement validé après démarrage à froid/deep-S3. Les essais mauvais doigt et sur un autre matériel restent nécessaires.
+**Installation par défaut : rel71.30.** Après réenrôlement par l'interface native KDE, 8/8 captures de vérification ont réussi sur le MateBook 13 de référence (seuil 7). rel71.24 reste le dernier rollback intégralement validé après démarrage à froid/deep-S3. Un premier essai avec le majeur non enregistré a été refusé trois fois (scores 2/3/4), puis l'index enregistré a été accepté directement (score 16, seuil 7). Il reste à vérifier d'autres appareils et configurations.
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;
@@ -68,7 +68,9 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 - aucune fusion de scores ;
 - enrollments template-v4 conservés.
 
-Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 candidate](fingerprint/docs/candidate-71.30.md)
+Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 recommandée en préversion](fingerprint/docs/candidate-71.30.md)
+
+**Ubuntu :** les installateurs prévoient le pilote seul (`./fingerprint/install.sh`) ou l'ensemble HUAWEI/GPU (`./install.sh` après `./install.sh --doctor-only`). Il faut le capteur exact `GXFP51A0` ; la gestion du GPU nécessite une MX250 `10de:1d13` et NVIDIA R580 adapté au noyau. Les essais réels du capteur sous Ubuntu, Secure Boot/DKMS et l'intégration PAM graphique restent à vérifier.
 
 Installation du pilote seul, sans GPU Manager/HUAWEI (voir [guide autonome](fingerprint/DRIVER_ONLY.md)) :
 
