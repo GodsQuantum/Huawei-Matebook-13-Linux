@@ -186,7 +186,7 @@ assert "latest semantic fingerprint prewarm FAILED" in doctor
 assert "-t gxfp51a0-boot-prewarm" in doctor
 
 linux = LINUX.read_text()
-assert 'PORTABLE_RELEASE="rel71.24-portable2"' in linux
+assert 'PORTABLE_RELEASE="rel71.30-portable1"' in linux
 assert "portable_exact_installed" in linux
 assert "Preserving the live fprintd/TLS session" in linux
 assert "$STATE_DIR/release" in linux
