@@ -1,8 +1,26 @@
-# Huawei MateBook 13 sous Linux
+<div align="center">
 
-> Onboarding Linux en une commande, avec priorité aux mécanismes natifs, pour le Huawei MateBook 13 de référence.
->
-> **English: [README.md](README.md)** · **简体中文: [README.ZH-CN.md](README.ZH-CN.md)**
+# Huawei MateBook 13 · Linux
+
+**Rendre au MateBook 13 les fonctions matérielles qui lui manquent sous Linux.**
+
+Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la demande · prise en charge du MateBook 13 **2020 / 2021** (`WRTB-WXX9`)
+
+[![Quality](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/quality.yml)
+[![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
+[![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
+[![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+
+[**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
+
+</div>
+
+## Choisir son installation
+
+**Pilote d’empreintes seul :** `./fingerprint/install.sh` ([archive autonome](fingerprint/DRIVER_ONLY.md)). **Configuration complète (empreintes + MX250) :** `./install.sh`. **Vérification du matériel sans modification :** `./install.sh --doctor-only`.
+
+Lancez ces commandes comme **utilisateur normal**, pas en root. Pour enregistrer ou supprimer une empreinte, utilisez **les paramètres graphiques natifs de KDE/GNOME**, jamais un outil d’enrôlement personnalisé.
 
 ## Une seule commande
 
@@ -16,17 +34,17 @@ cd huawei-matebook-13-linux
 
 À lancer avec l'utilisateur normal du bureau, **pas avec sudo**.
 
-Sans argument dans un terminal interactif, `./install.sh` commence par un audit matériel en lecture seule puis ouvre un menu **Whiptail**. L’interface s’adapte automatiquement à la taille du terminal ; `Esc`/Annuler quitte sans modification. **RECOMMENDED** vérifie le baseline natif et n’applique que les composants du dépôt manquants/obsolètes, tandis que **FINGERPRINT** et **GPU** restent strictement limités au composant choisi.
+Sans argument dans un terminal interactif, `./install.sh` commence par un audit matériel en lecture seule puis ouvre un menu **Whiptail**. L’interface s’adapte automatiquement à la taille du terminal ; `Esc`/Annuler quitte sans modification. **RECOMMENDED** vérifie les composants natifs et n’applique que les composants du dépôt manquants/obsolètes, tandis que **FINGERPRINT** et **GPU** restent strictement limités au composant choisi.
 
-Après une installation/mise à jour réussie, le checkout installe le raccourci utilisateur :
+Après une installation/mise à jour réussie, le dépôt installe le raccourci utilisateur :
 
 ```bash
 HUAWEI
 ```
 
-`HUAWEI` ouvre le même menu audité. Les flags explicites comme `HUAWEI --doctor-only` restent disponibles pour les scripts.
+`HUAWEI` ouvre le même menu audité. Les options explicites comme `HUAWEI --doctor-only` restent disponibles pour les scripts.
 
-La réexécution de la release fingerprint exactement installée est sûre : l’installeur conserve la session fprintd/TLS active au lieu de rebuild/restart le capteur. Une vraie mise à jour du pilote doit obtenir un nouveau `PREWARM_RESULT=READY` avant que l'installation soit déclarée réussie.
+La réexécution de la release fingerprint exactement installée est sûre : l’installeur conserve la session fprintd/TLS active au lieu de recompiler le pilote ou de redémarrer le capteur. Une vraie mise à jour du pilote doit obtenir un nouveau `PREWARM_RESULT=READY` avant que l'installation soit déclarée réussie.
 
 Le dépôt ne corrige que les manques matériels que Linux ne gère pas correctement ; tout ce qui est déjà natif reste géré par le kernel, la distribution et le bureau.
 
@@ -49,7 +67,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.30 préversion recommandée · rel71.24 rollback S3 validé** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrollment connecté et un rescue conservateur par vue |
+| **Fingerprint** | **rel71.30 préversion recommandée · rel71.24 rollback S3 validé** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -66,7 +84,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 - deep-S3 manuel validé côté transport ;
 - seuil fixe **7** ;
 - aucune fusion de scores ;
-- enrollments template-v4 conservés.
+- empreintes au format v4 conservées.
 
 Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 recommandée en préversion](fingerprint/docs/candidate-71.30.md)
 
@@ -78,7 +96,7 @@ Installation du pilote seul, sans GPU Manager/HUAWEI (voir [guide autonome](fing
 ./fingerprint/install.sh
 ```
 
-Distributions prises en charge par l'installateur fingerprint : **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE et Alpine**.
+Distributions prises en charge par l’installateur d’empreintes : **Arch/CachyOS, Debian/Ubuntu, Fedora/RHEL-family, openSUSE et Alpine**.
 
 ## Pourquoi la MX250 nécessite un gestionnaire
 

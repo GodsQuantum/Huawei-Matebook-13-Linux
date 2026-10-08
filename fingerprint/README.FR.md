@@ -32,72 +32,6 @@ La décision biométrique reste conservatrice : seuil fixe **7**, meilleure vue 
 
 Voir [`docs/validated-checkpoint-71.24.md`](docs/validated-checkpoint-71.24.md) et [`docs/recovery-architecture-2026-10-06.md`](docs/recovery-architecture-2026-10-06.md).
 
-## Historique technique — 24 septembre 2026
-
-Cible matériellement validée :
-
-- ACPI HID : `GXFP51A0`
-- Goodix GF3658 / ST411, chip ID `0x2504`
-- firmware validé : `GF_ST411SEC_APP_14115`
-- SPI mode 0 + `SPI_CS_HIGH`, 1 MHz
-- GPIO48 readiness/IRQ et GPIO264 reset MCU actif HIGH
-- TLS 1.2 `PSK-AES128-GCM-SHA256`
-- image active 80×64
-- base libfprint épinglée : `v1.94.100`
-
-Chemin de production :
-
-```text
-GXFP51A0 → libfprint → fprintd → PAM du bureau / CLI
-```
-
-### Base validée en conditions réelles : rel40
-
-Un vrai login graphique après cold boot sur le MateBook 13 2021 de référence a
-réussi avec les enrollments existants. Plasma Login Manager a utilisé
-`Identify` : première pose `2/3/3`; sur la pose suivante, la première image a
-été rejetée par le quality gate et la **deuxième image de la même pose physique
-a obtenu 7/7**, ouvrant la session.
-
-rel40 valide donc ensemble :
-
-- le `WakeupMCU` Windows exact : SPI brut `0f 00 00 0e` + 5 ms ;
-- la revalidation hardware du contexte warm et `WARM_REBASE` ;
-- `Verify` et `Identify` multi-empreintes ;
-- jusqu'à 3 images indépendantes sur une même pose via `RetryCaptureIMG` ;
-- seuil fixe **7**, sans addition ni fusion de scores ;
-- jusqu'à 3 poses physiques avant rejet terminal ;
-- enrollment 20 vues et compatibilité template-v4/SIGFM-v3 ;
-- récupération transport bornée, prewarm boot et prewarm après deep sleep ;
-- aucun keepalive Claim périodique ;
-- aucun writer de dump biométrique dans les builds release.
-
-### Candidat rel43 : auto-calibration protocolaire + installation Linux portable
-
-rel43 conserve intégralement le chemin biométrique rel40 validé : `WakeupMCU` Windows exact, `WARM_REBASE`, same-press Verify/Identify, seuil 7, format des templates et enrollments existants restent inchangés.
-
-rel42 avait correctement supprimé les timings persistants, mais son cold boot a révélé une régression : remettre le timing protocolaire à 100 % à chaque préparation froide provoquait des retries ACK/FDT sans IRQ, et le greeter atteignait `IDENTIFY ... READY` sans détecter le doigt. rel43 garde le pacing capture uniquement en RAM, tandis que le timing protocolaire s'auto-calibre par pas bornés de 50 points après de vrais misses ACK/FDT/TLS. Une récupération dans le même processus conserve ce timing prouvé ; rien n'est persisté entre les boots.
-
-La suite rel43 et le build reproductible passent. Le source rel43 réel passe également les gates build + ABI fprintd sur Debian stable, Fedora current, openSUSE Tumbleweed, Arch Linux et Alpine edge/musl. rel40 reste le dernier login humain validé jusqu'au cold boot d'acceptation rel43.
-
-### Candidat rel42 : adaptation rapide en RAM + installation Linux portable
-
-rel42 conserve intégralement le chemin biométrique rel40 validé. Il supprime les
-fichiers de timing persistants rel24–rel40, car un échec lifecycle/prewarm
-pouvait faire grimper définitivement le pacing au fil des boots. Après une
-frontière lifecycle fraîche, le timing repart toujours à 100 % et ne s'adapte
-qu'en RAM :
-
-- un échec lifecycle/prewarm ne modifie jamais le pacing capture ;
-- 3 captures réussies consécutives ayant nécessité le retry GET_IMAGE montent
-  le pacing d'un pas de 50 points pour le daemon courant ;
-- 8 captures propres redescendent d'un pas vers la valeur nominale ;
-- une vraie désynchronisation biométrique peut augmenter le pacing de session
-  et déclenche la récupération complète déjà validée ;
-- le timing protocole/TLS peut aussi s'assouplir en session, sans persistance.
-
-La suite logicielle rel42 et le build libfprint reproductible passent. Le gate build/ABI portable passe aussi dans des conteneurs propres Debian stable, Fedora current, openSUSE Tumbleweed, Arch Linux et Alpine edge/musl. rel42 ne remplace pas encore la validation humaine rel40 tant qu'il n'a pas reçu son propre test cold boot.
-
 ## Installation
 
 La réexécution est idempotente : une release déjà exacte ne rebuild/restart pas le capteur. Une vraie mise à jour doit terminer avec un nouveau `PREWARM_RESULT=READY`.
@@ -150,14 +84,9 @@ Les autres bureaux conservent leur intégration fprintd/PAM native.
 
 Benjamin Allègre (Sigfrodr) publie tools/eval/fp_eval.py dans Sigfrodr/libfprint-goodixtls : un évaluateur local commun à la famille Milan-SPI avec séparation enrol/probe disjointe. Il ne sort que des agrégats EER, FAR/FRR, distributions de scores et d-prime ; captures et templates restent sur la machine du testeur. C'est utile pour une validation multi-utilisateur défendable en upstream de SIGFM face à des références neutres descriptor/géométriques et NBIS optionnel. Ce n'est pas une dépendance runtime et les builds release restent incapables de dumper les captures biométriques.
 
-## Historique technique
+## Installation par distribution
 
-### rel24-rc1 : candidat de compatibilité transport lent
-
-Le premier retour confirmé sur un MateBook 13 2020 ST411/14115 montre que rel23 peut authentifier correctement cette révision tout en subissant parfois un état transport dégradé avec des retries GET_IMAGE/FDT très lents. rel24-rc1 conserve le gap capture validé de 30 ms par défaut, mais apprend séparément un pacing capture de 100 à 300 % uniquement après un échec GET_IMAGE complet. Cette valeur est indépendante du timing TLS/init existant et n'est persistée qu'après une capture de doigt complète réussie. Les deux signatures `no ACK/TLS` et `ACK mais aucune image TLS après retry` déclenchent une récupération MCU/session complète ; un échec transport ne consomme jamais une tentative biométrique.
-
-Le prewarm d'énumération devient également volontairement court : une seule tentative externe, au plus deux essais TLS avec le PMK en cache et aucun fallback fresh-staging. Si cette optimisation échoue, fprintd devient quand même disponible et la vraie ouverture biométrique conserve sa récupération bornée complète. rel24-rc1 ne change ni template v4, ni SIGFM v3, ni le seuil 7, ni les 20 vues d'enrollment, ni les trois presses indépendantes maximum.
-
+Les anciennes expériences (rel24–rel61) restent accessibles dans l’[historique technique](docs/history/), le [journal de recherche](docs/research-log.md) et Git. Elles ne constituent pas la procédure actuelle. rel71.30 est la préversion recommandée ; rel71.24 reste le dernier rollback entièrement testé après démarrage à froid et deep-S3.
 
 ### Arch / CachyOS
 
@@ -176,15 +105,7 @@ couvrir plusieurs zones du doigt.
 
 ### Anciens templates de développement
 
-Le format courant est template driver v4 / SIGFM v3. Une personne venant d'une
-ancienne révision de développement de ce dépôt peut devoir supprimer une fois
-ses anciens templates puis ré-enroller :
-
-```bash
-fprintd-delete "$USER"
-```
-
-Une installation neuve n'a pas cette étape.
+Le format actuel est driver v4 / SIGFM v3. Si une empreinte enregistrée avec une ancienne version expérimentale n’est plus reconnue, supprimez **uniquement ce doigt** depuis les **paramètres graphiques natifs → Utilisateurs → Empreintes**, puis enregistrez-le de nouveau au même endroit. Ne supprimez pas toutes les empreintes et n’utilisez pas la ligne de commande pour les gérer. Cette étape n’est pas nécessaire pour une installation neuve.
 
 ### Debian / Ubuntu / Fedora / openSUSE / Alpine / autres Linux
 

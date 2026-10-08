@@ -14,7 +14,7 @@ This document records why the root installer manages some components and deliber
 | Mic-mute / hotkeys | Huawei WMI input/LED | Mainline | Verify only |
 | Intel graphics | 8086:9b41 | i915 | Verify only |
 | NVIDIA dGPU | 10de:1d13 MX250 Pascal | PRIME works; NVIDIA RTD3 is Turing+ | Repo-managed on-demand PCI power gate |
-| Fingerprint | GXFP51A0 / GF3658 ST411 | Not upstream libfprint | Repo-managed rel71.24 |
+| Fingerprint | GXFP51A0 / GF3658 ST411 | Not upstream libfprint | Repo-managed **rel71.30 preview** (rel71.24 S3-validated rollback) |
 | Wi-Fi | Intel CNVi 8086:02f0 | iwlwifi | Verify only |
 | Bluetooth | Intel 8087:0aaa | btusb/Intel firmware stack | Verify only |
 | Camera | IMC 13d3:56c6 | UVC | Verify only |
