@@ -166,9 +166,8 @@ Release 包含：
 
 安装器会检查 GXFP51A0、构建并安装审核过的 libfprint/fprintd、仅增加驱动所需的 gpiochip 权限，并安装一次性的 boot prime；不会安装周期 keepalive，也不会安装外部 S3 resume hook。仅在 Plasma 6.7.5 上，它还会应用 package-managed、幂等且可回滚的 KDE/Plasma Login Manager 兼容集成；其他桌面继续使用自己的原生 fprintd/PAM 集成。之后可使用桌面标准设置，或：
 
-    fprintd-enroll -f right-index-finger
-    fprintd-verify
-    fprintd-list "$USER"
+    # 请通过 KDE/GNOME 原生图形界面添加、删除和验证指纹。
+    # 安装程序不启动命令行录入或验证。
 
 驱动要求 20 次 enrollment 按压。每次轻微移动手指，让 80×64 小传感器覆盖不同区域。
 
@@ -176,7 +175,7 @@ Release 包含：
 
 当前磁盘格式为 driver template v4 / SIGFM v3。如果之前安装过本仓库的早期开发版本，可能需要一次性删除旧模板并重新 enrollment：
 
-    fprintd-delete "$USER"
+    # 如需删除旧指纹，请使用桌面图形界面，不要批量删除。
 
 全新安装不需要此步骤。
 

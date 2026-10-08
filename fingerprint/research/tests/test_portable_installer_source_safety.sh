@@ -79,13 +79,15 @@ grep -Fq 'LEGACY_PLASMA_PATCHES=0' "$a"
 grep -Fq 'native fprintd/PAM' "$i"
 grep -Fq 'native fprintd/PAM' "$a"
 
-# Zero-to-working gates: doctor + enrollment + live verify.
+# Production gate: driver doctor + native KDE/GNOME GUI enrollment; never
+# force the user through a custom CLI and never delete existing enrollments.
 grep -Fq 'gxfp51a0-doctor.sh' "$i"
-grep -Fq 'fprintd-enroll -f "$FINGER"' "$i"
-grep -Fq 'fprintd-verify "$USER"' "$i"
+grep -Fq 'native graphical Settings' "$i"
+grep -Fq 'native graphical Settings' "$a"
 grep -Fq -- '--pre-enroll' "$i"
-grep -Fq 'No enrolled fingerprint found' "$a"
-grep -Fq 'Final live fingerprint verification' "$a"
+! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$i"
+! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$a"
+grep -Fq 'PORTABLE_RELEASE="rel71.30-portable1"' "$i"
 
 # Never delete biometric templates or the validated per-unit PMK cache.
 ! grep -Eq 'rm .*goodix51a0-pmk' "$i"

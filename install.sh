@@ -147,7 +147,7 @@ fingerprint_expected_version() {
     return
   fi
   portable="$(sed -n 's/^PORTABLE_RELEASE="\(.*\)"/\1/p' "$ROOT/fingerprint/install-linux.sh" | head -n1)"
-  printf '%s\n' "${portable:-rel71.24}"
+  printf '%s\n' "${portable:-rel71.30-portable1}"
 }
 
 fingerprint_installed_version() {

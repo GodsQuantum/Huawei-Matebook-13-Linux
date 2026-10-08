@@ -1,7 +1,7 @@
 # Candidate rel71.30 — connected enrollment + conservative near-miss rescue
 
 **Date:** 2026-10-08
-**Status:** candidate; not yet promoted to a validated release
+**Status:** recommended public preview after native KDE field testing; cross-finger, cold-boot, deep-S3 and second-machine checks still pending
 **Validated rollback:** rel71.24 (rel71.18 remains the older immutable rollback reference)
 
 ## Why this candidate exists
@@ -110,6 +110,12 @@ The package installs as:
 ```text
 libfprint-goodix51a0 1.94.100.goodix51a0-71.30
 ```
+
+## Native KDE field results on reference MateBook 13 (2026-10-08)
+
+A fresh **right-index-only** template was created through the KDE graphical interface at 15:02:01 CEST. In the following live period, **8/8 logged verify captures** scored at or above the unchanged threshold 7 (scores: 7, 10, 7, 13, 9, 11, 11, 19); no GET_IMAGE/FDT ACK retry was logged in that period. No biometric material is distributed in the repository. Two previously enrolled fingers are not present in the live fprintd database after the operator's GUI actions; no automatic deletion/restoration was performed by project tooling.
+
+These results establish a positive single-machine field test, **not** a universal false-accept rate, cross-hardware reliability result, or proof of cold-boot/deep-S3 compatibility with rel71.30. Treat rel71.30 as the recommended public preview for controlled community testing, with rel71.24 retained for fully validated rollback.
 
 ## Validation still required
 

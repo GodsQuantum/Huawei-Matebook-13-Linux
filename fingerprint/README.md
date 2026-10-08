@@ -7,15 +7,15 @@ GXFP51A0 found in the Huawei MateBook 13 2021 family.
 
 ## Status — 2026-10-08
 
-### Validated checkpoint: 71.24
+### Recommended preview: rel71.30 (reference-machine field test)
 
-rel71.24 is the current validated production checkpoint. rel71.18 remains the immutable rollback reference.
+rel71.30 is the default install. Native KDE enrollment followed by eight successful scored verification captures on the reference MateBook 13 at threshold 7 (7, 10, 7, 13, 9, 11, 11, 19). No post-enrollment ACK/TLS errors were logged during that series. This is not a population-level false-acceptance estimate. rel71.24 is still the last fully cold-boot/deep-S3 validated rollback (rel71.18 older immutable reference).
 
-### Active candidate: 71.30
+### Changes in rel71.30
 
 rel71.30 keeps the fixed authentication threshold at 7 and adds two narrowly scoped changes: a conservative per-view photometric rescue for genuine near misses, plus connected enrollment that builds a redundant five-view anchor before controlled coverage expansion. It deliberately does **not** restore the rejected multi-view score fusion.
 
-The candidate is built and installed for validation, but it is not promoted until a fresh rel71.30 enrollment passes repeated first-placement login, cross-finger negative controls, cold boot and deep-S3 checks. See [`docs/candidate-71.30.md`](docs/candidate-71.30.md).
+GUI re-enrollment and routine KDE lock/unlock have been successful on the reference machine. Wrong-finger negative controls, independent hardware, cold boot and deep-S3 remain necessary before full validation. See [`docs/candidate-71.30.md`](docs/candidate-71.30.md).
 
 Hardware-validated target:
 
@@ -60,6 +60,10 @@ Full rationale and package hashes: [`docs/validated-checkpoint-71.24.md`](docs/v
 
 The installer is idempotent: an exact current release is a no-op for the live sensor session. A real driver change must pass a fresh semantic prewarm (`PREWARM_RESULT=READY`) before success is reported.
 
+## Driver-only distribution (no Huawei/GPU manager)
+
+The [driver-only installation guide](DRIVER_ONLY.md) covers the **independent source archive** and prebuilt Arch/CachyOS package attached to the rel71.30 GitHub pre-release. Both use standard libfprint → fprintd → native Linux desktop interfaces and require no HUAWEI Whiptail manager, GPU tools or project-specific enrollment UI. Only the exact GXFP51A0/ST411 hardware profile is in scope; distribution and board differences require independent confirmation.
+
 ## Quick start: zero fingerprint support → working stack
 
 Clone the repository and run one command as your normal user:
@@ -78,12 +82,11 @@ The installer:
 4. validates the distribution `fprintd` ABI **before** system installation;
 5. installs native udev/spidev integration and the fprintd runtime path;
 6. installs one bounded boot prime and removes periodic keepalive/external sleep glue;
-7. integrates the validated Plasma 6.7.5 KScreenLocker/Login Manager path when
-   that exact desktop version is installed;
+7. uses the desktop's native fprintd/PAM integration by default; optional legacy Plasma integrations are never applied silently;
 8. preserves password authentication in parallel;
 9. preserves existing fingerprint templates and the validated PMK cache;
-10. starts standard `fprintd` enrollment on a fresh machine;
-11. runs a real `fprintd-verify`;
+10. instructs users to enroll with their distribution's native GUI (KDE/GNOME), without invoking CLI enrollment;
+11. preserves existing finger templates;
 12. finishes with `gxfp51a0-doctor`.
 
 The installer deliberately refuses to enable `pam_fprintd` globally when doing
@@ -99,7 +102,7 @@ Useful modes:
 ./fingerprint/install.sh --no-desktop-integration
 ./fingerprint/install.sh --no-enroll
 ./fingerprint/install.sh --no-verify
-./fingerprint/install.sh --finger right-index-finger
+./fingerprint/install.sh --no-enroll
 ```
 
 Arch/CachyOS can use the native package path directly:
@@ -152,7 +155,7 @@ Plasma Login Manager integrations used by the validated reference setup.
 
 ## Production package invariants
 
-The Arch/CachyOS production package contains the current 71.24 driver and only
+The Arch/CachyOS production package contains the recommended rel71.30 driver and only
 one GXFP-specific lifecycle helper: a **one-shot boot prime** before graphical
 login. It deliberately does **not** package:
 
@@ -704,13 +707,7 @@ Non-KDE desktops are left unchanged. On KDE, one package-owned
 LockScreenUi.qml file is intentionally patched by the integration helper and
 restored on driver removal.
 
-Then enroll through your desktop settings or standard fprintd:
-
-```bash
-fprintd-enroll -f right-index-finger
-fprintd-verify
-fprintd-list "$USER"
-```
+Enroll, remove and verify fingerprints through your desktop's native graphical settings (KDE Plasma **System Settings → Users**, GNOME **Settings → Users**). The installer never starts command-line biometric enrollment or verification.
 
 The driver requests 20 enrollment presses. Move the finger slightly between
 presses so the small 80×64 sensor sees different parts of the fingertip.
