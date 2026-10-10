@@ -89,3 +89,46 @@ fprintd dependencies BEFORE applying the candidate. Only then validate
 a native no-finger DBus Claim, one normal KDE enrolled-finger unlock,
 and manually initiated genuine S3, plus returned TLS/FDT/match result.
 Do not remotely sleep or reboot the user's laptop without request.
+
+## Pegasus live validation after user finished pacman -Syu, 16:08-16:13
+
+The user's separate pacman transaction completed, db.lck no longer exists.
+Updated installed kernel package is linux-cachyos 7.2.9-2, but the currently
+BOOTED kernel stays at 7.2.9-1-cachyos until user explicitly reboots.
+The new kernel 7.2.9-2 and LTS 6.18.55-2 were compiled/installed together
+with NVIDIA DKMS by pacman, and initramfs/Limine files generated. No reboot
+was initiated by assistant. Do not confuse tests on 7.2.9-1 with tests on
+the not-yet-booted 7.2.9-2 kernel.
+
+rel71.36 package (SHA256 previously recorded) INSTALLED on Pegasus using
+pacman -U. Snapper root pre/post snapshots 1557/1558. Existing right-index
+template, Bitwarden PIN and Polkit left untouched. Existing stock fprintd
+1.94.5-2.1 active with no extra GXFP-specific units/hooks/helpers; PCI SPI
+controller power/control left auto; no kernel/sysfs/mount changes.
+
+Native no-finger D-Bus Claim tests:
+- 16:09:57 brand-new fprintd initial cold Claim returned a D-Bus error after
+  ~25 seconds, with 5 TLS digest/handshake failures. The existing driver
+  continued an independent recovery and FINALLY reached production_ready=1
+  at 16:10:43 (~46 sec after initiating). Thus COLD first-Claim is not
+  consistently below D-Bus operation deadline; record as FAILED first
+  Claim, not successful merely because it later recovered.
+- 16:11:16 repeated warm Claim 1/2/3 all succeeded at 125ms, 113ms,
+  112ms with native FAST_READY at 83ms, 82ms, 82ms respectively.
+- 16:11:59 controlled restart of **only stock fprintd**. Fresh cold Claim
+  succeeded in ~7431ms; production_ready=1 by 16:12:06.
+- 16:12:25 another controlled restart of **only stock fprintd**. Fresh
+  cold Claim succeeded in ~7275ms; production_ready=1 by 16:12:33.
+- None of these tests captured human fingerprints, tested matcher
+  scores after update, or exercised actual post-S3 on rel71.36.
+
+Conclusion: native regular cold Claim works in 2 out of 3 fresh process
+initializations, but the first needed >25sec and violated the D-Bus Claim
+deadline. Driver cannot yet be pronounced fully reliable. The defining
+physical test now required WITHOUT REBOOT is KDE Super+L normal unlock
+with enrolled right index, followed IF SUCCESS by manually invoking one
+deep S3 from KDE, waking and trying same right index. Read kernel S3
+and native fprintd log markers (S3_PARK, NATIVE_S3_SHORT_RESET,
+NATIVE_S3_TLS_EARLY_RECOVER, NATIVE_S3_REL61_FALLBACK, ready, match score).
+Do not auto-suspend/reboot the machine from RDC. The next kernel 7.2.9-2
+behavior must be tested separately only after user authorizes reboot.
