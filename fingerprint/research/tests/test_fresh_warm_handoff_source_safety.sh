@@ -14,7 +14,7 @@ grep -Fq 'warm_candidate = gx_warm_available (self);' <<<"$open_block"
 grep -Fq 'if (warm_candidate && !self->capture_recovery_pending)' <<<"$open_block"
 grep -Fq 'if (gx_warm_fast_ready (self))' <<<"$open_block"
 grep -Fq 'if (gx_warm_validate (self))' <<<"$open_block"
-grep -Fq 'RESET_TRACE cold boundary before spidev open' <<<"$open_block"
+grep -Fq 'NATIVE_COLD_QUIESCE before SPI open' <<<"$open_block"
 
 fast_line="$(grep -n 'if (gx_warm_fast_ready (self))' "$src" | head -1 | cut -d: -f1)"
 full_line="$(grep -n 'if (gx_warm_validate (self))' "$src" | tail -1 | cut -d: -f1)"

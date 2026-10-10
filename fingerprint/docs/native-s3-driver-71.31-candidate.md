@@ -53,3 +53,16 @@ PENDING: real PEGASUS KDE lock/unlock
 before and after deep S3 and hibernation; cold boot; wrong-finger control;
 Bitwarden's actual Polkit fingerprint prompt. User, not the assistant,
 triggers any actual sleep/reboot. The archived rel71.24 Arch package remains available for immediate rollback if the new candidate fails the normal or S3 gate.
+
+## Native cold-open quiescence experiment (rel71.32, not proven)
+After post-package restart at 02:48, first Claim took approx. 31 seconds and encountered repeated TLS digest failures; no later S3 was registered by logind since the package upgrade. A separate candidate inserts a bounded 1 second pre-reset and 1 second post-reset bus quiet period within the native cold-Claim path, with SPI descriptors closed, but does NOT touch sysfs binding nor reinstall external units. This addresses first-Claim quiescence, not proof of repeated S3 reliability.
+
+## Field report, 2026-10-10 02:48 CEST
+
+The user reported fingerprint failure after sleep; host systemd/logind journal showed no new suspend operation after rel71.31 installation at 02:39:44. The last actual suspend ended 01:57:42, before the package update. Thus native S3 callback remains untested against a new S3 event.
+
+At 02:48 fprintd PID 142304 first-Claim native GPIO cold reset was followed by many ACK failures and TLS digest check failures at 02:48:05, 02:48:12, 02:48:19. At 02:48:23 TLS/FDT was viable but an already-pressed finger contaminated clean background acquisition. The sensor retained warm state at 02:48:32. Cold first-Claim recovery is unreliable without earlier pre-enumeration/prewarm, independent of actual new S3.
+
+## rel71.32 code-only candidate (NOT deployed)
+
+Adds a bounded one-second pre-reset and one-second post-reset SPI-closed quiescence within the native driver cold Claim. No extra service, hook, timer or background worker; no sysfs device unbind from a live FpDevice. Software build PASS and complete fingerprint/research test suite PASS in Cloud9 LXC700. This has not been physically validated and must not be considered a proven S3 fix. Keep rel71.31 installed until an actual post-package S3 trace can be inspected.
