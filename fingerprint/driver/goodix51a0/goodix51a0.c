@@ -2506,7 +2506,7 @@ gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
     }
 
   fp_info ("GXFP51A0 capture-context recovery reset/A8 confirmed: %s", fw);
-  self->s3_first_tls_pending = FALSE; /* full native boundary completed */
+  /* Keep the S3 marker until TLS and image/FDT capture actually succeed. */
   return TRUE;
 }
 
@@ -4652,6 +4652,8 @@ gx_dev_suspend (FpDevice *dev)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   gboolean idle = self->spi_fd < 0 && self->irq_fd < 0;
+  gboolean warm = gx_warm_available (self);
+  gboolean attempted = FALSE;
   gboolean parked = FALSE;
 
   /* The patched native libfprint idle suspend invokes this callback inside
@@ -4661,7 +4663,7 @@ gx_dev_suspend (FpDevice *dev)
    * Normal Close preserves the useful warm TLS session and closes the file
    * descriptors. Open them ONLY at a real system suspend boundary to issue
    * Windows' SLEEP 0x60 / payload 01 00 with a mandatory ACK. */
-  if (idle && gx_warm_available (self))
+  if (idle)
     {
       g_autoptr(GError) err = NULL;
       struct gxfp_target_packet packet;
@@ -4669,7 +4671,10 @@ gx_dev_suspend (FpDevice *dev)
       if (gx_transport_open (dev, &err))
         {
           if (gxfp_build_sleep (&packet))
-            parked = gx_target_send_ack (self, &packet, 0x60, NULL);
+            {
+              attempted = TRUE;
+              parked = gx_target_send_ack (self, &packet, 0x60, NULL);
+            }
           gx_transport_close (self);
         }
       else
@@ -4690,8 +4695,9 @@ gx_dev_suspend (FpDevice *dev)
       self->production_ready = FALSE;
     }
 
-  fp_warn ("GXFP51A0 NATIVE_S3_PARK idle=%d ack=%d",
-           idle ? 1 : 0, parked ? 1 : 0);
+  fp_warn ("GXFP51A0 NATIVE_S3_PARK idle=%d attempted=%d ack=%d warm=%d",
+           idle ? 1 : 0, attempted ? 1 : 0,
+           parked ? 1 : 0, warm ? 1 : 0);
   if (idle)
     fpi_device_suspend_complete (dev, NULL);
   else

@@ -94,3 +94,45 @@ package, physically verify 3 normal KDE unlocks (>=7/7), cold login,
 one real deep S3 after a normal success, follow-up repeat S3, hibernate,
 then Bitwarden Polkit prompt (PIN preserved). Never delete templates/PMK,
 lower match threshold, export biometric images or invent a success.
+
+## Follow-up: rel71.34 experiment, October 10, 2026
+
+- KDE PowerDevil automatically requested S3 at 11:36:48 and 11:47:27.
+  First failed to freeze Bitwarden (task in uninterruptible disk I/O) then
+  xHCI blocked a fallback s2idle; second entered real deep S3 and returned
+  at 11:57:48.
+- rel71.33 reported NATIVE_S3_PARK idle=1 ack=0 twice, but this may mean
+  the sleep command was NOT attempted: it only transmitted 0x60 if the
+  existing libfprint object had complete warm context. The log lacked
+  an attempted field.
+- After S3 rel71.33 returned to whole-context recovery on first TLS error,
+  but then cleared the recovery marker after mere firmware A8 response.
+  Its next TLS attempt tried five times, repeatedly failing, and Claim
+  never reached READY.
+- One-time DIAGNOSTIC archived recovery with stock fprintd STOPPED
+  (unbind target spi-GXFP51A0:00; quiet 1 sec; GPIO264 HIGH10ms/LOW;
+  quiet 2 sec; rebind target SPI child; quiet 1 sec) reported READY.
+  This is not an installed helper or a service, only a one-time experiment.
+  The following standard fprintd own-user DBus Claim reached normal
+  production_ready=1 at 12:04:34: authentic TLS + FDT restored without
+  capturing or matching any finger. The old recovery can work.
+- rel71.34 changes only idle S3 sleep to ATTEMPT the raw 0x60 opcode even
+  without warm host state, recording attempted/ack/warm independently.
+  Post-S3 TLS-fast-recovery flag is cleared only after complete
+  production-ready TLS+background+FDT, not when FW A8 first answers.
+  Normal non-S3 TLS resets untouched. Full software build and all project
+  tests PASS; Arch native-only package PASS, no auxiliary GXFP units.
+- Installed on Pegasus ~12:10. The native own-user DBus Claim (no
+  fingerprint capture or user finger) then FAILED: TLS digest failures and
+  an accepted GET_IMAGE timeout. Retried exact archived target-only offline
+  unbind/GPIO/rebind and restarted stock fprintd; this time a second native
+  DBus Claim ~12:11 still FAILED in TLS. Thus historical recovery is not
+  universally reliable, and rel71.34 is NOT a confirmed S3 fix.
+- Likely remaining boundary problem: host spidev/kernel state must be
+  reset at a safe native device-enumeration lifecycle point, NOT by
+  unbinding under an active libfprint FpDevice (udev hot-removal risk).
+  Do not repeat failed rel71.21 approach of closing SPI during every
+  Goodix protocol reset. Investigate FpContext pre-enumeration or proper
+  kernel PM before adding further code. No extra daemon, timer or hook.
+- No changes to kernel, BIOS, GPU, mounts, PCI PM, enrollment templates,
+  PMK, Bitwarden PIN or other authentication services.
