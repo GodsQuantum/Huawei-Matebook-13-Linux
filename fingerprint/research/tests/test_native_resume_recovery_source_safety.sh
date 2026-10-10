@@ -66,7 +66,11 @@ assert "self->s3_first_tls_pending = TRUE" in suspend
 assert "NATIVE_S3_TLS_EARLY_RECOVER" in tls
 assert "if (self->s3_first_tls_pending)" in tls
 assert "!self->s3_first_tls_pending" in tls
-assert "self->s3_first_tls_pending = FALSE" in recover
+assert "self->s3_first_tls_pending = FALSE" not in recover
+assert "attempted = TRUE" in suspend
+assert "gboolean warm = gx_warm_available (self)" in suspend
+assert "if (idle)" in suspend
+assert "attempted=%d ack=%d warm=%d" in suspend
 assert "self->s3_first_tls_pending = FALSE" in cold
 assert "gx_transport_close (self)" in recover
 assert "gx_gpio_reset (self)" in recover
