@@ -14,7 +14,7 @@ assert rec.index("gx_gpio_reset (self);") < rec.index("gx_transport_open (FP_DEV
 assert "RESET_TRACE transport reopened after detached GPIO264 reset" in rec
 
 op=s[s.index("gx_dev_open (FpDevice *dev)"):s.index("gx_dev_close (FpDevice *dev)")]
-cold=op.index('RESET_TRACE cold boundary before spidev open')
+cold=op.index('NATIVE_COLD_QUIESCE before SPI open')
 reset=op.index("gx_gpio_reset (self);", cold)
 open_=op.index("gx_transport_open (dev, &err)", reset)
 assert cold < reset < open_

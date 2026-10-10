@@ -4521,9 +4521,14 @@ gx_dev_open (FpDevice *dev)
           gx_warm_discard (self);
         }
 
-      fp_warn ("GXFP51A0 RESET_TRACE cold boundary before spidev open");
+      /* The prestart reset previously succeeded only after a fully quiet
+       * detached bus. Keep this timing in libfprint itself; do not rebind the
+       * kernel spidev child from inside a live FpDevice (udev removal race). */
+      fp_warn ("GXFP51A0 NATIVE_COLD_QUIESCE before SPI open");
       gx_transport_close (self);
+      g_usleep (G_USEC_PER_SEC);
       gx_gpio_reset (self);
+      g_usleep (G_USEC_PER_SEC);
       self->force_cold_reset = FALSE;
     }
 
