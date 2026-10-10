@@ -73,7 +73,13 @@ assert "if (idle)" in suspend
 assert "attempted=%d ack=%d warm=%d" in suspend
 assert "self->s3_first_tls_pending = FALSE" in cold
 assert "gx_transport_close (self)" in recover
-assert "gx_gpio_reset (self)" in recover
+assert "gx_reset_detached_s3_boundary (self)" in recover
+assert "gx_reset_detached_s3_boundary (self)" in fn("gx_dev_open")
+assert "NATIVE_S3_SHORT_RESET detached" in s
+assert "gx51_reset_gpio264_short" in (Path(sys.argv[1]).parent/'gx51_transport.c').read_text()
+assert "req.config.attrs[0].attr.values = 0" in (Path(sys.argv[1]).parent/'gx51_transport.c').read_text()
+
+assert "gx_reset_detached_s3_boundary (self)" in recover
 assert "gx_transport_open (FP_DEVICE (self)" in recover
 assert "gx_gpio_reset (self)" in tls
 

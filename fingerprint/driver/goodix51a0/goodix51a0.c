@@ -581,6 +581,23 @@ gx_gpio_reset (FpiDeviceGoodix51A0 *self)
 
 
 
+/* A real S3 transition is different from a protocol-defined Windows reset.
+ * Use rel71.24's short MCU pulse only while transport is ALREADY detached.
+ * Do not reintroduce rel71.21's blanket SPI close/reset/reopen changes. */
+static void
+gx_reset_detached_s3_boundary (FpiDeviceGoodix51A0 *self)
+{
+  if (self->s3_first_tls_pending && self->spi_fd < 0 && self->irq_fd < 0)
+    {
+      fp_warn ("GXFP51A0 NATIVE_S3_SHORT_RESET detached GPIO264 HIGH10/LOW150");
+      if (gx51_reset_gpio264_short () == 0)
+        return;
+      fp_warn ("GXFP51A0 NATIVE_S3_SHORT_RESET failed; falling back to reviewed long reset");
+    }
+
+  gx_gpio_reset (self);
+}
+
 static gboolean
 gx_target_read_body (FpiDeviceGoodix51A0 *self,
                      guint8                 *body,
@@ -2485,7 +2502,7 @@ gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
       fp_info ("GXFP51A0 NATIVE_S3_RECOVERY detached quiet before GPIO reset");
       g_usleep (G_USEC_PER_SEC);
     }
-  gx_gpio_reset (self);
+  gx_reset_detached_s3_boundary (self);
   if (self->s3_first_tls_pending)
     g_usleep (G_USEC_PER_SEC);
 
@@ -4550,7 +4567,7 @@ gx_dev_open (FpDevice *dev)
       fp_warn ("GXFP51A0 NATIVE_COLD_QUIESCE before SPI open");
       gx_transport_close (self);
       g_usleep (G_USEC_PER_SEC);
-      gx_gpio_reset (self);
+      gx_reset_detached_s3_boundary (self);
       g_usleep (G_USEC_PER_SEC);
       self->force_cold_reset = FALSE;
     }

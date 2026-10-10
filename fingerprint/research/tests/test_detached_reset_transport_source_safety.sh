@@ -9,13 +9,13 @@ import sys
 s=Path(sys.argv[1]).read_text()
 
 rec=s[s.index("gx_recover_capture_context"):s.index("gx_prepare_capture_context", s.index("gx_recover_capture_context"))]
-assert rec.index("gx_transport_close (self);") < rec.index("gx_gpio_reset (self);")
-assert rec.index("gx_gpio_reset (self);") < rec.index("gx_transport_open (FP_DEVICE (self)")
+assert rec.index("gx_transport_close (self);") < rec.index("gx_reset_detached_s3_boundary (self);")
+assert rec.index("gx_reset_detached_s3_boundary (self);") < rec.index("gx_transport_open (FP_DEVICE (self)")
 assert "RESET_TRACE transport reopened after detached GPIO264 reset" in rec
 
 op=s[s.index("gx_dev_open (FpDevice *dev)"):s.index("gx_dev_close (FpDevice *dev)")]
 cold=op.index('NATIVE_COLD_QUIESCE before SPI open')
-reset=op.index("gx_gpio_reset (self);", cold)
+reset=op.index("gx_reset_detached_s3_boundary (self);", cold)
 open_=op.index("gx_transport_open (dev, &err)", reset)
 assert cold < reset < open_
 assert "open -> GPIO reset" in op
