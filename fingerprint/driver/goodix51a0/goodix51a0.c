@@ -4623,29 +4623,66 @@ static void
 gx_dev_suspend (FpDevice *dev)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+  gboolean idle = self->spi_fd < 0 && self->irq_fd < 0;
+  gboolean parked = FALSE;
 
-  /* The ST411 does not preserve TLS/FDT state across S3, so an interactive
-   * action cannot safely continue after resume.  libfprint explicitly asks
-   * such drivers to return NOT_SUPPORTED: it cancels the current action before
-   * forwarding the suspend result to fprintd, which accepts this condition. */
+  /* The patched native libfprint idle suspend invokes this callback inside
+   * fprintd's EXISTING logind delay inhibitor; there is no external service,
+   * system-sleep hook, timer or polling worker.
+   *
+   * Normal Close preserves the useful warm TLS session and closes the file
+   * descriptors. Open them ONLY at a real system suspend boundary to issue
+   * Windows' SLEEP 0x60 / payload 01 00 with a mandatory ACK. */
+  if (idle && gx_warm_available (self))
+    {
+      g_autoptr(GError) err = NULL;
+      struct gxfp_target_packet packet;
+
+      if (gx_transport_open (dev, &err))
+        {
+          if (gxfp_build_sleep (&packet))
+            parked = gx_target_send_ack (self, &packet, 0x60, NULL);
+          gx_transport_close (self);
+        }
+      else
+        fp_warn ("GXFP51A0 NATIVE_S3_PARK transport unavailable: %s",
+                 err ? err->message : "unknown");
+    }
+
+  /* Idle and in-progress actions have different libfprint semantics. Never
+   * transmit Sleep during an active biometric capture. A failed park cannot
+   * justify reusing a warm context; the following Claim must be cold. */
   self->force_cold_reset = TRUE;
-  self->warm_valid = FALSE;
-  self->production_ready = FALSE;
-  fp_info ("GXFP51A0 suspend: cancelling active action; cold reset required after resume");
-  fpi_device_suspend_complete (
-    dev, fpi_device_error_new (FP_DEVICE_ERROR_NOT_SUPPORTED));
+  if (idle)
+    gx_warm_abandon (self);
+  else
+    {
+      self->warm_valid = FALSE;
+      self->production_ready = FALSE;
+    }
+
+  fp_warn ("GXFP51A0 NATIVE_S3_PARK idle=%d ack=%d",
+           idle ? 1 : 0, parked ? 1 : 0);
+  if (idle)
+    fpi_device_suspend_complete (dev, NULL);
+  else
+    fpi_device_suspend_complete (
+      dev, fpi_device_error_new (FP_DEVICE_ERROR_NOT_SUPPORTED));
 }
 
 static void
 gx_dev_resume (FpDevice *dev)
 {
-  /* If libfprint cancelled the action, the following Claim/Open sees
-   * force_cold_reset. If a desktop kept an already-open action alive, the
-   * BOOTTIME-vs-MONOTONIC poll guard detects the same S3 boundary and jumps
-   * through GX_ST_SESSION for an in-operation cold rebuild. */
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+
+  /* Called for idle devices too; never carry stale TLS/PMK or background
+   * across deep S3. The next genuine Claim executes cold preparation. */
+  self->force_cold_reset = TRUE;
+  if (self->spi_fd < 0 && self->irq_fd < 0)
+    gx_warm_abandon (self);
+  fp_info ("GXFP51A0 NATIVE_S3_RESUME cold Claim required");
   fpi_device_resume_complete (dev, NULL);
 }
-
 
 
 /* --- verification completion --------------------------------------- */

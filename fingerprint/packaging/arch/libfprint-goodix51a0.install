@@ -1,3 +1,10 @@
+# Remove historical separately packaged GXFP one-shot units before the
+# native-only replacement removes their files; preserve fprintd and templates.
+pre_upgrade() {
+  systemctl disable --now gxfp51a0-boot-prewarm.service 2>/dev/null || true
+  systemctl disable --now gxfp51a0-fprintd-suspend.service 2>/dev/null || true
+}
+
 post_install() {
   udevadm control --reload || true
   udevadm trigger --subsystem-match=spi || true
@@ -8,18 +15,12 @@ post_install() {
   # These files contain no biometric/secret material and are obsolete.
   rm -f /var/lib/fprint/.goodix51a0-timing         /var/lib/fprint/.goodix51a0-capture-timing
   systemctl daemon-reload || true
-  # Fast-ready production: prime exactly once at boot before the greeter.
-  # This is not a heartbeat: there is no timer and no periodic synthetic Claim.
-  systemctl enable gxfp51a0-boot-prewarm.service 2>/dev/null || true
   # rel73: suspend belongs to the native libfprint/fprintd lifecycle only.
   # Explicitly keep the obsolete external system-sleep helper disabled.
   systemctl disable --now gxfp51a0-fprintd-suspend.service 2>/dev/null || true
-  # Package upgrades happen in an already-running graphical session, so the
-  # graphical.target boot prime is not re-triggered by systemd. Restart fprintd
-  # synchronously, let ExecStartPre perform the proven target-only spidev
-  # recovery, then run the one-shot cold Claim before pacman returns.
-  systemctl restart fprintd.service || true
-  systemctl start gxfp51a0-boot-prewarm.service || true
+  # Only the distro's existing fprintd service is used. No new service,
+  # prestart helper or boot prewarm is installed by this release.
+  systemctl try-restart fprintd.service || true
 }
 
 post_upgrade() {
