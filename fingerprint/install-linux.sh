@@ -5,7 +5,7 @@ ORIGINAL_ARGS=("$@")
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/gxfp51a0-libfprint-build"
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.30-portable1"
+PORTABLE_RELEASE="rel71.31-native-s3-preview1"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -17,10 +17,6 @@ DROPIN_DIR="/etc/systemd/system/fprintd.service.d"
 DROPIN_FILE="$DROPIN_DIR/60-goodix51a0-local.conf"
 EARLY_WANTS_DIR="/etc/systemd/system/graphical.target.wants"
 EARLY_WANTS_LINK="$EARLY_WANTS_DIR/fprintd.service"
-BOOT_PREWARM_HELPER_FILE="$LIBEXEC_DIR/gxfp51a0-boot-prewarm"
-PRESTART_RECOVERY_FILE="$LIBEXEC_DIR/gxfp51a0-prestart-recover"
-BOOT_PREWARM_UNIT_FILE="/etc/systemd/system/gxfp51a0-boot-prewarm.service"
-BOOT_PREWARM_WANTS_LINK="$EARLY_WANTS_DIR/gxfp51a0-boot-prewarm.service"
 KDE_HELPER_FILE="$LIBEXEC_DIR/gxfp51a0-kde-lockscreen-integrate"
 DOCTOR_FILE="$PREFIX/bin/gxfp51a0-doctor"
 
@@ -284,16 +280,6 @@ fi
   exit 6
 }
 
-# Build the pre-enumeration recovery helper from the exact same reviewed
-# GPIO264 implementation as the driver. It is a short-lived fprintd preflight,
-# not a sidecar daemon, and has no libgpiod CLI/runtime dependency.
-mkdir -p "$STAGE$(dirname "$PRESTART_RECOVERY_FILE")"
-cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic "${PORTABILITY_CFLAGS[@]}" \
-  -I"$ROOT/driver/goodix51a0" \
-  "$ROOT/integration/prestart-recover/gxfp51a0-prestart-recover.c" \
-  "$ROOT/driver/goodix51a0/gx51_transport.c" \
-  -o "$STAGE$PRESTART_RECOVERY_FILE"
-
 SYSTEMD_AVAILABLE=0
 FPRINTD_UNIT=""
 FPRINTD_BIN=""
@@ -461,15 +447,11 @@ After=systemd-udev-trigger.service
 Before=display-manager.service
 
 [Service]
-ExecStartPre=$PRESTART_RECOVERY_FILE
-ExecStartPre=-$UDEVADM_BIN settle --timeout=3
 ExecStart=
 ExecStart=$FPRINTD_BIN --no-timeout
 TimeoutStartSec=40s
 Environment=LD_LIBRARY_PATH=$LIBDIR
 DeviceAllow=char-gpiochip rw
-ReadWritePaths=-/sys/bus/spi/drivers/spidev
-ReadWritePaths=-/sys/bus/spi/devices/spi-GXFP51A0:00
 LimitCORE=0
 EOF
   run_root install -m0644 "$TMP_STATE/dropin" "$DROPIN_FILE"
@@ -480,36 +462,7 @@ EOF
     printf '%s\n' "$EARLY_WANTS_LINK" > "$TMP_STATE/created-early-wants"
   fi
 
-  run_root install -Dm0755 \
-    "$ROOT/integration/boot-prewarm/gxfp51a0-boot-prewarm" \
-    "$BOOT_PREWARM_HELPER_FILE"
-  cat > "$TMP_STATE/gxfp51a0-boot-prewarm.service" <<EOF
-[Unit]
-Description=Prepare Goodix GXFP51A0 once before graphical login
-Documentation=https://github.com/GodsQuantum/huawei-matebook-13-linux
-Requires=fprintd.service
-After=fprintd.service
-Before=display-manager.service
 
-[Service]
-Type=oneshot
-ExecStart=$BOOT_PREWARM_HELPER_FILE
-TimeoutStartSec=55s
-NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectHome=yes
-ProtectSystem=strict
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
-RestrictSUIDSGID=yes
-
-[Install]
-WantedBy=graphical.target
-EOF
-  run_root install -Dm0644 "$TMP_STATE/gxfp51a0-boot-prewarm.service" \
-    "$BOOT_PREWARM_UNIT_FILE"
-  run_root ln -sfn "$BOOT_PREWARM_UNIT_FILE" "$BOOT_PREWARM_WANTS_LINK"
 fi
 
 if (( ! NO_DESKTOP_INTEGRATION && LEGACY_KDE_HELPER )); then
@@ -517,10 +470,12 @@ if (( ! NO_DESKTOP_INTEGRATION && LEGACY_KDE_HELPER )); then
 fi
 
 # Production invariant: remove/disable historical periodic/sleep glue.
-# Keep only the one-shot boot prime installed above.
+# Native driver owns the actual S3 callback and physical MCU park.
+# No project-specific service, timer, or system-sleep helper is installed.
 if (( SYSTEMD_AVAILABLE )); then
   run_root systemctl disable --now \
     gxfp51a0-fprintd-suspend.service \
+    gxfp51a0-boot-prewarm.service \
     gxfp51a0-warm-keepalive.timer \
     gxfp51a0-warm-keepalive.service \
     gxfp51a0-resume-prewarm.service \
@@ -528,6 +483,10 @@ if (( SYSTEMD_AVAILABLE )); then
 fi
 run_root rm -f \
   /usr/local/libexec/gxfp51a0-spidev-bind \
+  /usr/local/libexec/gxfp51a0-prestart-recover \
+  /usr/local/libexec/gxfp51a0-boot-prewarm \
+  /etc/systemd/system/gxfp51a0-boot-prewarm.service \
+  /etc/systemd/system/graphical.target.wants/gxfp51a0-boot-prewarm.service \
   /etc/systemd/system/gxfp51a0-spidev-bind.service \
   /usr/local/libexec/gxfp51a0-warm-keepalive \
   /etc/systemd/system/gxfp51a0-warm-keepalive.service \
@@ -578,39 +537,9 @@ fi
 
 if (( SYSTEMD_AVAILABLE )); then
   run_root systemctl daemon-reload
-
-  prewarm_ready_once() {
-    local cursor result
-    cursor="$(journalctl -b -t gxfp51a0-boot-prewarm -n 0 \
-      --show-cursor --no-pager 2>/dev/null | sed -n 's/^-- cursor: //p')"
-    run_root systemctl start gxfp51a0-boot-prewarm.service || true
-    if [[ -n "$cursor" ]]; then
-      result="$(journalctl -b -t gxfp51a0-boot-prewarm \
-        --after-cursor "$cursor" --no-pager -o cat 2>/dev/null |
-        grep 'PREWARM_RESULT=' | tail -n1 || true)"
-    else
-      result="$(journalctl -b -t gxfp51a0-boot-prewarm \
-        --no-pager -o cat 2>/dev/null | grep 'PREWARM_RESULT=' | tail -n1 || true)"
-    fi
-    printf '    %s\n' "${result:-PREWARM_RESULT=UNKNOWN}"
-    [[ "$result" == *'PREWARM_RESULT=READY'* ]]
-  }
-
-  ready=0
-  for attempt in 1 2; do
-    echo "==> Semantic fingerprint prewarm attempt $attempt/2"
-    run_root systemctl restart fprintd.service
-    if prewarm_ready_once; then
-      ready=1
-      break
-    fi
-    (( attempt == 1 )) && echo "WARN: prewarm was not READY; retrying one full prestart recovery." >&2
-  done
-  if (( ! ready )); then
-    echo "ERROR: GXFP51A0 did not reach PREWARM_RESULT=READY after bounded recovery." >&2
-    exit 8
-  fi
+  run_root systemctl try-restart fprintd.service || true
 fi
+
 if (( LEGACY_KDE_HELPER )) && [[ -x "$KDE_HELPER_FILE" &&
       -f /usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen/LockScreenUi.qml ]]; then
   run_root "$KDE_HELPER_FILE" --apply || true

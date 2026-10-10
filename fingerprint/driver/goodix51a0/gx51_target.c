@@ -84,6 +84,14 @@ bool gxfp_build_idle(struct gxfp_target_packet *packet)
     return build_fixed(body, sizeof(body), packet);
 }
 
+/* Exact ST411 Windows Sleep command. Only valid at the native S3 boundary,
+ * never at ordinary device Close (rel68/69 proved that path harmful). */
+bool gxfp_build_sleep(struct gxfp_target_packet *packet)
+{
+    static const uint8_t body[] = {0x60,0x03,0x00,0x01,0x00,0x46};
+    return build_fixed(body, sizeof(body), packet);
+}
+
 bool gxfp_build_reg_write(uint16_t address, uint16_t value,
                           struct gxfp_target_packet *packet)
 {

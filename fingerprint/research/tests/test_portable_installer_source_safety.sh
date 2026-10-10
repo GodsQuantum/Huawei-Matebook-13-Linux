@@ -40,18 +40,18 @@ grep -Fq 'LD_BIND_NOW=1' "$i"
 grep -Fq 'UDEV_RULES_DIR=' "$root/scripts/build-libfprint-v1.94.100.sh"
 grep -Fq -- '-Dudev_hwdb=disabled' "$root/scripts/build-libfprint-v1.94.100.sh"
 
-# Production lifecycle: standard resident fprintd + one-shot boot prime.
-# No periodic heartbeat/keepalive and no external suspend hook.
+# Native driver lifecycle: standard resident fprintd, NO extra GXFP services.
 grep -Fq 'Environment=LD_LIBRARY_PATH=$LIBDIR' "$i"
-grep -Fq 'integration/boot-prewarm/gxfp51a0-boot-prewarm' "$i"
-grep -Fq 'BOOT_PREWARM_HELPER_FILE=' "$i"
-grep -Fq 'BOOT_PREWARM_UNIT_FILE=' "$i"
-grep -Fq 'systemctl start gxfp51a0-boot-prewarm.service' "$i"
+! grep -Fq 'BOOT_PREWARM_HELPER_FILE=' "$i"
+! grep -Fq 'BOOT_PREWARM_UNIT_FILE=' "$i"
+! grep -Fq 'PRESTART_RECOVERY_FILE=' "$i"
+! grep -Fq 'systemctl start gxfp51a0-boot-prewarm.service' "$i"
+! grep -Fq 'integration/boot-prewarm/' "$root/packaging/arch/PKGBUILD"
+! grep -Fq 'ExecStartPre=/usr/libexec/gxfp51a0-prestart-recover' "$root/packaging/arch/fprintd-goodix51a0.conf"
 ! grep -Fq 'RESUME_HELPER_FILE=' "$i"
 ! grep -Fq 'RESUME_HOOK_FILE=' "$i"
 ! grep -Fq 'KEEPALIVE_HELPER_FILE=' "$i"
 ! grep -Fq 'KEEPALIVE_TIMER_FILE=' "$i"
-grep -Fq 'gxfp51a0-fprintd-suspend.service' "$i"
 
 # Non-systemd isolates the custom library to fprintd, never global ld.so.
 grep -Fq '/etc/dbus-1/system-services' "$i"
@@ -87,7 +87,7 @@ grep -Fq 'native graphical Settings' "$a"
 grep -Fq -- '--pre-enroll' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$a"
-grep -Fq 'PORTABLE_RELEASE="rel71.30-portable1"' "$i"
+grep -Fq 'PORTABLE_RELEASE="rel71.31-native-s3-preview1"' "$i"
 
 # Never delete biometric templates or the validated per-unit PMK cache.
 ! grep -Eq 'rm .*goodix51a0-pmk' "$i"
@@ -107,11 +107,10 @@ grep -Fq 'org.freedesktop.DBus.ReloadConfig' "$u"
 ! grep -Fq 'integration/kde-lockscreen/' "$root/packaging/arch/PKGBUILD"
 ! grep -Fq 'gxfp51a0-kde-lockscreen-integrate' "$hook"
 
-# Native Arch package enables only the one-shot boot prime and keeps the
-# external sleep hook disabled.
-grep -Fq 'systemctl enable gxfp51a0-boot-prewarm.service' "$hook"
-grep -Fq 'disable --now gxfp51a0-fprintd-suspend.service' "$hook"
-grep -Fq 'integration/boot-prewarm/' "$root/packaging/arch/PKGBUILD"
+# Native Arch package contains only the driver and fprintd runtime glue.
+! grep -Fq 'systemctl enable gxfp51a0-boot-prewarm.service' "$hook"
+! grep -Fq 'integration/boot-prewarm/' "$root/packaging/arch/PKGBUILD"
+! grep -Fq 'integration/prestart-recover/' "$root/packaging/arch/PKGBUILD"
 ! grep -Fq 'integration/systemd/gxfp51a0-fprintd-suspend.service' "$root/packaging/arch/PKGBUILD"
 
 echo 'test_portable_installer_source_safety: OK (production zero-to-working path)'

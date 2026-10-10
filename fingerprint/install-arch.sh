@@ -148,57 +148,17 @@ fi
 [[ -z "$KSCREEN_PKG" ]] || sudo pacman -U --needed --noconfirm "$KSCREEN_PKG"
 [[ -z "$PLM_PKG" ]] || sudo pacman -U --needed --noconfirm "$PLM_PKG"
 
-# Production invariant: one boot-time prime only. No periodic keepalive and
-# no external suspend/resume service.
-sudo systemctl disable --now   gxfp51a0-fprintd-suspend.service   gxfp51a0-warm-keepalive.timer   gxfp51a0-warm-keepalive.service 2>/dev/null || true
-sudo rm -f   /etc/systemd/system/sleep.target.wants/gxfp51a0-fprintd-suspend.service   /etc/systemd/system/timers.target.wants/gxfp51a0-warm-keepalive.timer
-
+# Only the distribution fprintd service remains. No separate GXFP daemon,
+# boot prewarm unit, timer, or resume hook may be installed.
+sudo systemctl disable --now   gxfp51a0-boot-prewarm.service   gxfp51a0-fprintd-suspend.service   gxfp51a0-warm-keepalive.timer   gxfp51a0-warm-keepalive.service 2>/dev/null || true
 sudo systemctl daemon-reload
-sudo systemctl enable gxfp51a0-boot-prewarm.service 2>/dev/null || true
-
-latest_prewarm_result() {
-  journalctl -b -t gxfp51a0-boot-prewarm --no-pager -o cat 2>/dev/null |
-    grep 'PREWARM_RESULT=' | tail -n1 || true
-}
-
-prewarm_ready_once() {
-  local cursor result
-  cursor="$(journalctl -b -t gxfp51a0-boot-prewarm -n 0 \
-    --show-cursor --no-pager 2>/dev/null | sed -n 's/^-- cursor: //p')"
-  sudo systemctl start gxfp51a0-boot-prewarm.service || true
-  if [[ -n "$cursor" ]]; then
-    result="$(journalctl -b -t gxfp51a0-boot-prewarm \
-      --after-cursor "$cursor" --no-pager -o cat 2>/dev/null |
-      grep 'PREWARM_RESULT=' | tail -n1 || true)"
-  else
-    result="$(latest_prewarm_result)"
-  fi
-  printf '    %s\n' "${result:-PREWARM_RESULT=UNKNOWN}"
-  [[ "$result" == *'PREWARM_RESULT=READY'* ]]
-}
-
 if (( DRIVER_CHANGED )); then
-  echo "==> Reloading native SPI/fprintd path"
   sudo udevadm control --reload
   sudo udevadm trigger --subsystem-match=spi
   sudo udevadm settle --timeout=3 || true
-
-  ready=0
-  for attempt in 1 2; do
-    echo "==> Semantic fingerprint prewarm attempt $attempt/2"
-    sudo systemctl restart fprintd.service
-    if prewarm_ready_once; then
-      ready=1
-      break
-    fi
-    (( attempt == 1 )) && echo "WARN: prewarm was not READY; retrying one full prestart recovery." >&2
-  done
-  if (( ! ready )); then
-    echo "ERROR: GXFP51A0 did not reach PREWARM_RESULT=READY after bounded recovery." >&2
-    exit 7
-  fi
+  sudo systemctl try-restart fprintd.service || true
 else
-  echo "==> Fingerprint runtime unchanged; preserving current sensor session"
+  echo "==> Native fingerprint runtime unchanged; preserving current session"
 fi
 
 if (( DESKTOP_INTEGRATION && LEGACY_PLASMA_PATCHES )) && [[ -x /usr/libexec/gxfp51a0-kde-lockscreen-integrate ]]; then

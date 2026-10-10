@@ -48,20 +48,14 @@ assert 'systemctl' not in helper
 assert 'modprobe' not in helper
 assert 'no firmware operation' in helper
 
-p = dropin.index('ExecStartPre=/usr/libexec/gxfp51a0-prestart-recover')
-s = dropin.index('ExecStartPre=-/usr/bin/udevadm settle --timeout=3')
-assert p < s
-assert 'ReadWritePaths=-/sys/bus/spi/drivers/spidev' in dropin
-assert 'ReadWritePaths=-/sys/bus/spi/devices/spi-GXFP51A0:00' in dropin
-
-assert 'gxfp51a0-prestart-recover.c' in pkg
-assert 'usr/libexec/gxfp51a0-prestart-recover' in pkg
-assert 'prestart-recover.service' not in pkg
-
-assert 'PRESTART_RECOVERY_FILE="$LIBEXEC_DIR/gxfp51a0-prestart-recover"' in installer
-assert 'ExecStartPre=$PRESTART_RECOVERY_FILE' in installer
-assert '"$PRESTART_RECOVERY_FILE"' in installer
-assert 'ReadWritePaths=-/sys/bus/spi/drivers/spidev' in installer
+# This helper remains as historical offline research, but the native-only
+# candidate must never install/invoke it or change fprintd's SPI binding.
+assert 'ExecStartPre=/usr/libexec/gxfp51a0-prestart-recover' not in dropin
+assert 'ReadWritePaths=-/sys/bus/spi/drivers/spidev' not in dropin
+assert 'gxfp51a0-prestart-recover.c' not in pkg
+assert 'usr/libexec/gxfp51a0-prestart-recover' not in pkg
+assert 'PRESTART_RECOVERY_FILE=' not in installer
+assert 'ExecStartPre=$PRESTART_RECOVERY_FILE' not in installer
 PY
 
 echo 'test_prestart_spidev_recovery_source_safety: OK'
