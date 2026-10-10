@@ -132,3 +132,72 @@ and native fprintd log markers (S3_PARK, NATIVE_S3_SHORT_RESET,
 NATIVE_S3_TLS_EARLY_RECOVER, NATIVE_S3_REL61_FALLBACK, ready, match score).
 Do not auto-suspend/reboot the machine from RDC. The next kernel 7.2.9-2
 behavior must be tested separately only after user authorizes reboot.
+
+## FIRST REAL HUMAN POST-S3 SUCCESS rel71.36 — 16:21–16:22 CEST
+
+USER REPORTED: normal lock unlocked on 1st index-right pose; after
+S3 several finger presentations seemed to fail, then unlocked after mouse
+movement showed KDE password prompt. Hardware logs independently confirm
+the successful fingerprint *without a password* and the actual timings.
+
+- 16:21:56 KDE regular lock: native FAST_READY ~82ms, refreshed stale
+  ImageBase in 1206ms, finger verification first pose scored 14/7 ACCEPTED
+  at 16:21:58, complete success at 16:21:59.
+- 16:22:07 driver native S3_PARK idle=1 attempted=1 ack=1 warm=1 (Goodix
+  Windows 0x60/01 00 command really ACKed before S3).
+- 16:22:08 through 16:22:14 kernel PM: suspend entry (deep) and actual
+  ACPI S3 wake. This is a REAL S3 success, not screen DPMS/s2idle.
+- 16:22:14 stock kscreenlocker_greet logs Resume: rearming fingerprint
+  PAM and restarting noninteractive authenticators, meaning an auth flow
+  was requested without a mouse action at that moment. fprintd started
+  native COLD_QUIESCE 16:22:14, short SPI-detached GPIO reset at 16:22:15.
+- 16:22:24 first TLS handshake FAILED. Native rel71.36 first phase ran:
+  NATIVE_S3_TLS_EARLY_RECOVER then full detached transport recovery with
+  second short GPIO264 reset 16:22:25, SPI reopened and A8 verified.
+- 16:22:26 actual NEW NATIVE_S3_REL61_FALLBACK marker emitted. The historic
+  second phase ran and proceeded into image calibration. This is the first
+  field evidence that the rel71.36 code change resolved the rel71.35
+  double-early-exit inability to reconstruct TLS.
+- 16:22:28–16:22:35 calibration repeatedly detected a finger resting
+  on the reader (sensor FDT mean ~199–247 instead of clear ~354, touch
+  0x3f). The implementation correctly DISCARDED contaminated ImageBase
+  backgrounds and WAITED for the sensor to be clear. This is intentional:
+  accepting these images as background would destroy first-match quality.
+- 16:22:37 native FDT probe/WakeupMCU completed; actual first post-S3
+  VERIFY_TRACE READY. 16:22:38 finger present with 6 zones; 16:22:39
+  enrolled right index scored **26/7**, ACCEPTED immediately. 16:22:40
+  CLOSE_TRACE preserved full TLS/background as production_ready=1.
+- There was also a Bluetooth MX Master mouse HID reconnect log at 16:22:43,
+  AFTER the successful biometric score at 16:22:39. This kernel timestamp
+  alone does not timestamp the user's earlier mouse movement. The mouse
+  may have raised KDE's visually hidden password/authentication UI, but
+  it did NOT cause TLS to recover: fprintd began its Claim at 16:22:14
+  and completed staged recovery independently. Most early finger touches
+  happened DURING calibration, before VERIFY_READY, so no matching scores
+  are expected for those touches.
+- On Pegasus existing kscreenlocker 6.7.5 QML already contains a
+  GXFP51A0 window-ready startup timer and uiVisible/startAuthenticating()
+  interactions. This UI file was only READ in this audit; DO NOT silently
+  rewrite/remove it or install a new service/hook. A Sep-2026 community
+  report about forcing KDE lock UI early warned it can keep some USB
+  sensors awake through S0ix and cost battery; this machine uses real S3
+  and the kernel proved sleep entry. Preserve native fprintd lifecycle.
+- No failure of matcher/security threshold: accepted post-S3 score 26/7.
+  Real delay to first VERIFY_READY ~23 sec after wake, ~25 sec until
+  matched. Safe potential future improvement is to reduce first wasted
+  TLS attempt and/or convey "finger off while calibrating", BUT neither
+  optimization has been validated. Do not change functioning rel71.36
+  without preserving it as an instant rollback.
+- This is ONE verified post-S3 success (plus clean 1/1 regular unlock)
+  under booted Linux CachyOS 7.2.9-1. The separately INSTALLED kernel
+  7.2.9-2 has not been booted. No user reboot, S3, user lock initiated
+  automatically, no custom systemd service/helper/timer created.
+- Next physical reliability gate (when user is ready): manually wake
+  the KDE screen with mouse or keyboard FIRST, keep finger entirely off
+  sensor while it is preparing, and only present enrolled right index
+  when a live fingerprint prompt is accepting it. Repeat real S3 once
+  or twice if user wishes, to check reproducibility and timings; no
+  need to unenroll or use passwords other than existing fallback.
+  Inspect logs after each trial. Never relax score threshold or use
+  a finger-on sensor image to calibrate. Test kernel 7.2.9-2 only
+  after explicit user-approved reboot.
