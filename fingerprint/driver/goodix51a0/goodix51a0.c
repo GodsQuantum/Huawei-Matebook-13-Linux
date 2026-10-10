@@ -117,6 +117,7 @@ struct _FpiDeviceGoodix51A0
   gint64        warm_sleep_delta_us; /* CLOCK_BOOTTIME-MONOTONIC when warm state was armed */
   gboolean      warm_sleep_clock_valid; /* baseline validity; zero is a legitimate pre-first-suspend value */
   gboolean      force_cold_reset; /* suspend/lifecycle invalidation: never reuse stale sensor state */
+  gboolean      s3_first_tls_pending; /* use full recovery promptly after a real S3 failure */
 };
 
 G_DECLARE_FINAL_TYPE (FpiDeviceGoodix51A0, fpi_device_goodix51a0, FPI,
@@ -2025,6 +2026,18 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
 
       gx_tls_teardown (self);
 
+      /* On the very first TLS failure following real S3, stop repeating
+       * protocol resets through the same SPI lifetime. Let the enclosing
+       * gx_prepare_capture_context() perform its reviewed full recovery:
+       * close SPI/IRQ -> GPIO264 reset -> reopen -> firmware/A8 -> retry.
+       * rel71.21 proved that changing EVERY protocol reset was harmful.
+       * This exception is restricted to a proven S3 boundary. */
+      if (self->s3_first_tls_pending)
+        {
+          fp_warn ("GXFP51A0 NATIVE_S3_TLS_EARLY_RECOVER after first failure");
+          break;
+        }
+
       /* A PMK that reached D4 in an earlier session is durable trusted state.
        * A transport/configuration/handshake failure later does NOT prove that
        * the key changed, so never unlink the cache on a transient failure. */
@@ -2061,7 +2074,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
    * disk while probing fresh boot staging. If the newly recovered candidate
    * reaches D4, gx_pmk_cache_save() atomically replaces the old file. If it
    * does not, the last-known-good cache remains available for a later boot. */
-  if (!self->tls_up && !diagnostic && self->psk_from_cache)
+  if (!self->tls_up && !diagnostic && self->psk_from_cache &&
+      !self->s3_first_tls_pending)
     {
       fp_warn ("GXFP51A0 cached PMK could not establish TLS; trying fresh staging without deleting validated cache");
       gx_pmk_clear (self);
@@ -2466,7 +2480,14 @@ gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
    * userspace equivalent to a cold device boundary and is safe to use inside
    * a live libfprint operation. */
   gx_transport_close (self);
+  if (self->s3_first_tls_pending)
+    {
+      fp_info ("GXFP51A0 NATIVE_S3_RECOVERY detached quiet before GPIO reset");
+      g_usleep (G_USEC_PER_SEC);
+    }
   gx_gpio_reset (self);
+  if (self->s3_first_tls_pending)
+    g_usleep (G_USEC_PER_SEC);
 
   if (!gx_transport_open (FP_DEVICE (self), &reopen_error))
     {
@@ -2485,6 +2506,7 @@ gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
     }
 
   fp_info ("GXFP51A0 capture-context recovery reset/A8 confirmed: %s", fw);
+  self->s3_first_tls_pending = FALSE; /* full native boundary completed */
   return TRUE;
 }
 
@@ -4447,6 +4469,7 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
   self->capture_pacing_suppressed = FALSE;
   self->production_ready = TRUE;
   self->warm_valid = TRUE;
+  self->s3_first_tls_pending = FALSE;
   self->warm_last_activity_us = g_get_monotonic_time ();
   self->warm_sleep_clock_valid =
     gx_sleep_delta_us (&self->warm_sleep_delta_us);
@@ -4658,6 +4681,7 @@ gx_dev_suspend (FpDevice *dev)
    * transmit Sleep during an active biometric capture. A failed park cannot
    * justify reusing a warm context; the following Claim must be cold. */
   self->force_cold_reset = TRUE;
+  self->s3_first_tls_pending = TRUE;
   if (idle)
     gx_warm_abandon (self);
   else

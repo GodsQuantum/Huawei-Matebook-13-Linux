@@ -54,6 +54,25 @@ assert "fpi_device_suspend_complete" in suspend
 assert "NATIVE_S3_RESUME cold Claim required" in resume
 assert "NATIVE_S3_PARK" in suspend
 assert "gxfp_build_sleep (&packet)" in suspend
+
+# A REAL S3 should advance directly to one full detached recovery after its
+# first failed TLS session; non-S3 attempts preserve the Windows protocol
+# reset sequence. This specifically must NOT reintroduce rel71.21's blanket
+# SPI close/reset/reopen change.
+tls=fn("gx_tls_session")
+recover=fn("gx_recover_capture_context")
+cold=fn("gx_cold_prepare")
+assert "self->s3_first_tls_pending = TRUE" in suspend
+assert "NATIVE_S3_TLS_EARLY_RECOVER" in tls
+assert "if (self->s3_first_tls_pending)" in tls
+assert "!self->s3_first_tls_pending" in tls
+assert "self->s3_first_tls_pending = FALSE" in recover
+assert "self->s3_first_tls_pending = FALSE" in cold
+assert "gx_transport_close (self)" in recover
+assert "gx_gpio_reset (self)" in recover
+assert "gx_transport_open (FP_DEVICE (self)" in recover
+assert "gx_gpio_reset (self)" in tls
+
 PY2
 
 grep -Fq 'pkgrel=71' "$pkg"
