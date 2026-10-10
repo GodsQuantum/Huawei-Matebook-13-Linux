@@ -118,6 +118,7 @@ struct _FpiDeviceGoodix51A0
   gboolean      warm_sleep_clock_valid; /* baseline validity; zero is a legitimate pre-first-suspend value */
   gboolean      force_cold_reset; /* suspend/lifecycle invalidation: never reuse stale sensor state */
   gboolean      s3_first_tls_pending; /* use full recovery promptly after a real S3 failure */
+  gboolean      s3_rel61_tls_fallback; /* after one detached recovery, allow historic complete TLS retry sequence */
 };
 
 G_DECLARE_FINAL_TYPE (FpiDeviceGoodix51A0, fpi_device_goodix51a0, FPI,
@@ -2049,9 +2050,9 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
        * close SPI/IRQ -> GPIO264 reset -> reopen -> firmware/A8 -> retry.
        * rel71.21 proved that changing EVERY protocol reset was harmful.
        * This exception is restricted to a proven S3 boundary. */
-      if (self->s3_first_tls_pending)
+      if (self->s3_first_tls_pending && !self->s3_rel61_tls_fallback)
         {
-          fp_warn ("GXFP51A0 NATIVE_S3_TLS_EARLY_RECOVER after first failure");
+          fp_warn ("GXFP51A0 NATIVE_S3_TLS_EARLY_RECOVER first failed handshake; full detached recovery before legacy retries");
           break;
         }
 
@@ -2092,7 +2093,7 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
    * reaches D4, gx_pmk_cache_save() atomically replaces the old file. If it
    * does not, the last-known-good cache remains available for a later boot. */
   if (!self->tls_up && !diagnostic && self->psk_from_cache &&
-      !self->s3_first_tls_pending)
+      (!self->s3_first_tls_pending || self->s3_rel61_tls_fallback))
     {
       fp_warn ("GXFP51A0 cached PMK could not establish TLS; trying fresh staging without deleting validated cache");
       gx_pmk_clear (self);
@@ -2523,7 +2524,16 @@ gx_recover_capture_context (FpiDeviceGoodix51A0 *self)
     }
 
   fp_info ("GXFP51A0 capture-context recovery reset/A8 confirmed: %s", fw);
-  /* Keep the S3 marker until TLS and image/FDT capture actually succeed. */
+  /* The first quick S3 attempt failed; the native detached recovery is now
+   * complete. The old rel59/61 code recovered real S3 with multiple normal
+   * Goodix TLS protocol retries and, when appropriate, fresh staging.
+   * Restore those retries for the NEXT attempt without clearing the S3
+   * marker until actual image+FDT production readiness. */
+  if (self->s3_first_tls_pending && !self->s3_rel61_tls_fallback)
+    {
+      self->s3_rel61_tls_fallback = TRUE;
+      fp_warn ("GXFP51A0 NATIVE_S3_REL61_FALLBACK detached reset confirmed; next TLS uses historical complete bounded retries");
+    }
   return TRUE;
 }
 
@@ -4487,6 +4497,7 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
   self->production_ready = TRUE;
   self->warm_valid = TRUE;
   self->s3_first_tls_pending = FALSE;
+  self->s3_rel61_tls_fallback = FALSE;
   self->warm_last_activity_us = g_get_monotonic_time ();
   self->warm_sleep_clock_valid =
     gx_sleep_delta_us (&self->warm_sleep_delta_us);
@@ -4704,6 +4715,7 @@ gx_dev_suspend (FpDevice *dev)
    * justify reusing a warm context; the following Claim must be cold. */
   self->force_cold_reset = TRUE;
   self->s3_first_tls_pending = TRUE;
+  self->s3_rel61_tls_fallback = FALSE;
   if (idle)
     gx_warm_abandon (self);
   else

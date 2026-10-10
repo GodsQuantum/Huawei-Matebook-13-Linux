@@ -64,13 +64,23 @@ recover=fn("gx_recover_capture_context")
 cold=fn("gx_cold_prepare")
 assert "self->s3_first_tls_pending = TRUE" in suspend
 assert "NATIVE_S3_TLS_EARLY_RECOVER" in tls
-assert "if (self->s3_first_tls_pending)" in tls
+assert "if (self->s3_first_tls_pending && !self->s3_rel61_tls_fallback)" in tls
 assert "!self->s3_first_tls_pending" in tls
 assert "self->s3_first_tls_pending = FALSE" not in recover
 assert "attempted = TRUE" in suspend
 assert "gboolean warm = gx_warm_available (self)" in suspend
 assert "if (idle)" in suspend
 assert "attempted=%d ack=%d warm=%d" in suspend
+
+assert "self->s3_rel61_tls_fallback = FALSE" in suspend
+assert "self->s3_rel61_tls_fallback = TRUE" in recover
+assert "NATIVE_S3_REL61_FALLBACK" in recover
+assert "self->s3_first_tls_pending && !self->s3_rel61_tls_fallback" in tls
+assert "(!self->s3_first_tls_pending || self->s3_rel61_tls_fallback)" in tls
+assert "self->s3_rel61_tls_fallback" in tls
+assert "gx_gpio_reset (self)" in tls
+assert "self->s3_rel61_tls_fallback = FALSE" in cold
+
 assert "self->s3_first_tls_pending = FALSE" in cold
 assert "gx_transport_close (self)" in recover
 assert "gx_reset_detached_s3_boundary (self)" in recover
