@@ -44,7 +44,8 @@ assert "fpi_device_open_complete (dev, NULL)" in open_
 assert open_.index("if (!gx_cold_prepare (self))") < open_.rindex("fpi_device_open_complete (dev, NULL)")
 
 assert "gx_tls_teardown (self)" in recover
-assert "gx_gpio_reset (self)" in recover
+assert "gx_reset_detached_s3_boundary (self)" in recover
+assert "gx_gpio_reset (self)" in fn("gx_reset_detached_s3_boundary")
 assert "gx_read_fw_version_stage2e" in recover
 assert "gx_pmk_clear" not in recover
 PY2

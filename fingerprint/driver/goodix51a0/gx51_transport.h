@@ -26,3 +26,4 @@ int gx51_wait_irq_gpio48_low(int line_fd, unsigned int timeout_ms);
 int gx51_read_frame_fd(int spi_fd, int irq_gpio_fd, uint8_t *type,
                        uint8_t *body, size_t capacity, size_t *body_len);
 int gx51_reset_gpio264(void);
+int gx51_reset_gpio264_short(void);
