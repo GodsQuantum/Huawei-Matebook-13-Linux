@@ -449,7 +449,7 @@ Before=display-manager.service
 [Service]
 ExecStart=
 ExecStart=$FPRINTD_BIN --no-timeout
-TimeoutStartSec=40s
+TimeoutStartSec=90s
 Environment=LD_LIBRARY_PATH=$LIBDIR
 DeviceAllow=char-gpiochip rw
 LimitCORE=0

@@ -27,11 +27,15 @@ close=fn("gx_dev_close")
 assert "production_ready" in s and "warm_valid" in s
 assert "probe_prewarm" not in s
 
-# rel26: probe is host-transport-only. No biometric/session I/O before Claim.
+# rel71.38 restores rel23 early probe readiness using FULL rel71.36 prep,
+# not the rejected rel71.37 shortened TLS path.
+assert "gx_cold_prepare (self)" in probe
+assert "gx_warm_available (self)" in probe
 assert "gx_transport_open" in probe and "gx_transport_close" in probe
-for forbidden in ("gx_cold_prepare", "gx_gpio_reset", "gx_tls_session",
-                  "gx_prepare_capture_context"):
-    assert forbidden not in probe
+assert "gx_gpio_reset (self)" in probe
+assert probe.index("gx_transport_close (self)") < probe.index("gx_gpio_reset (self)")
+assert probe.index("gx_gpio_reset (self)") < probe.rindex("gx_transport_open (dev, &err)")
+assert "if (diagnostic)" in probe
 
 # Claim performs bounded preparation and never reports success after a failed prepare.
 assert "gx_prepare_capture_context (self, FALSE)" in cold

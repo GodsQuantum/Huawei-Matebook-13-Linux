@@ -4513,18 +4513,61 @@ gx_dev_probe (FpDevice *dev)
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   GError *err = NULL;
 
-  /* Enumeration must be passive.  rel24/25 performed a complete TLS +
-   * background GET_IMAGE transaction here, before any biometric Claim.  A
-   * transport miss could therefore desynchronise the MCU before the greeter
-   * ever asked for a fingerprint.  Validate only host-side transport
-   * availability in probe(); the real Claim/open owns sensor initialisation. */
-  if (!gx_transport_open (dev, &err))
+  /* Restore rel23 native enumeration-time preparation, but use the exact
+   * known-working rel71.36 FULL recovery path rather than the truncated
+   * prewarm from rejected rel71.37. fprintd synchronously enumerates BEFORE
+   * owning its D-Bus name; the existing service is already ordered before
+   * the Plasma login manager. On success its FIRST Claim is FAST_READY.
+   *
+   * Every reset must be done with SPI and IRQ CLOSED, unlike rel24/25;
+   * a transient accepted GET_IMAGE/TLS timeout gets normal whole-session
+   * recovery and PMK staging fallback WITHOUT deleting the validated cache.
+   * Do not ship any custom daemon, helper, timer or system-sleep hook. */
+  gboolean diagnostic = g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") != NULL ||
+                        g_getenv ("GXFP_DIAGNOSTIC_ONESHOT") != NULL ||
+                        g_getenv ("GXFP_DIAGNOSTIC_TLS_ONLY") != NULL;
+  gboolean ready = FALSE;
+  gint64 started_us = g_get_monotonic_time ();
+
+  if (diagnostic)
     {
-      fpi_device_probe_complete (dev, NULL, NULL, err);
+      if (!gx_transport_open (dev, &err))
+        {
+          fpi_device_probe_complete (dev, NULL, NULL, err);
+          return;
+        }
+      gx_transport_close (self);
+      fpi_device_probe_complete (dev, NULL, NULL, NULL);
       return;
     }
 
   gx_transport_close (self);
+  g_usleep (G_USEC_PER_SEC);
+  gx_gpio_reset (self);
+  g_usleep (G_USEC_PER_SEC);
+
+  if (gx_transport_open (dev, &err))
+    {
+      /* The SAME bounded full preparation/recovery and TLS staging proven
+       * by the 7-16-second real Claim tests, not a shorter unproven fork. */
+      ready = gx_cold_prepare (self) && gx_warm_available (self);
+      gx_transport_close (self);
+    }
+
+  if (ready)
+    fp_info ("GXFP51A0 NATIVE_PROBE_PREWARM ready elapsed_ms=%d; "
+             "first greeter Claim can reuse warm TLS/FDT",
+             (int)((g_get_monotonic_time () - started_us)/1000));
+  else
+    {
+      fp_warn ("GXFP51A0 NATIVE_PROBE_PREWARM full cold preparation failed; "
+               "keeping the recognized device available for later Claim");
+      gx_warm_abandon (self);
+    }
+
+  /* Never hide the sensor or delete its enrolled prints after a recoverable
+   * TLS/image initialization miss. The password greeter remains independent. */
+  g_clear_error (&err);
   fpi_device_probe_complete (dev, NULL, NULL, NULL);
 }
 
