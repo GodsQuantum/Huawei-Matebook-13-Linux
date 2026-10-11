@@ -106,3 +106,31 @@ version evidence matrix, original bundle ref inventory and a private tar.gz
 lossless text-history snapshot are all retained. These PRIVATE files
 must never be pushed to public GitHub. Stable main is untouched until
 physical end-to-end verification.
+
+## Additional same-boot field evidence (2026-10-11 14:57 CEST)
+
+- Three native service starts + first own-user D-Bus Claims:
+  7435ms + 106ms, 14411ms + 107ms, 15553ms + 107ms;
+  native FAST_READY 82-83ms.
+- Existing fprintd Before=plasmalogin ordering and PLM After=fprintd
+  verified. Per systemd Type=dbus semantics, unit readiness means D-Bus
+  BusName acquired; native fprintd/libfprint enumeration finishes first.
+  References: https://fprint.freedesktop.org/libfprint-dev/FpContext.html
+  and https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html
+- Pacman integrity on installed libfprint, PLM and fprintd:
+  32/210/270 files respectively, zero modified files.
+  Right-index enrollment retained. No new systemd fingerprint units.
+- Another host power transition at 14:06-14:28 was specifically ACPI
+  **S4 hibernation**, NOT deep S3 (kernel journal):
+  S4 resumed 14:28:49, native short GPIO reset 14:28:51,
+  post-resume VERIFY_READY 14:28:56. NO accepted biometric match was
+  recorded then, so do not mislabel it as a successful S3 unlock.
+  The kernel S4 state is described at
+  https://cdn.kernel.org/doc/html/latest/admin-guide/pm/sleep-states.html
+- The canonical PRIVATE project archive contains whole-project snapshot
+  plus SHA256, 226 indexed records and original 126-ref Git history
+  bundle, an isolated experimental source clone, and protected original
+  main edits. No private files uploaded to GitHub.
+- Real rel71.38 COLD BOOT fingerprint LOGIN, ordinary lock and genuine
+  S3 wake with >=7/7 matcher score remain physically UNTESTED.
+  Do not promote or tag public stable main until all are proven.
