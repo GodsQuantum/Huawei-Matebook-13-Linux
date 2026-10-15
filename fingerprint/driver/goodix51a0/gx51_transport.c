@@ -11,6 +11,7 @@
 #include <linux/spi/spidev.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <time.h>
@@ -158,16 +159,81 @@ static int gx51_open_int34bb(void)
     return -1;
 }
 
+/* Boards whose ACPI GpioInt for GXFP51A0 is not INT34BB line 48.  The
+ * reset line (264) is the same on every board listed here. */
+static const struct {
+    const char *sys_vendor;
+    const char *product_name;
+    unsigned int irq_line;
+} gx51_irq_quirks[] = {
+    { "HONOR", "BBR-WAX9", 279u },
+};
+
+static int gx51_read_dmi(const char *name, char *buf, size_t size)
+{
+    char path[64];
+    ssize_t n;
+    int fd;
+
+    if (snprintf(path, sizeof path, "/sys/class/dmi/id/%s", name) < 0)
+        return -1;
+    fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return -1;
+    n = read(fd, buf, size - 1);
+    close(fd);
+    if (n < 0)
+        return -1;
+    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == ' '))
+        n--;
+    buf[n] = '\0';
+    return 0;
+}
+
+unsigned int gx51_irq_line(void)
+{
+    const char *env = getenv("GXFP51A0_IRQ_LINE");
+    char vendor[64], product[64];
+    size_t i;
+
+    if (env && *env) {
+        char *end;
+        unsigned long v = strtoul(env, &end, 10);
+
+        if (*end == '\0' && v < 1024ul)
+            return (unsigned int)v;
+    }
+
+    if (gx51_read_dmi("sys_vendor", vendor, sizeof vendor) == 0 &&
+        gx51_read_dmi("product_name", product, sizeof product) == 0) {
+        for (i = 0; i < sizeof gx51_irq_quirks / sizeof gx51_irq_quirks[0]; i++) {
+            if (strcmp(vendor, gx51_irq_quirks[i].sys_vendor) == 0 &&
+                strcmp(product, gx51_irq_quirks[i].product_name) == 0)
+                return gx51_irq_quirks[i].irq_line;
+        }
+    }
+
+    return GX51_EXPECTED_HWIRQ;
+}
+
 int gx51_open_irq_gpio48(void)
 {
     struct gpio_v2_line_request req = {0};
+    struct gpiochip_info info = {0};
+    unsigned int line = gx51_irq_line();
     int chip = gx51_open_int34bb();
 
     if (chip < 0)
         return -1;
 
+    if (ioctl(chip, GPIO_GET_CHIPINFO_IOCTL, &info) < 0 || line >= info.lines) {
+        close(chip);
+        errno = EINVAL;
+        return -1;
+    }
+
     req.num_lines = 1;
-    req.offsets[0] = GX51_EXPECTED_HWIRQ;
+    req.offsets[0] = line;
     req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
     strncpy(req.consumer, "goodix51a0-irq", sizeof(req.consumer) - 1);
 

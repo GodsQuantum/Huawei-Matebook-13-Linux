@@ -4144,7 +4144,7 @@ gx_transport_open (FpDevice *dev, GError **error)
       return FALSE;
     }
 
-  fp_info ("GXFP51A0 IRQ source: direct GPIO48 level polling");
+  fp_info ("GXFP51A0 IRQ source: direct GPIO%u level polling", gx51_irq_line ());
   return TRUE;
 }
 

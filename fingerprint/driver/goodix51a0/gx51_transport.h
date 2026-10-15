@@ -20,6 +20,7 @@ uint8_t gx51_body_checksum(const uint8_t *data, size_t len);
 size_t gx51_read_chunk_size(size_t remaining);
 int gx51_write_frame_fd(int spi_fd, uint8_t type,
                         const uint8_t *body, size_t len);
+unsigned int gx51_irq_line(void);
 int gx51_open_irq_gpio48(void);
 int gx51_wait_irq_gpio48(int line_fd, unsigned int timeout_ms);
 int gx51_wait_irq_gpio48_low(int line_fd, unsigned int timeout_ms);
