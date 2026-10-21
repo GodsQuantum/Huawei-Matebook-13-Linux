@@ -61,7 +61,7 @@ class ManagerV3Tests(unittest.TestCase):
             env = test_env(Path(d))
             p = bash(self.source_cmd('printf "%s|%s|%s\\n" "$VERSION" "$STATE_SCHEMA" "$INSTALL_SCHEMA"'), env)
             self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertEqual(p.stdout.strip(), "3.2.0|3|4")
+            self.assertEqual(p.stdout.strip(), "3.2.1|3|4")
 
     def test_01_state_round_trip(self):
         with tempfile.TemporaryDirectory() as d:
@@ -602,15 +602,51 @@ class ManagerV3Tests(unittest.TestCase):
             self.assertIn("730\tCounter-Strike 2", p.stdout)
             self.assertNotIn("1628350", p.stdout)
 
-    def test_32_installed_cli_creates_gpu_control_aliases(self):
+    def test_32_unified_huawei_removes_only_managed_aliases(self):
         with tempfile.TemporaryDirectory() as d:
             td = Path(d); env = test_env(td)
+            user_bin = Path(env["HUAWEI_GPU_USER_BIN"])
+            user_bin.mkdir(parents=True)
+            old = user_bin / "huawei-matebook-gpu-manager"
+            old.write_text("#!/usr/bin/env bash\n# Huawei MateBook 13 GPU Manager\n")
+            (user_bin / "GPU-control").symlink_to(old.name)
+            (user_bin / "gpu-control").symlink_to(old.name)
             p = bash(self.source_cmd("install_manager_cli"), env)
             self.assertEqual(p.returncode, 0, p.stderr)
-            user_bin = Path(env["HUAWEI_GPU_USER_BIN"])
-            self.assertTrue((user_bin / "huawei-matebook-gpu-manager").is_file())
-            self.assertEqual(os.readlink(user_bin / "GPU-control"), "huawei-matebook-gpu-manager")
-            self.assertEqual(os.readlink(user_bin / "gpu-control"), "huawei-matebook-gpu-manager")
+            self.assertFalse(old.exists())
+            self.assertFalse((user_bin / "GPU-control").is_symlink())
+            self.assertFalse((user_bin / "gpu-control").is_symlink())
+
+    def test_32b_kwin_680_avoids_symlink_and_render_nodes_override(self):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d); env = test_env(td)
+            code = self.source_cmd(r"""
+                plasma_wayland_detected(){ return 0; }
+                kwin_version(){ echo 6.8.0; }
+                systemctl(){ return 0; }
+                load_discovered(){ :; }
+                mkdir -p "$KWIN_DROPIN_DIR"
+                printf '[Service]\n# Keep KWin on the Intel iGPU\nEnvironment=KWIN_RENDER_NODES=\n' > "$KWIN_DROPIN"
+                install_kwin_isolation
+                [[ ! -e "$KWIN_DROPIN" ]]
+            """)
+            x = bash(code,env)
+            self.assertEqual(x.returncode,0,x.stderr)
+
+    def test_32c_kwin_681_pins_intel_without_disabling_render_nodes(self):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d); env = test_env(td)
+            code = self.source_cmd(r"""
+                plasma_wayland_detected(){ return 0; }
+                kwin_version(){ echo 6.8.1; }
+                systemctl(){ return 0; }
+                load_discovered(){ :; }
+                install_kwin_isolation
+                grep -Fq "KWIN_DRM_DEVICES=$INTEL_ALIAS" "$KWIN_DROPIN"
+                ! grep -q KWIN_RENDER_NODES "$KWIN_DROPIN"
+            """)
+            x = bash(code,env)
+            self.assertEqual(x.returncode,0,x.stderr)
 
     def test_33_dashboard_is_no_wake_and_source_checkout_is_not_rewritten(self):
         text = SCRIPT.read_text()

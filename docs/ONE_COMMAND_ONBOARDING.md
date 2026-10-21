@@ -239,12 +239,12 @@ See [HARDWARE_SUPPORT_MATRIX.md](HARDWARE_SUPPORT_MATRIX.md) for the audited sup
 
 - `HUAWEI` — audited Whiptail control center.
 - `HUAWEI --doctor-only` — read-only full MateBook audit.
-- `GPU-control status` — detailed MX250/NVIDIA state.
-- `GPU-control list` — list managed applications.
-- `GPU-control run -- app` — one-off MX250 launch.
-- `GPU-control add App.desktop` — persistently route that desktop application through the MX250.
-- `GPU-control remove App.desktop` — remove the persistent NVIDIA wrapper.
-- `GPU-control doctor` — read-only GPU Manager audit.
-- `GPU-control test` — reversible MX250 wake/use/release smoke test.
+- `HUAWEI --gpu status` — detailed MX250/NVIDIA state.
+- `HUAWEI --gpu list` — list managed applications.
+- `HUAWEI --gpu run -- app` — one-off MX250 launch.
+- `HUAWEI --gpu add App.desktop` — persistently route that desktop application through the MX250.
+- `HUAWEI --gpu remove App.desktop` — remove the persistent NVIDIA wrapper.
+- `HUAWEI --gpu doctor` — read-only GPU Manager audit.
+- `HUAWEI --gpu test` — reversible MX250 wake/use/release smoke test.
 
 The GPU Manager does not infer workload requirements from application behavior. It only auto-imports desktop entries that explicitly request a non-default GPU; all other routing is user-selected and reversible.

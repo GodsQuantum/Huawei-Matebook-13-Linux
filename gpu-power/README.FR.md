@@ -95,7 +95,7 @@ chmod +x huawei-matebook-13-gpu-manager.sh
 
 Un redémarrage est attendu après la première installation afin d'appliquer proprement la politique de boot, le module NVIDIA correspondant au noyau démarré et l'environnement KWin.
 
-L'installateur crée aussi `~/.local/bin/GPU-control` (et `gpu-control` en minuscules). Sans argument, `GPU-control` affiche un dashboard en lecture seule qui ne réveille pas la dGPU : état Intel/NVIDIA, runtime PCIe, profil d'alimentation actif, disponibilité NVIDIA pour le **noyau réellement démarré**, et liste exacte des applications autorisées à activer la MX250.
+L'installateur crée aussi `~/.local/bin/HUAWEI --gpu` (et `gpu-control` en minuscules). Sans argument, `HUAWEI --gpu` affiche un dashboard en lecture seule qui ne réveille pas la dGPU : état Intel/NVIDIA, runtime PCIe, profil d'alimentation actif, disponibilité NVIDIA pour le **noyau réellement démarré**, et liste exacte des applications autorisées à activer la MX250.
 
 ### Mise à niveau / réparation
 
@@ -105,14 +105,14 @@ Sur CachyOS/Arch utilisant réellement Limine, le gestionnaire appelle directeme
 
 ## Ajouter ou retirer des applications
 
-Après installation, `GPU-control` devient le point d'entrée normal :
+Après installation, `HUAWEI --gpu` devient le point d'entrée normal :
 
 ```bash
-GPU-control                         # vue d'ensemble sans réveiller la MX250
-GPU-control add                     # sélection interactive d'une application
-GPU-control add DaVinciResolve.desktop
-GPU-control remove DaVinciResolve.desktop
-GPU-control list
+HUAWEI --gpu                         # vue d'ensemble sans réveiller la MX250
+HUAWEI --gpu add                     # sélection interactive d'une application
+HUAWEI --gpu add DaVinciResolve.desktop
+HUAWEI --gpu remove DaVinciResolve.desktop
+HUAWEI --gpu list
 ```
 
 Le script source reste directement utilisable et conserve son menu interactif lorsqu'il est lancé sans argument.
@@ -133,9 +133,9 @@ Depuis la v3, l’état utilisateur canonique est versionné dans le répertoire
 Le client Steam doit rester sur Intel. Les jeux sélectionnés peuvent être enveloppés par le runner GPU :
 
 ```bash
-GPU-control steam-add 730
-GPU-control steam-remove 730
-GPU-control steam-all-on
+HUAWEI --gpu steam-add 730
+HUAWEI --gpu steam-remove 730
+HUAWEI --gpu steam-all-on
 ```
 
 `steam-all-on` vise les jeux installés mais exclut volontairement les composants de compatibilité Valve connus comme Proton et Steam Linux Runtime. Ces runtimes restent l'infrastructure du jeu et ne doivent pas devenir eux-mêmes des applications gérées par la dGPU.
@@ -147,15 +147,15 @@ L'édition directe du VDF étant plus fragile que les `.desktop`, le support Ste
 ## Diagnostic et test
 
 ```bash
-GPU-control
-GPU-control status
-GPU-control doctor
-GPU-control test
+HUAWEI --gpu
+HUAWEI --gpu status
+HUAWEI --gpu doctor
+HUAWEI --gpu test
 ```
 
 Le dashboard et les diagnostics évitent volontairement `nvidia-smi`, qui n'est pas un bon probe d'idle lorsqu'on cherche à maintenir une dGPU agressivement hors tension. Ils distinguent également un bon état Intel-only d'un décalage noyau/DKMS où NVIDIA est installé pour un autre noyau mais indisponible dans celui qui tourne.
 
-Au repos, la MX250 doit être absente. `GPU-control test` utilise Vulkan comme test PRIME indépendant du serveur d'affichage (donc utilisable depuis Wayland/SSH) ; GLX n'est ajouté que si un display X/Xwayland authentifié est réellement joignable. Le test doit ensuite revenir à une dGPU absente, sans module ni utilisateur NVIDIA restant.
+Au repos, la MX250 doit être absente. `HUAWEI --gpu test` utilise Vulkan comme test PRIME indépendant du serveur d'affichage (donc utilisable depuis Wayland/SSH) ; GLX n'est ajouté que si un display X/Xwayland authentifié est réellement joignable. Le test doit ensuite revenir à une dGPU absente, sans module ni utilisateur NVIDIA restant.
 
 ## Détail Plasma / KWin
 

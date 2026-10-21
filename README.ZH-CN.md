@@ -144,29 +144,29 @@ GPU Manager v3.2 会：
 | `HUAWEI --no-fingerprint` | 执行 onboarding，但跳过指纹改动。 |
 | `HUAWEI --no-gpu` | 执行 onboarding，但跳过 GPU Manager 改动。 |
 | `HUAWEI --gpu-driver-preinstalled` | 要求发行版已提供 NVIDIA R580，脚本绝不安装驱动。 |
-| `GPU-control` | 显示 GPU Manager 总览。 |
-| `GPU-control menu` | 打开 GPU Manager 自己的交互式菜单。 |
-| `GPU-control overview` | 显式显示同一总览/仪表盘。 |
-| `GPU-control status` | 显示 MX250/NVIDIA/PCI/lease 的详细状态。 |
-| `GPU-control list` | 列出当前由 NVIDIA 策略管理的应用。 |
-| `GPU-control run -- COMMAND` | 仅本次启动使用 MX250，程序退出后自动释放。示例：`GPU-control run -- handy`。 |
-| `GPU-control add App.desktop` | 让某个桌面应用今后正常启动时始终使用 MX250。示例：`GPU-control add Handy.desktop`。 |
-| `GPU-control remove App.desktop` | 移除该永久 NVIDIA 包装，恢复默认/Intel 启动。 |
-| `GPU-control add` | 交互式选择一个桌面应用进行管理。 |
-| `GPU-control steam-add APPID` | 为一个 Steam 游戏启用按需 NVIDIA。 |
-| `GPU-control steam-remove APPID` | 移除该 Steam 游戏的按需 NVIDIA。 |
-| `GPU-control steam-all-on` | 为检测到的所有 Steam 游戏启用按需 NVIDIA。 |
-| `GPU-control steam-all-off` | 关闭 Steam 全局策略。 |
-| `GPU-control apply` | 重新应用已保存的 desktop/Steam 路由规则。 |
-| `GPU-control install / repair / upgrade` | 安装或事务式修复/升级 GPU Manager。 |
-| `GPU-control doctor` | 对 GPU Manager 做只读完整性审计。 |
-| `GPU-control test` | 可逆 MX250 测试：唤醒 → 加载 NVIDIA → 测试 → 释放。 |
-| `GPU-control uninstall` | 删除 GPU Manager 集成并恢复保存的 desktop 状态。 |
-| `GPU-control --lang en|fr|zh COMMAND` | 选择 GPU Manager CLI/菜单语言。 |
+| `HUAWEI --gpu` | 显示 GPU Manager 总览。 |
+| `HUAWEI --gpu menu` | 打开 GPU Manager 自己的交互式菜单。 |
+| `HUAWEI --gpu overview` | 显式显示同一总览/仪表盘。 |
+| `HUAWEI --gpu status` | 显示 MX250/NVIDIA/PCI/lease 的详细状态。 |
+| `HUAWEI --gpu list` | 列出当前由 NVIDIA 策略管理的应用。 |
+| `HUAWEI --gpu run -- COMMAND` | 仅本次启动使用 MX250，程序退出后自动释放。示例：`HUAWEI --gpu run -- handy`。 |
+| `HUAWEI --gpu add App.desktop` | 让某个桌面应用今后正常启动时始终使用 MX250。示例：`HUAWEI --gpu add Handy.desktop`。 |
+| `HUAWEI --gpu remove App.desktop` | 移除该永久 NVIDIA 包装，恢复默认/Intel 启动。 |
+| `HUAWEI --gpu add` | 交互式选择一个桌面应用进行管理。 |
+| `HUAWEI --gpu steam-add APPID` | 为一个 Steam 游戏启用按需 NVIDIA。 |
+| `HUAWEI --gpu steam-remove APPID` | 移除该 Steam 游戏的按需 NVIDIA。 |
+| `HUAWEI --gpu steam-all-on` | 为检测到的所有 Steam 游戏启用按需 NVIDIA。 |
+| `HUAWEI --gpu steam-all-off` | 关闭 Steam 全局策略。 |
+| `HUAWEI --gpu apply` | 重新应用已保存的 desktop/Steam 路由规则。 |
+| `HUAWEI --gpu install / repair / upgrade` | 安装或事务式修复/升级 GPU Manager。 |
+| `HUAWEI --gpu doctor` | 对 GPU Manager 做只读完整性审计。 |
+| `HUAWEI --gpu test` | 可逆 MX250 测试：唤醒 → 加载 NVIDIA → 测试 → 释放。 |
+| `HUAWEI --gpu uninstall` | 删除 GPU Manager 集成并恢复保存的 desktop 状态。 |
+| `HUAWEI --gpu --lang en|fr|zh COMMAND` | 选择 GPU Manager CLI/菜单语言。 |
 
-GPU Manager 不会猜测哪些应用“看起来很吃 GPU”。安装/修复时，它只会自动导入明确通过 `PrefersNonDefaultGPU=true` 或 `X-KDE-RunOnDiscreteGpu=true` 请求独显的 `.desktop`。其他应用默认继续使用 Intel。偶尔需要 NVIDIA 时使用 `GPU-control run -- app`；如果希望某应用以后每次正常启动都使用 NVIDIA，则使用 `GPU-control add App.desktop`。
+GPU Manager 不会猜测哪些应用“看起来很吃 GPU”。安装/修复时，它只会自动导入明确通过 `PrefersNonDefaultGPU=true` 或 `X-KDE-RunOnDiscreteGpu=true` 请求独显的 `.desktop`。其他应用默认继续使用 Intel。偶尔需要 NVIDIA 时使用 `HUAWEI --gpu run -- app`；如果希望某应用以后每次正常启动都使用 NVIDIA，则使用 `HUAWEI --gpu add App.desktop`。
 
-对于 Handy，建议让自启动继续使用 Intel；只有明确需要 MX250 时再运行 `GPU-control run -- handy`。
+对于 Handy，建议让自启动继续使用 Intel；只有明确需要 MX250 时再运行 `HUAWEI --gpu run -- handy`。
 
 ## 许可证
 

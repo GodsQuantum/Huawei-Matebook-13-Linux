@@ -116,9 +116,9 @@ Les applications déclarant déjà `PrefersNonDefaultGPU=true` ou `X-KDE-RunOnDi
 Pour une application dont les métadonnées sont incorrectes :
 
 ```bash
-GPU-control add
-GPU-control list
-GPU-control doctor
+HUAWEI --gpu add
+HUAWEI --gpu list
+HUAWEI --gpu doctor
 ```
 
 ## Fonctions Huawei natives
@@ -158,29 +158,29 @@ Les mêmes commandes sont accessibles directement dans le menu Whiptail `HUAWEI`
 | `HUAWEI --no-fingerprint` | Lance l’onboarding sans modifier le fingerprint. |
 | `HUAWEI --no-gpu` | Lance l’onboarding sans modifier GPU Manager. |
 | `HUAWEI --gpu-driver-preinstalled` | Exige un pilote NVIDIA R580 fourni par la distro et n’en installe jamais. |
-| `GPU-control` | Affiche la vue d’ensemble du GPU Manager. |
-| `GPU-control menu` | Ouvre le menu interactif propre à GPU Manager. |
-| `GPU-control overview` | Alias explicite de la vue d’ensemble. |
-| `GPU-control status` | Affiche l’état détaillé MX250/NVIDIA/PCI/leases. |
-| `GPU-control list` | Liste les applications actuellement gérées pour NVIDIA. |
-| `GPU-control run -- COMMANDE` | Utilise la MX250 pour ce lancement uniquement, puis la libère. Exemple : `GPU-control run -- handy`. |
-| `GPU-control add App.desktop` | Force une application graphique donnée à utiliser la MX250 à chaque lancement normal. Exemple : `GPU-control add Handy.desktop`. |
-| `GPU-control remove App.desktop` | Retire ce wrapper NVIDIA permanent et restaure le lancement normal/Intel. |
-| `GPU-control add` | Permet de choisir interactivement une application graphique. |
-| `GPU-control steam-add APPID` | Active NVIDIA à la demande pour un jeu Steam. |
-| `GPU-control steam-remove APPID` | Retire NVIDIA à la demande pour ce jeu Steam. |
-| `GPU-control steam-all-on` | Active NVIDIA à la demande pour tous les jeux Steam détectés. |
-| `GPU-control steam-all-off` | Désactive cette politique globale Steam. |
-| `GPU-control apply` | Réapplique toutes les règles desktop/Steam sauvegardées. |
-| `GPU-control install / repair / upgrade` | Installe ou répare/met à jour transactionnellement GPU Manager. |
-| `GPU-control doctor` | Audit en lecture seule de l’intégrité/configuration GPU Manager. |
-| `GPU-control test` | Smoke-test réversible : réveil MX250 → NVIDIA → test → extinction. |
-| `GPU-control uninstall` | Désinstalle l’intégration GPU Manager et restaure les états desktop sauvegardés. |
-| `GPU-control --lang en|fr|zh COMMANDE` | Choisit la langue CLI/menu de GPU Manager. |
+| `HUAWEI --gpu` | Affiche la vue d’ensemble du GPU Manager. |
+| `HUAWEI --gpu menu` | Ouvre le menu interactif propre à GPU Manager. |
+| `HUAWEI --gpu overview` | Alias explicite de la vue d’ensemble. |
+| `HUAWEI --gpu status` | Affiche l’état détaillé MX250/NVIDIA/PCI/leases. |
+| `HUAWEI --gpu list` | Liste les applications actuellement gérées pour NVIDIA. |
+| `HUAWEI --gpu run -- COMMANDE` | Utilise la MX250 pour ce lancement uniquement, puis la libère. Exemple : `HUAWEI --gpu run -- handy`. |
+| `HUAWEI --gpu add App.desktop` | Force une application graphique donnée à utiliser la MX250 à chaque lancement normal. Exemple : `HUAWEI --gpu add Handy.desktop`. |
+| `HUAWEI --gpu remove App.desktop` | Retire ce wrapper NVIDIA permanent et restaure le lancement normal/Intel. |
+| `HUAWEI --gpu add` | Permet de choisir interactivement une application graphique. |
+| `HUAWEI --gpu steam-add APPID` | Active NVIDIA à la demande pour un jeu Steam. |
+| `HUAWEI --gpu steam-remove APPID` | Retire NVIDIA à la demande pour ce jeu Steam. |
+| `HUAWEI --gpu steam-all-on` | Active NVIDIA à la demande pour tous les jeux Steam détectés. |
+| `HUAWEI --gpu steam-all-off` | Désactive cette politique globale Steam. |
+| `HUAWEI --gpu apply` | Réapplique toutes les règles desktop/Steam sauvegardées. |
+| `HUAWEI --gpu install / repair / upgrade` | Installe ou répare/met à jour transactionnellement GPU Manager. |
+| `HUAWEI --gpu doctor` | Audit en lecture seule de l’intégrité/configuration GPU Manager. |
+| `HUAWEI --gpu test` | Smoke-test réversible : réveil MX250 → NVIDIA → test → extinction. |
+| `HUAWEI --gpu uninstall` | Désinstalle l’intégration GPU Manager et restaure les états desktop sauvegardés. |
+| `HUAWEI --gpu --lang en|fr|zh COMMANDE` | Choisit la langue CLI/menu de GPU Manager. |
 
-GPU Manager ne cherche volontairement pas à « deviner » quelles applications seraient gourmandes. À l’installation/réparation, il peut importer les fichiers `.desktop` qui demandent explicitement le GPU discret avec `PrefersNonDefaultGPU=true` ou `X-KDE-RunOnDiscreteGpu=true`. Les autres applications restent sur Intel par défaut. Utilisez `GPU-control run -- app` pour un usage NVIDIA ponctuel, ou `GPU-control add App.desktop` pour rendre ce choix permanent pour cette application.
+GPU Manager ne cherche volontairement pas à « deviner » quelles applications seraient gourmandes. À l’installation/réparation, il peut importer les fichiers `.desktop` qui demandent explicitement le GPU discret avec `PrefersNonDefaultGPU=true` ou `X-KDE-RunOnDiscreteGpu=true`. Les autres applications restent sur Intel par défaut. Utilisez `HUAWEI --gpu run -- app` pour un usage NVIDIA ponctuel, ou `HUAWEI --gpu add App.desktop` pour rendre ce choix permanent pour cette application.
 
-Pour Handy, la configuration recommandée est de laisser l’autostart sur Intel et d’utiliser `GPU-control run -- handy` uniquement lorsque la MX250 est réellement souhaitée.
+Pour Handy, la configuration recommandée est de laisser l’autostart sur Intel et d’utiliser `HUAWEI --gpu run -- handy` uniquement lorsque la MX250 est réellement souhaitée.
 
 ## Licence
 

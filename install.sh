@@ -32,6 +32,8 @@ Options:
   --no-fingerprint           Skip GXFP51A0 installation even when detected.
   --no-gpu                   Skip MX250 on-demand power/offload installation.
   --gpu-driver-preinstalled  Never install NVIDIA packages; require R580 already present.
+  --gpu SUBCOMMAND [ARGS...]  All MX250 controls through HUAWEI.\n  --gpu-status/doctor/test/list/menu  Short aliases to GPU controls.
+  --gpu-run -- CMD [ARGS...]  Launch an application with the MX250.
   -h, --help                 Show this help.
 
 Default policy:
@@ -44,6 +46,28 @@ Default policy:
     or stack multiple CPU/platform power managers.
 EOF
 }
+
+# One public CLI for onboarding and on-demand GPU management.
+# GPU actions never trigger fingerprint or package installation.
+if (( $# )); then
+  case "$1" in
+    --gpu)
+      shift
+      (( $# )) || { echo 'Usage: HUAWEI --gpu [menu|status|doctor|test|add|remove|run|...]' >&2; exit 2; }
+      exec "$ROOT/gpu-power/huawei-matebook-13-gpu-manager.sh" "$@"
+      ;;
+    --gpu-status|--gpu-doctor|--gpu-test|--gpu-list|--gpu-menu)
+      gpu_action="${1#--gpu-}"
+      exec "$ROOT/gpu-power/huawei-matebook-13-gpu-manager.sh" "$gpu_action"
+      ;;
+    --gpu-run)
+      shift
+      [[ "${1:-}" == -- ]] && shift
+      (( $# )) || { echo 'Usage: HUAWEI --gpu-run -- COMMAND [ARGS...]' >&2; exit 2; }
+      exec "$ROOT/gpu-power/huawei-matebook-13-gpu-manager.sh" run -- "$@"
+      ;;
+  esac
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -349,13 +373,13 @@ GPU MANAGER
     ONE-OFF NVIDIA launch. The MX250 is enabled only for that command and is
     released/powered down when the command exits.
     Example:
-      GPU-control run -- handy
+      HUAWEI --gpu-run -- handy
 
   GPU-control add APP.desktop
     ALWAYS use the MX250 when that desktop application is launched normally.
     The manager creates a reversible local .desktop wrapper.
     Example:
-      GPU-control add Handy.desktop
+      HUAWEI --gpu-menu # select add application
 
   GPU-control remove APP.desktop
     Remove the permanent NVIDIA wrapper and restore the application's normal
@@ -422,7 +446,7 @@ HOW APPLICATION DETECTION WORKS
 CURRENT RECOMMENDATION FOR HANDY
   Keep Handy on Intel at autostart.
   Use:
-    GPU-control run -- handy
+    HUAWEI --gpu-run -- handy
   when you explicitly want Handy on the MX250.
 
 All GPU Manager application changes are reversible.
@@ -477,6 +501,7 @@ interactive_menu() {
       "RECOMMENDED" "Baseline + only missing/outdated repository components" \
       "FINGERPRINT" "Fingerprint only — $fp" \
       "GPU" "MX250 only — $gpu" \
+      "GPU_CONTROL" "MX250 control panel: apps / Steam / status / test" \
       "ALL" "Install/update/repair all detected repository components" \
       "AUDIT" "Show the detailed read-only hardware audit" \
       "SHORTCUTS" "Explain HUAWEI and GPU-control commands with examples" \
@@ -496,6 +521,11 @@ interactive_menu() {
         ;;
       SHORTCUTS)
         show_shortcuts_box
+        ;;
+      GPU_CONTROL)
+        cleanup_menu_files
+        "$ROOT/gpu-power/huawei-matebook-13-gpu-manager.sh" menu
+        prepare_menu_files
         ;;
       EXIT)
         exit 0
