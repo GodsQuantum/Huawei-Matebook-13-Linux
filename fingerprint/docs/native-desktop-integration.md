@@ -53,13 +53,12 @@ but never blindly survives a power-state boundary. Native libfprint
 idle-suspend fallback detects elapsed sleep from the
 `CLOCK_BOOTTIME - CLOCK_MONOTONIC` delta at the next Claim.
 
-For systems where deep sleep removes sensor power, the package also installs a
-small system-level resume integration. A `sleep.target` hook schedules an
-asynchronous worker which briefly performs the standard fprintd `Claim("")`.
-This drives the same libfprint open/close lifecycle early enough to rebuild
-TLS/background/FDT before the lock-screen finger normally arrives. It does not
-restart fprintd, does not perform verification/enrollment, and never blocks the
-resume target on a slow sensor.
+Current public production packages do **not** install an external sleep hook,
+resume worker or periodic keepalive. The driver's resume callback invalidates
+stale state and the next Claim rebuilds TLS/background/FDT, so the first
+post-S3 use may still be slow or fail if the finger touches during calibration.
+Reliable eager, cancellable native recovery after real deep S3 remains an open
+hardware validation requirement, not an already-shipped feature.
 
 ## Authentication latency
 
@@ -79,3 +78,30 @@ installer do not edit `/etc/pam.d/*`.
 A correctly configured desktop sees only the standard fprintd device and
 properties: `scan-type`, enrollment stages, `finger-needed` and
 `finger-present`.
+
+
+## Authentication policy, fail-closed
+
+Run password and fingerprint in **independent PAM workers** when the
+desktop supports concurrent authentication; serialising `pam_fprintd`
+inside `system-auth` can delay password entry.
+
+Do **not** combine a fingerprint-only stack containing `pam_fprintd`
+as `required` (especially `-auth required`) with `pam_permit.so`.
+Linux-PAM treats `PAM_IGNORE` as ignored, not a failure; if other
+required modules return success the biometric stack can succeed without
+a positive fingerprint match. This was reproduced with real Linux-PAM
+using a temporary `pam_start_confdir` policy and `pam_debug.so`.
+Use `[success=done default=die] pam_fprintd.so` as the final
+**mandatory biometric decision** after preliminary required checks
+and omit `pam_permit.so`. Always keep the independent password service.
+
+The included KScreenLocker compatibility PAM template is fail-closed,
+but it is not installed by default on every distro. Review the *actual*
+PAM files and the active greeter before promoting a desktop profile.
+
+KScreenLocker 6.8.0 may fail to show the fingerprint *hint* even when
+fingerprint authentication works (KDE bug 527171). The stock Plasma
+Login Manager 6.8.1 PAM service does not automatically start separate
+biometric verification (KDE request 506025). Do not apply the historic
+Plasma Login Manager **6.7** binary/QML patch package to **6.8**.

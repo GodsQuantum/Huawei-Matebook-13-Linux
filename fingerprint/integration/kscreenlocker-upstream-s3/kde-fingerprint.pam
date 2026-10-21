@@ -3,9 +3,9 @@
 auth       required                    pam_shells.so
 auth       requisite                   pam_nologin.so
 auth       requisite                   pam_faillock.so      preauth
--auth      required                    pam_fprintd.so
-auth       optional                    pam_permit.so
 auth       required                    pam_env.so
+# Accept only a positive fingerprint match; PAM_IGNORE/unavailable must fail.
+auth       [success=done default=die] pam_fprintd.so
 
 account    include                     system-local-login
 

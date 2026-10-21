@@ -92,6 +92,24 @@ if [[ -d /usr/share/plasma || -d /usr/share/plasma/shells ]]; then
   done
   [[ -n "$kde_pam" ]] && ok "KDE fingerprint PAM stack present: $kde_pam" || warn "KDE detected but kde-fingerprint PAM stack not found"
 
+  # A required fingerprint module that returns PAM_IGNORE does not fail PAM.
+  # Pairing it with pam_permit can falsely authenticate without a match.
+  if [[ -n "$kde_pam" ]] \
+     && grep -Eq '^[[:space:]]*-?auth[[:space:]]+required[[:space:]]+pam_fprintd[.]so' "$kde_pam" \
+     && grep -Eq '^[[:space:]]*auth[[:space:]]+optional[[:space:]]+pam_permit[.]so' "$kde_pam"; then
+    fail "unsafe KDE biometric PAM: pam_fprintd required + pam_permit can accept PAM_IGNORE"
+  fi
+
+  # The login greeter is a separate authentication path from KScreenLocker.
+  # Do not assume a healthy libfprint device implies boot-login fingerprint.
+  login_pam=""
+  for p in /etc/pam.d/plasmalogin /usr/lib/pam.d/plasmalogin; do
+    [[ -f "$p" ]] && { login_pam="$p"; break; }
+  done
+  if [[ -n "$login_pam" ]] && ! grep -Eq '^[[:space:]]*-?auth.*pam_fprintd[.]so' "$login_pam"; then
+    warn "Plasma Login Manager PAM has no direct fingerprint module: check any included PAM stacks and 6.8 greeter support"
+  fi
+
   qml=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen/LockScreenUi.qml
   if [[ -f "$qml" ]]; then
     grep -q 'GXFP51A0 .*fingerprint integration' "$qml"       && ok "KDE lockscreen immediate fingerprint integration present"       || warn "KDE lockscreen has no GXFP51A0 immediate-start integration"
