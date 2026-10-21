@@ -74,49 +74,49 @@ CPU/平台电源策略建议只保留一个桌面集成提供者，例如 `power
 
 安装器还会创建：
 
-- `~/.local/bin/GPU-control`
+- `~/.local/bin/HUAWEI --gpu`
 - `~/.local/bin/gpu-control`
 
-直接运行 `GPU-control` 会显示不会唤醒 dGPU 的只读 dashboard：Intel/NVIDIA 状态、PCIe runtime 状态、当前电源 profile、**当前正在运行内核**的 NVIDIA 可用性，以及允许启动 MX250 的应用列表。
+直接运行 `HUAWEI --gpu` 会显示不会唤醒 dGPU 的只读 dashboard：Intel/NVIDIA 状态、PCIe runtime 状态、当前电源 profile、**当前正在运行内核**的 NVIDIA 可用性，以及允许启动 MX250 的应用列表。
 
 ## 添加/移除应用
 
-    GPU-control
-    GPU-control add
-    GPU-control add DaVinciResolve.desktop
-    GPU-control remove DaVinciResolve.desktop
-    GPU-control list
+    HUAWEI --gpu
+    HUAWEI --gpu add
+    HUAWEI --gpu add DaVinciResolve.desktop
+    HUAWEI --gpu remove DaVinciResolve.desktop
+    HUAWEI --gpu list
 
 管理器会创建用户级 `.desktop` override，并保存原始 launcher。`DBusActivatable=false` 会确保桌面真正执行被修改的 `Exec=`。
 
 ## 单次命令
 
-    GPU-control run -- glxinfo -B
-    GPU-control run -- blender
+    HUAWEI --gpu run -- glxinfo -B
+    HUAWEI --gpu run -- blender
 
 ## Steam
 
 Steam 客户端本身保持在 Intel。游戏可通过 runner 按需使用 MX250：
 
-    GPU-control steam-add 730
-    GPU-control steam-remove 730
-    GPU-control steam-all-on
+    HUAWEI --gpu steam-add 730
+    HUAWEI --gpu steam-remove 730
+    HUAWEI --gpu steam-all-on
 
 `steam-all-on` 会管理已安装游戏，但排除已知 Valve 兼容组件，例如 Proton 和 Steam Linux Runtime。Steam 必须完全退出后才能修改 `localconfig.vdf`；每次编辑前都会创建时间戳备份。
 
 ## 状态与测试
 
-    GPU-control
-    GPU-control status
-    GPU-control doctor
-    GPU-control test
+    HUAWEI --gpu
+    HUAWEI --gpu status
+    HUAWEI --gpu doctor
+    HUAWEI --gpu test
 
 Dashboard 和诊断故意不使用 `nvidia-smi` 作为 idle probe，因为主动查询 NVIDIA 不适合“尽可能保持独显断电”的目标。它们还会区分：
 
 - 健康的 Intel-only 空闲；
 - NVIDIA 已为其他内核安装，但当前运行内核没有对应模块的 DKMS/kernel mismatch。
 
-健康空闲应显示 MX250 absent、NVIDIA 模块未加载、PCIe root port suspended。`GPU-control test` 以 Vulkan 作为不依赖显示服务器的 PRIME 测试（可从 Wayland/SSH 使用）；只有在可访问认证的 X/Xwayland display 时才额外测试 GLX。之后必须回到完整 Intel-only。
+健康空闲应显示 MX250 absent、NVIDIA 模块未加载、PCIe root port suspended。`HUAWEI --gpu test` 以 Vulkan 作为不依赖显示服务器的 PRIME 测试（可从 Wayland/SSH 使用）；只有在可访问认证的 X/Xwayland display 时才额外测试 GLX。之后必须回到完整 Intel-only。
 
 ## Plasma / KWin
 
@@ -129,10 +129,10 @@ Dashboard 和诊断故意不使用 `nvidia-smi` 作为 idle probe，因为主动
 
 ## 卸载
 
-    GPU-control uninstall
+    HUAWEI --gpu uninstall
 
 卸载会恢复受管桌面 launcher，移除 helper/services/KWin override，但保留 NVIDIA 软件包。之后建议重启。
 
 ## 安全与报告
 
-脚本不会刷写固件、GPU ROM 或 ACPI table。报告问题时请提供通用硬件 ID、发行版、内核、桌面环境以及 `GPU-control status` 输出，不要提交序列号、UUID、个人路径或无关系统 dump。
+脚本不会刷写固件、GPU ROM 或 ACPI table。报告问题时请提供通用硬件 ID、发行版、内核、桌面环境以及 `HUAWEI --gpu status` 输出，不要提交序列号、UUID、个人路径或无关系统 dump。

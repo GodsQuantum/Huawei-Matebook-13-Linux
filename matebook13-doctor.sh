@@ -98,10 +98,10 @@ if command -v lspci >/dev/null 2>&1; then
        [[ -x /usr/local/sbin/huawei-matebook-dgpu-power ]] &&
        [[ -x /usr/local/bin/huawei-matebook-dgpu-run ]]; then
       ok "MX250 on-demand PCI power manager installed"
-      if command -v GPU-control >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/GPU-control" ]]; then
-        ok "GPU-control user CLI installed"
+      if [[ -x "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/install.sh" ]]; then
+        ok "HUAWEI unified onboarding and GPU CLI available"
       else
-        note "GPU-control user CLI missing"
+        note "HUAWEI repository entrypoint not executable"
       fi
       if [[ -r "$HOME/.config/environment.d/61-huawei-matebook-intel-default.conf" ]]; then
         if grep -Fqx 'VK_LOADER_DRIVERS_SELECT=*intel*' "$HOME/.config/environment.d/61-huawei-matebook-intel-default.conf" &&
@@ -162,6 +162,27 @@ compgen -G '/dev/video*' >/dev/null && ok "video device node present" || note "n
 compgen -G '/dev/snd/*' >/dev/null && ok "audio device nodes present" || note "no ALSA device nodes found"
 
 command -v fwupdmgr >/dev/null 2>&1 && ok "fwupd available for distro/vendor firmware updates" || info "fwupd not installed; firmware remains distro/vendor-managed"
+
+# Detect silent software fallback in the *running* Wayland compositor.
+# Works through SSH as the desktop user; no session or compositor restart.
+if command -v qdbus6 >/dev/null 2>&1; then
+  runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  if [[ -S "$runtime/bus" ]]; then
+    kwin_support="$(XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" qdbus6 org.kde.KWin /KWin org.kde.KWin.supportInformation 2>/dev/null || true)"
+    if [[ -n "$kwin_support" ]]; then
+      renderer="$(printf '%s\n' "$kwin_support" | sed -n 's/^OpenGL renderer string: //p' | head -n 1)"
+      if [[ "$renderer" == *llvmpipe* || "$renderer" == *softpipe* ]]; then
+        bad "KWin SOFTWARE rendering: $renderer (hardware Intel EGL must be restored)"
+      elif [[ -n "$renderer" ]]; then
+        ok "KWin hardware renderer: $renderer"
+      else
+        info "KWin live renderer was not reported"
+      fi
+    else
+      info "No accessible running KWin compositor; runtime GPU test skipped"
+    fi
+  fi
+fi
 
 printf '\nSummary: failures=%d warnings=%d\n' "$fail" "$warn"
 (( fail == 0 ))

@@ -25,7 +25,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -n "${XDG_RUNTIME_DIR:-}" && -S "$XD
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 
-VERSION="3.2.0"
+VERSION="3.2.1"
 STATE_SCHEMA=3
 INSTALL_SCHEMA=4
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -1056,18 +1056,45 @@ plasma_wayland_detected() {
     [[ "${XDG_CURRENT_DESKTOP:-}" == *KDE* || "${XDG_CURRENT_DESKTOP:-}" == *Plasma* ]]
 }
 
+# Avoid KWin 6.8.0 symlink regression (KDE #527309). Plasma 6.8.1+
+# fixes this; older/unknown versions use native GPU discovery.
+kwin_version() {
+    local line
+    command -v kwin_wayland >/dev/null 2>&1 || return 1
+    line="$(kwin_wayland --version 2>/dev/null | head -n 1)" || return 1
+    [[ "$line" =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]] || return 1
+    printf '%s.%s.%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+}
+kwin_symlink_safe() {
+    local major minor patch version
+    version="$(kwin_version)" || return 1
+    IFS=. read -r major minor patch <<<"$version"
+    if (( 10#$major > 6 )); then return 0; fi
+    (( 10#$major == 6 )) || return 1
+    if (( 10#$minor > 8 )); then return 0; fi
+    (( 10#$minor == 8 && 10#$patch >= 1 ))
+}
 install_kwin_isolation() {
-    if ! plasma_wayland_detected; then
-        warn "$(msg plasma_warn)"
+    # Do not set KWIN_RENDER_NODES= (empty): on some setups it causes
+    # software rendering (llvmpipe) instead of Intel hardware EGL.
+    if ! plasma_wayland_detected || ! kwin_symlink_safe; then
+        if [[ -f "$KWIN_DROPIN" ]]; then
+            if grep -Fq 'Keep KWin on the Intel iGPU' "$KWIN_DROPIN"; then
+                rm -f -- "$KWIN_DROPIN"
+                systemctl --user daemon-reload
+            else
+                warn "Unmanaged KWin override left unchanged: $KWIN_DROPIN"
+            fi
+        fi
+        info "KWin native GPU discovery (pre-6.8.1 or unknown)."
         return 0
     fi
+    load_discovered
     mkdir -p "$KWIN_DROPIN_DIR"
     cat > "$KWIN_DROPIN" <<EOF2
 [Service]
-# Keep KWin on the Intel iGPU even while the MX250 is hot-added.
+# Keep KWin on the Intel iGPU; symlink fix included in KWin 6.8.1+.
 Environment=KWIN_DRM_DEVICES=$INTEL_ALIAS
-# Plasma 6.7+ GpuManager: do not auto-open secondary render nodes.
-Environment=KWIN_RENDER_NODES=
 EOF2
     systemctl --user daemon-reload
 }
@@ -1331,14 +1358,22 @@ overview() {
 }
 
 install_manager_cli() {
-    mkdir -p "$USER_BIN"
-    if [[ "$(readlink -f "$SELF")" != "$(readlink -f "$MANAGER_CLI" 2>/dev/null || true)" ]]; then
-        install -m 0755 "$SELF" "$MANAGER_CLI"
-    else
-        chmod 0755 "$MANAGER_CLI"
+    # HUAWEI is the single public entrypoint. Remove only our generated
+    # aliases, never another program which might share the same basename.
+    if [[ -L "$MANAGER_ALIAS_UPPER" ]] &&
+       [[ "$(readlink "$MANAGER_ALIAS_UPPER")" == "$(basename "$MANAGER_CLI")" ]]; then
+        rm -f -- "$MANAGER_ALIAS_UPPER"
     fi
-    ln -sfn "$(basename "$MANAGER_CLI")" "$MANAGER_ALIAS_UPPER"
-    ln -sfn "$(basename "$MANAGER_CLI")" "$MANAGER_ALIAS_LOWER"
+    if [[ -L "$MANAGER_ALIAS_LOWER" ]] &&
+       [[ "$(readlink "$MANAGER_ALIAS_LOWER")" == "$(basename "$MANAGER_CLI")" ]]; then
+        rm -f -- "$MANAGER_ALIAS_LOWER"
+    fi
+    # An older deployed copy may be version 3.2.0. Limit cleanup to the
+    # recognizable managed script rather than deleting arbitrary user files.
+    if [[ -f "$MANAGER_CLI" && ! -L "$MANAGER_CLI" ]] &&
+       head -n 4 "$MANAGER_CLI" | grep -Fq 'Huawei MateBook 13 GPU Manager'; then
+        rm -f -- "$MANAGER_CLI"
+    fi
 }
 
 install_runner() {
@@ -2273,11 +2308,15 @@ doctor() {
     current="$(find_dgpu_bdf 2>/dev/null || true)"
     version="$(modinfo -F version nvidia 2>/dev/null | head -n1 || true)"
 
-    if [[ -f "$KWIN_DROPIN" ]] && grep -q "KWIN_DRM_DEVICES=$INTEL_ALIAS" "$KWIN_DROPIN" && grep -q '^Environment=KWIN_RENDER_NODES=$' "$KWIN_DROPIN"; then
-        kwin="OK"
-    elif plasma_wayland_detected; then kwin="MISSING"
-    else kwin="NOT_VALIDATED"
-    fi
+    if ! plasma_wayland_detected; then kwin="NOT_VALIDATED"
+    elif kwin_symlink_safe; then
+        if [[ -f "$KWIN_DROPIN" ]] &&
+           grep -Fqx "Environment=KWIN_DRM_DEVICES=$INTEL_ALIAS" "$KWIN_DROPIN" &&
+           ! grep -Fq 'KWIN_RENDER_NODES=' "$KWIN_DROPIN"; then
+            kwin="INTEL_PINNED"
+        else kwin="MISSING_OR_LEGACY"; drift=1; fi
+    elif [[ ! -e "$KWIN_DROPIN" ]]; then kwin="NATIVE"
+    else kwin="UNSAFE_LEGACY"; drift=1; fi
 
     # Validate the privileged path functionally. A correctly secured sudoers file
     # is normally root:root 0440 and therefore intentionally unreadable by the

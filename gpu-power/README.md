@@ -101,7 +101,7 @@ French UI:
 
 A reboot is expected after the initial installation so the boot policy, NVIDIA module for the running kernel and KWin environment are applied cleanly.
 
-The installer also creates `~/.local/bin/GPU-control` (and lowercase `gpu-control`). Running `GPU-control` with no arguments shows a read-only/no-wake dashboard: Intel-vs-NVIDIA state, PCIe runtime state, current power profile, NVIDIA readiness for the **running** kernel, and the exact desktop/Steam applications allowed to activate the MX250.
+The installer also creates `~/.local/bin/HUAWEI --gpu` (and lowercase `gpu-control`). Running `HUAWEI --gpu` with no arguments shows a read-only/no-wake dashboard: Intel-vs-NVIDIA state, PCIe runtime state, current power profile, NVIDIA readiness for the **running** kernel, and the exact desktop/Steam applications allowed to activate the MX250.
 
 ### Upgrade / repair behavior
 
@@ -111,14 +111,14 @@ On CachyOS/Arch systems actively using Limine, the manager calls `limine-mkinitc
 
 ## Add or remove applications
 
-After installation, `GPU-control` is the normal entry point:
+After installation, `HUAWEI --gpu` is the normal entry point:
 
 ```bash
-GPU-control                         # no-wake overview
-GPU-control add                     # interactive desktop-app picker
-GPU-control add DaVinciResolve.desktop
-GPU-control remove DaVinciResolve.desktop
-GPU-control list
+HUAWEI --gpu                         # no-wake overview
+HUAWEI --gpu add                     # interactive desktop-app picker
+HUAWEI --gpu add DaVinciResolve.desktop
+HUAWEI --gpu remove DaVinciResolve.desktop
+HUAWEI --gpu list
 ```
 
 The original script remains usable directly and keeps its interactive no-argument menu.
@@ -139,9 +139,9 @@ Since v3, canonical per-user state is versioned under the XDG configuration dire
 The Steam client itself should stay on Intel. Individual games can be wrapped with the on-demand runner.
 
 ```bash
-GPU-control steam-add 730
-GPU-control steam-remove 730
-GPU-control steam-all-on
+HUAWEI --gpu steam-add 730
+HUAWEI --gpu steam-remove 730
+HUAWEI --gpu steam-all-on
 ```
 
 `steam-all-on` targets installed games while deliberately excluding known Valve compatibility components such as Proton and Steam Linux Runtime. Those runtimes must remain infrastructure for the game, not become dGPU-managed applications themselves.
@@ -153,15 +153,15 @@ Direct `localconfig.vdf` editing is inherently less stable than the freedesktop 
 ## Status and test
 
 ```bash
-GPU-control
-GPU-control status
-GPU-control doctor
-GPU-control test
+HUAWEI --gpu
+HUAWEI --gpu status
+HUAWEI --gpu doctor
+HUAWEI --gpu test
 ```
 
 The dashboard and diagnostics intentionally avoid `nvidia-smi`, because querying NVIDIA is not a suitable idle-state probe on an aggressively powered-down dGPU. They also distinguish a healthy Intel-only idle state from a kernel/DKMS mismatch where NVIDIA is installed for another kernel but cannot yet be loaded by the running one.
 
-A healthy idle result should show the MX250 as absent. `GPU-control test` uses Vulkan as its display-server-independent PRIME test (so it works from Wayland/SSH); GLX is additionally tested only when an authenticated X/Xwayland display is reachable. It must then return to an absent dGPU with no NVIDIA modules/users.
+A healthy idle result should show the MX250 as absent. `HUAWEI --gpu test` uses Vulkan as its display-server-independent PRIME test (so it works from Wayland/SSH); GLX is additionally tested only when an authenticated X/Xwayland display is reachable. It must then return to an absent dGPU with no NVIDIA modules/users.
 
 ## Plasma / KWin detail
 
