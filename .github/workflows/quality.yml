@@ -2,7 +2,7 @@ name: Quality
 
 on:
   push:
-    branches: [main]
+    branches: [main, qa/gxfp51a0-rel71.51-plm681-20261023]
   pull_request:
 
 permissions:
