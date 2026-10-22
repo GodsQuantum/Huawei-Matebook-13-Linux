@@ -17,7 +17,7 @@ makedepends=(extra-cmake-modules qt6-tools)
 source=("https://download.kde.org/stable/plasma/6.8.1/plasma-login-manager-6.8.1.tar.xz"
         "0001-plasma-login-6.8.1-native-dual-fingerprint-password.patch")
 sha256sums=('c9228146d26878a2d236ae6fc3460e0722cf4d62bf86ddf7ae1d5011c8d7d7d7'
-            '2c4abc8c8b165250fcdbffe0839c3c7bac10bbb14cb60fe4b85fd2778ce78140')
+            '5d11582363172d1d830611a1ee5733f058bb099c5eea914682041ae5a4108e96')
 
 prepare() {
   cd "plasma-login-manager-$pkgver"

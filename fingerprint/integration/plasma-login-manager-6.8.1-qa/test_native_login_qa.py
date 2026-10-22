@@ -45,6 +45,8 @@ class BootBiometricQA(unittest.TestCase):
   self.assertIn("m_fingerprintAuth(new Auth(this))",d)
   self.assertIn('QStringLiteral("plasmalogin-fingerprint")',d)
   self.assertIn("startAuth(m_auth, user, password, session)",d)
+  self.assertIn("if (!startAuth(m_auth, user, password, session))",d)
+  self.assertIn("emit loginFailed(socket);",d)
   self.assertIn("startAuth(m_fingerprintAuth, user, QString(), session",d)
   self.assertIn("m_loginCommitted = true",d)
   self.assertIn("m_committedAuth = winner",d)
