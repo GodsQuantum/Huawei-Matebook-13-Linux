@@ -85,6 +85,9 @@ jobs:
               cmake --build /work/build -j 4
               DESTDIR=/work/stage cmake --install /work/build
               test -f /work/stage/usr/lib/pam.d/plasmalogin-fingerprint
-              test -f /work/stage/usr/lib/libexec/plasma-login-greeter
+              # -DCMAKE_INSTALL_LIBEXECDIR=lib selects /usr/lib, not
+              # /usr/lib/libexec (the default with a different prefix).
+              test -f /work/stage/usr/lib/plasma-login-greeter
+              test -f /work/stage/usr/lib/plasmalogin-helper
               echo PLM_681_NATIVE_CI_BUILD_PASS
             '
