@@ -32,6 +32,8 @@ jobs:
         run: python3 tests/test-goodix51a0-first-contact.py
       - name: Native Linux-PAM fail-closed regression
         run: python3 tests/test-fingerprint-pam-failclosed.py
+      - name: GXFP51A0 in-operation SPI detached-reset regression
+        run: python3 fingerprint/research/tests/test_s3_detached_transport_source_safety.py
       - name: ShellCheck
         run: |
           shellcheck -S error -x install.sh
