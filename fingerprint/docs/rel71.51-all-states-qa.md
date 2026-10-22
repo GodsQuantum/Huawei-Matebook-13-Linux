@@ -22,8 +22,13 @@ waits for its completion before the suspend request finishes. Driver
 callbacks after blocking sensor/TLS workers now check this cancellation
 on the main thread, abandon image scoring/retries, and terminate the SSM
 instead of opening another capture. The worker MUST finish sensor cleanup
-before libfprint releases the inhibitor. No changes to fingerprint threshold
-7, 20-enrollment-view format, GPIO, MCU reset timing or firmware.
+before libfprint releases the inhibitor. In libfprint v1.94.100,
+fpi_device_suspend_complete(NOT_SUPPORTED) cancels the active operation
+and waits for the current task to finish; the driver must still drain
+blocking SPI/TLS operations within logind's actual inhibitor deadline.
+Hardware S3 timing and ReleaseDevice remain UNVERIFIED. No changes
+to fingerprint threshold 7, 20-enrollment-view format, GPIO, MCU
+reset timing or firmware.
 
 ## KDE startup authentication
 The optional 6.8.1 package uses two independent PAM helpers, one for
@@ -32,6 +37,9 @@ stopped. Unlike the historical KDE 6.7 experiment, biometric start is
 not gated on mouse/keyboard activation of the password overlay. User
 and session selection use the modern Plasma 6.8.1 session index. A
 failed/cancelled fingerprint attempt re-arms with a bounded delay.
+A rejected password login request (for instance while an earlier user's
+fingerprint helper is draining) now sends an explicit loginFailed response,
+restoring normal password input rather than disabling the greeter forever.
 This OPTIONAL integration is for Arch/CachyOS + KDE 6.8.1 only, not
 universal for every Linux desktop.
 
