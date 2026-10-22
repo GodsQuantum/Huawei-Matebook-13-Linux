@@ -43,7 +43,7 @@ assert "gx_active_sleep_recovery (dev, ssm)" in poll_off
 
 assert "if (self->force_cold_reset)" in session
 assert "gx_warm_abandon (self)" in session
-assert "gx_gpio_reset (self)" in session
+assert "gx_recover_capture_context (self)" in session
 assert "gx_cold_prepare (self)" in session
 assert "return gx_wakeup_mcu (self)" in session
 assert "self->capture_gap_scale = 0" in session

@@ -2,7 +2,7 @@ name: Fingerprint distro portability
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'qa/**']
     paths:
       - 'fingerprint/**'
       - '.github/workflows/fingerprint-portability.yml'

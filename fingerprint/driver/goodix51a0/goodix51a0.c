@@ -2561,13 +2561,18 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
       self->capture_retry_seen = FALSE;
       self->capture_pacing_suppressed = TRUE;
 
-      gx_gpio_reset (self);
-      self->force_cold_reset = FALSE;
-
-      if (!gx_cold_prepare (self))
+      /* S3 can leave an open spidev/IRQ pair owned by the interrupted
+       * operation. Reset only AFTER closing that transport; reuse the
+       * existing detached recovery, which also reopens SPI and confirms
+       * the firmware A8 boundary before attempting fresh TLS/ImageBase. */
+      if (!gx_recover_capture_context (self))
         return FALSE;
 
-      return gx_wakeup_mcu (self);
+      if (!gx_cold_prepare (self) || !gx_wakeup_mcu (self))
+        return FALSE;
+
+      self->force_cold_reset = FALSE;
+      return TRUE;
     }
 
   if (self->capture_recovery_pending)
@@ -2616,8 +2621,10 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
               fp_warn ("GXFP51A0 AUTH_TRACE stale ImageBase refresh failed; "
                        "rebuilding cold capture context");
               gx_warm_abandon (self);
-              gx_gpio_reset (self);
-              if (!gx_cold_prepare (self))
+              /* A failed warm ImageBase refresh can leave a live SPI fd:
+               * use the same detached reset/reopen/firmware boundary. */
+              if (!gx_recover_capture_context (self) ||
+                  !gx_cold_prepare (self))
                 return FALSE;
             }
           else if (self->bg_last_refresh_us > previous_refresh)
