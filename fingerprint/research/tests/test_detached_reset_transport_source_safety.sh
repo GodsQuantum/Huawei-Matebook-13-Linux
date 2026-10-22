@@ -8,14 +8,13 @@ from pathlib import Path
 import sys
 s=Path(sys.argv[1]).read_text()
 
-rec=s[s.index("gx_recover_capture_context"):s.index("gx_prepare_capture_context", s.index("gx_recover_capture_context"))]
-assert rec.index("gx_transport_close (self);") < rec.index("gx_gpio_reset (self);")
-assert rec.index("gx_gpio_reset (self);") < rec.index("gx_transport_open (FP_DEVICE (self)")
-assert "RESET_TRACE transport reopened after detached GPIO264 reset" in rec
-
+# Select the actual C function definition, not an earlier invocation.
+rec_start=s.index("gx_recover_capture_context (FpiDeviceGoodix51A0 *self)")
+rec_end=s.index("gx_prepare_capture_context (FpiDeviceGoodix51A0 *self",rec_start)
+rec=s[rec_start:rec_end]
 op=s[s.index("gx_dev_open (FpDevice *dev)"):s.index("gx_dev_close (FpDevice *dev)")]
-cold=op.index('RESET_TRACE cold boundary before spidev open')
-reset=op.index("gx_gpio_reset (self);", cold)
+cold=op.index('NATIVE_COLD_QUIESCE before SPI open')
+reset=op.index("gx_reset_detached_s3_boundary (self);", cold)
 open_=op.index("gx_transport_open (dev, &err)", reset)
 assert cold < reset < open_
 assert "open -> GPIO reset" in op

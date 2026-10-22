@@ -222,6 +222,52 @@ int gx51_wait_irq_gpio48_low(int line_fd, unsigned int timeout_ms)
     return gx51_wait_irq_gpio48_level(line_fd, timeout_ms, 0);
 }
 
+/* S3-only recovery reset with the short verified GPIO264 pulse from
+ * the archived rel71.24 pre-enumeration recovery. No kernel rebinding:
+ * caller must close SPI/IRQ before invoking this function. */
+int gx51_reset_gpio264_short(void)
+{
+    struct gpio_v2_line_request req = {0};
+    struct gpio_v2_line_values val = {0};
+    int chip = gx51_open_int34bb();
+
+    if (chip < 0)
+        return -1;
+
+    req.num_lines = 1;
+    req.offsets[0] = GX51_RESET_LINE;
+    req.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
+    req.config.num_attrs = 1;
+    req.config.attrs[0].attr.id = GPIO_V2_LINE_ATTR_ID_OUTPUT_VALUES;
+    req.config.attrs[0].attr.values = 0; /* explicitly LOW before pulse */
+    req.config.attrs[0].mask = 1;
+    strncpy(req.consumer, "goodix51a0-native", sizeof req.consumer - 1);
+    if (ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &req) < 0 || req.fd < 0) {
+        close(chip);
+        return -1;
+    }
+
+    val.mask = 1;
+    val.bits = 1; /* HIGH reset assertion */
+    if (ioctl(req.fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &val) < 0)
+        goto fail;
+    if (gx51_sleep_us(10000) < 0)
+        goto fail;
+    val.bits = 0; /* LOW release */
+    if (ioctl(req.fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &val) < 0)
+        goto fail;
+    close(req.fd);
+    close(chip);
+    return gx51_sleep_us(150000);
+
+fail:
+    val.bits = 0;
+    (void)ioctl(req.fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &val);
+    close(req.fd);
+    close(chip);
+    return -1;
+}
+
 int gx51_reset_gpio264(void)
 {
     struct gpio_v2_line_request req = {0};

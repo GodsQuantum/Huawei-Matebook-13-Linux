@@ -5,7 +5,7 @@ Compatibility package for Plasma Login Manager 6.7.5 on Arch/CachyOS.
 It keeps the upstream PAM-message fixes and the fingerprint-first greeter flow,
 then separates password and fingerprint into independent PAM services.
 
-## Current package: 6.7.5-3.8
+## Current package: 6.7.5-3.10
 
 Password PAM remains the normal `plasmalogin` stack and contains no
 `pam_fprintd`. Fingerprint auth uses `plasmalogin-fingerprint`:
@@ -47,6 +47,11 @@ regression: `SessionManagementScreen` accepts visual `QQuickItem` children, whil
 `Timer` is non-visual. The retry timer is therefore bound to an object property
 instead of being inserted directly into the visual child list. `qmllint` and the
 compiled QML cache both pass with this form.
+
+Patch `0010-initializing-cue.patch` displays an initialization message while
+PAM is preparing the reader, then the existing PAM information signal replaces
+it with the actual finger-placement cue. The password box stays usable in
+parallel; this does not change the native libfprint hardware recovery timing.
 
 The package remains package-managed and never contains, modifies, deletes, or
 re-enrols fingerprint templates.

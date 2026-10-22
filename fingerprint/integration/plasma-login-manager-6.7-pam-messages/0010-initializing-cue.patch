@@ -1,0 +1,8 @@
+--- a/src/frontend/greeter/qml/Main.qml
++++ b/src/frontend/greeter/qml/Main.qml
+@@ -419,3 +419,4 @@
+     function handleFingerprintLoginRequest(username, sessionType, sessionFileName) {
+-        root.notificationMessage = "";
++        // No fingerprint-ready cue before PAM confirms hardware initialization.
++        root.notificationMessage = Qt.locale().name.startsWith("fr") ? "Initialisation du lecteur d’empreintes…" : "Preparing fingerprint reader…";
+         PlasmaLogin.GreeterState.handleFingerprintLoginRequest(username, sessionType, sessionFileName);
