@@ -53,3 +53,28 @@ diff --git a/libfprint/fprint-list-udev-rules.c b/libfprint/fprint-list-udev-rul
 -      g_print ("ACTION==\"add|change\", SUBSYSTEM==\"spi\", ENV{MODALIAS}==\"acpi:%s:\", RUN{builtin}+=\"kmod load spi:spidev\", RUN+=\"/bin/sh -c 'echo spidev > %%S%%p/driver_override && echo %%k > %%S%%p/subsystem/drivers/spidev/bind'\"\n",
 +      g_print ("ACTION==\"add|change\", SUBSYSTEM==\"spi\", ENV{MODALIAS}==\"acpi:%s:*\", RUN{builtin}+=\"kmod load spi:spidev\", RUN+=\"/bin/sh -c 'echo spidev > %%S%%p/driver_override && { test -L %%S%%p/driver || echo %%k > %%S%%p/subsystem/drivers/spidev/bind; }'\"\n",
                 entry->spi_acpi_id);
+diff --git a/libfprint/fpi-device.c b/libfprint/fpi-device.c
+index 9500b3a..d91d8c0 100644
+--- a/libfprint/fpi-device.c
++++ b/libfprint/fpi-device.c
+@@ -1756,3 +1756,9 @@ fpi_device_suspend (FpDevice *device)
+     case FPI_DEVICE_ACTION_NONE:
+-      fpi_device_suspend_complete (device, NULL);
++      /* GXFP51A0 must park before S3 even when no fingerprint task is active.
++       * All other drivers keep the unmodified upstream idle behavior. */
++      if (g_strcmp0 (fp_device_get_driver (device), "goodix51a0") == 0 &&
++          FP_DEVICE_GET_CLASS (device)->suspend)
++        FP_DEVICE_GET_CLASS (device)->suspend (device);
++      else
++        fpi_device_suspend_complete (device, NULL);
+       break;
+@@ -1801,3 +1807,8 @@ fpi_device_resume (FpDevice *device)
+     case FPI_DEVICE_ACTION_NONE:
+-      fpi_device_resume_complete (device, NULL);
++      /* The idle Goodix device still needs its hardware cold-state resume. */
++      if (g_strcmp0 (fp_device_get_driver (device), "goodix51a0") == 0 &&
++          FP_DEVICE_GET_CLASS (device)->resume)
++        FP_DEVICE_GET_CLASS (device)->resume (device);
++      else
++        fpi_device_resume_complete (device, NULL);
+       break;

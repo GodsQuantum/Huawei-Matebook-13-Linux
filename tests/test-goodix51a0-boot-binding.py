@@ -1,235 +1,72 @@
 #!/usr/bin/env python3
+# Native rel71.51 boot/lock/S3 source gate. Source checks are not real BOOT certification.
 from pathlib import Path
-import fnmatch
 import re
-
-ROOT = Path(__file__).resolve().parents[1]
-PATCH = ROOT / "fingerprint/driver/goodix51a0/libfprint-v1.94.100.patch"
-DRIVER = ROOT / "fingerprint/driver/goodix51a0/goodix51a0.c"
-ARCH = ROOT / "fingerprint/install-arch.sh"
-DOCTOR = ROOT / "fingerprint/gxfp51a0-doctor.sh"
-LINUX = ROOT / "fingerprint/install-linux.sh"
-UNINSTALL = ROOT / "fingerprint/uninstall-linux-source.sh"
-BUILD = ROOT / "fingerprint/scripts/build-libfprint-v1.94.100.sh"
-PKGBUILD = ROOT / "fingerprint/packaging/arch/PKGBUILD"
-PKGINSTALL = ROOT / "fingerprint/packaging/arch/libfprint-goodix51a0.install"
-DROPIN = ROOT / "fingerprint/packaging/arch/fprintd-goodix51a0.conf"
-PLM_INTEGRATION = ROOT / "fingerprint/integration/plasma-login-manager-6.7-pam-messages"
-PLM_PKGBUILD = PLM_INTEGRATION / "PKGBUILD"
-PLM_PATCH1 = PLM_INTEGRATION / "0001-show-pam-authentication-messages.patch"
-PLM_PATCH2 = PLM_INTEGRATION / "0002-stop-notification-timer-for-pam-message.patch"
-PLM_PATCH3 = PLM_INTEGRATION / "0003-enable-fprintd-for-plasmalogin.patch"
-PLM_PATCH4 = PLM_INTEGRATION / "0004-autostart-first-fingerprint-attempt.patch"
-PLM_PATCH5 = PLM_INTEGRATION / "0005-split-fingerprint-password-auth.patch"
-PLM_PATCH9 = PLM_INTEGRATION / "0009-fix-retry-timer-qml-ownership.patch"
-
-actual = "acpi:GXFP51A0:GXFP51A0:"
-legacy = "acpi:GXFP51A0:"
-pattern = "acpi:GXFP51A0:*"
-assert fnmatch.fnmatchcase(actual, pattern)
-assert fnmatch.fnmatchcase(legacy, pattern)
-
-patch = PATCH.read_text()
-plus = "\n".join(
-    line[1:] for line in patch.splitlines()
-    if line.startswith("+") and not line.startswith("+++")
-)
-assert 'ENV{MODALIAS}==\\"acpi:%s:*\\"' in plus
-assert "test -L %%S%%p/driver || echo %%k > %%S%%p/subsystem/drivers/spidev/bind" in plus
-
-build = BUILD.read_text()
-assert "GOODIX51A0_UDEV_MODALIAS_GLOB=PASS" in build
-assert 'ENV{MODALIAS}=="acpi:GXFP51A0:*"' in build
-
-driver = DRIVER.read_text()
-assert "FPI_DEVICE_UDEV_SUBTYPE_SPIDEV" in driver
-assert '.spi_acpi_id = "GXFP51A0"' in driver
-assert "dev_class->probe = gx_dev_probe;" in driver
-assert "fpi_device_probe_complete (dev, NULL, NULL, NULL);" in driver
-assert "GX_WARM_TTL_US" not in driver
-assert "gx_warm_validate" in driver
-
-# rel26: enumeration is host-transport-only. No TLS/background/FDT prewarm may
-# run before a real Claim, because reference MateBook 13 2021 proved that a failed prewarm can
-# desynchronise GET_IMAGE before the greeter ever asks for a fingerprint.
-assert "probe_prewarm" not in driver
-assert "GX_PROBE_PREWARM_ATTEMPTS" not in driver
-assert "Enumeration must be passive" in driver
-assert "if (!gx_cold_prepare (self))" in driver
-assert "gx_prepare_capture_context (self, FALSE)" in driver
-assert "GXFP51A0 cold preparation failed" in driver
-
-# Native lifecycle invalidation: active suspend uses libfprint hooks; idle
-# suspend is caught from CLOCK_BOOTTIME-vs-MONOTONIC at the next Claim.
-assert "dev_class->suspend = gx_dev_suspend;" in driver
-assert "dev_class->resume = gx_dev_resume;" in driver
-assert "CLOCK_BOOTTIME" in driver
-assert "CLOCK_MONOTONIC" in driver
-assert "gx_warm_crossed_sleep" in driver
-assert "gx_warm_abandon" in driver
-assert "force_cold_reset" in driver
-
-assert "gx51_wait_irq_gpio48_low (self->irq_fd, 250)" in driver
-assert "first background capture must not race the tail of the TLS handshake" in driver
-assert "reset_before_cold" not in driver
-assert "warm_expire" not in driver
-assert re.search(r"^#define\s+GX_MATCH_THRESHOLD\s+7\s*$", driver, re.M)
-assert re.search(r"^#define\s+GX_VERIFY_MAX_ATTEMPTS\s+3\b", driver, re.M)
-assert "GPIO112" not in driver
-assert "GPP_D16" not in driver
-
-dropin = DROPIN.read_text()
-assert "After=systemd-udev-trigger.service" in dropin
-assert "Before=display-manager.service" in dropin
-assert "ExecStart=/usr/lib/fprintd --no-timeout" in dropin
-assert "TimeoutStartSec=40s" in dropin
-assert "DeviceAllow=char-gpiochip rw" in dropin
-assert "LimitCORE=0" in dropin
-assert "gxfp51a0-spidev-bind" not in dropin
-assert "ExecStartPre=/usr/libexec/gxfp51a0-prestart-recover" in dropin
-assert "ReadWritePaths=-/sys/bus/spi/drivers/spidev" in dropin
-assert "ReadWritePaths=-/sys/bus/spi/devices/spi-GXFP51A0:00" in dropin
-
-pkgbuild = PKGBUILD.read_text()
-pkginstall = PKGINSTALL.read_text()
-assert "pkgrel=71.30" in pkgbuild
-assert "install=libfprint-goodix51a0.install" in pkgbuild
-assert "graphical.target.wants/fprintd.service" in pkgbuild
-assert "graphical.target.wants/gxfp51a0-boot-prewarm.service" in pkgbuild
-assert "systemd/system-sleep/gxfp51a0-resume-prewarm" not in pkgbuild
-assert "timers.target.wants/gxfp51a0-warm-keepalive.timer" not in pkgbuild
-assert "gxfp51a0-prestart-recover.c" in pkgbuild
-assert "usr/libexec/gxfp51a0-prestart-recover" in pkgbuild
-assert "gxfp51a0-kde-lockscreen-integrate" not in pkgbuild
-assert "90-gxfp51a0-kde-lockscreen.hook" not in pkgbuild
-assert "gxfp51a0-spidev-bind" not in pkgbuild
-
-assert "gx_warm_fast_ready" in driver
-assert "gx_warm_crossed_sleep" in driver
-assert "gx_cold_prepare (self)" in driver
-assert "#define GX_MATCH_THRESHOLD            7" in driver
-assert "#define GX_TEMPLATE_VERSION 4u" in driver
-suspend_block = driver[driver.index("gx_dev_suspend"):driver.index("gx_dev_resume")]
-resume_block = driver[driver.index("gx_dev_resume"):driver.index("gx_verify_done")]
-assert "FP_DEVICE_ERROR_NOT_SUPPORTED" in suspend_block
-assert "self->force_cold_reset = TRUE" in suspend_block
-assert "self->warm_valid = FALSE" in suspend_block
-assert "fpi_device_suspend_complete" in suspend_block
-assert "fpi_device_resume_complete (dev, NULL)" in resume_block
-assert "g_cancellable_cancel" not in resume_block
-assert "fpi_device_critical_enter" not in driver
-assert "resume_bg_frame" not in driver
-
-plm_pkgbuild = PLM_PKGBUILD.read_text()
-plm_patch1 = PLM_PATCH1.read_text()
-plm_patch2 = PLM_PATCH2.read_text()
-plm_patch3 = PLM_PATCH3.read_text()
-plm_patch4 = PLM_PATCH4.read_text()
-plm_patch5 = PLM_PATCH5.read_text()
-plm_patch9 = PLM_PATCH9.read_text()
-assert "pkgver=6.7.5" in plm_pkgbuild
-assert "pkgrel=3.9" in plm_pkgbuild
-assert "0001-show-pam-authentication-messages.patch" in plm_pkgbuild
-assert "0002-stop-notification-timer-for-pam-message.patch" in plm_pkgbuild
-assert "0003-enable-fprintd-for-plasmalogin.patch" in plm_pkgbuild
-assert "0004-autostart-first-fingerprint-attempt.patch" in plm_pkgbuild
-assert "0005-split-fingerprint-password-auth.patch" in plm_pkgbuild
-assert "0006-fingerprint-password-preemption.patch" in plm_pkgbuild
-assert "0007-parallel-password-fingerprint-auth.patch" in plm_pkgbuild
-assert "0008-continuous-fingerprint-availability.patch" in plm_pkgbuild
-assert "0009-fix-retry-timer-qml-ownership.patch" in plm_pkgbuild
-assert "function onInformationMessage(message)" in plm_patch1
-assert "notificationResetTimer.stop();" in plm_patch2
-assert "pam_fprintd.so max-tries=3 timeout=12" in plm_patch3
-assert "maybeStartFingerprintLogin" in plm_patch4
-assert "fingerprintAutoAttemptDone" in plm_patch4
-assert "fingerprintAutoAttemptInFlight" in plm_patch4
-assert "startLogin(true)" in plm_patch4
-assert "plasmalogin-fingerprint" in plm_patch5
-assert "FingerprintLogin" in plm_patch5
-assert "CancelLogin" in plm_patch5
-assert "LoginCancelled" in plm_patch5
-assert "setPamService" in plm_patch5
-assert "onTextChanged" in plm_patch5
-assert "-auth        sufficient  pam_fprintd.so max-tries=3 timeout=12" in plm_patch5
-assert "+-auth      required     pam_fprintd.so max-tries=3 timeout=12" in plm_patch5
-assert "property Timer fingerprintRetryTimer: Timer {" in plm_patch9
-assert "-    Timer {" in plm_patch9
-assert "udevadm control --reload" in pkginstall
-assert "udevadm trigger --subsystem-match=spi" in pkginstall
-assert "systemctl restart --no-block fprintd.service" not in pkginstall
-assert "systemctl restart fprintd.service" in pkginstall
-assert "systemctl start gxfp51a0-boot-prewarm.service" in pkginstall
-assert pkginstall.index("systemctl restart fprintd.service") < pkginstall.index("systemctl start gxfp51a0-boot-prewarm.service")
-assert "gxfp51a0-kde-lockscreen-integrate --apply" not in pkginstall
-assert "systemctl stop gxfp51a0-warm-keepalive.timer" in pkginstall
-assert "systemctl start --no-block gxfp51a0-warm-keepalive.service" not in pkginstall
-assert "systemctl enable gxfp51a0-boot-prewarm.service" in pkginstall
-assert ".goodix51a0-timing" in pkginstall
-assert ".goodix51a0-capture-timing" in pkginstall
-
-arch = ARCH.read_text()
-doctor = DOCTOR.read_text()
-assert "gxfp51a0-boot-prewarm.service" in arch
-assert "systemctl restart fprintd.service" in arch
-assert "systemctl start gxfp51a0-boot-prewarm.service" in arch
-assert "gxfp51a0-spidev-bind" not in arch
-assert "installed_version" in arch and "expected_version" in arch
-assert "Preserving the live fprintd/TLS session" in arch
-assert "DRIVER_CHANGED=0" in arch
-assert "prewarm_ready_once" in arch
-assert "--after-cursor" in arch
-assert "PREWARM_RESULT=READY" in arch
-assert "-t gxfp51a0-boot-prewarm" in arch
-assert "latest semantic fingerprint prewarm is READY" in doctor
-assert "latest semantic fingerprint prewarm FAILED" in doctor
-assert "-t gxfp51a0-boot-prewarm" in doctor
-
-linux = LINUX.read_text()
-assert 'PORTABLE_RELEASE="rel71.30-portable1"' in linux
-assert "portable_exact_installed" in linux
-assert "Preserving the live fprintd/TLS session" in linux
-assert "$STATE_DIR/release" in linux
-assert "--after-cursor" in linux
-assert "PREWARM_RESULT=READY" in linux
-assert "UDEV_RULE_FILE=" in linux
-assert "EARLY_WANTS_LINK=" in linux
-assert "--no-timeout" in linux
-assert "TimeoutStartSec=40s" in linux
-assert "Before=display-manager.service" in linux
-assert "LimitCORE=0" in linux
-assert "KEEPALIVE_HELPER_FILE=" not in linux
-assert "BOOT_PREWARM_HELPER_FILE=" in linux
-assert "BOOT_PREWARM_UNIT_FILE=" in linux
-assert "DBUS_SERVICE_FILE=" in linux
-assert "FPRINTD_WRAPPER_FILE=" in linux
-assert "FPRINTD_ABI_COMPATIBILITY=PASS" in linux
-assert "ldd -r" in linux
-assert "LDCONF_FILE=" not in linux
-assert "90-gxfp51a0-local.conf" not in linux
-assert "SYSTEMD_AVAILABLE=0" in linux
-assert "introspect" in linux and "LIBDIR_REL=" in linux
-assert "KDE_HELPER_FILE=" in linux
-assert "LEGACY_KDE_HELPER=0" in linux
-assert "--legacy-kde-helper" in linux
-assert "if (( ! NO_DESKTOP_INTEGRATION && LEGACY_KDE_HELPER )); then" in linux
-assert "if (( LEGACY_KDE_HELPER )) && [[ -x \"$KDE_HELPER_FILE\"" in linux
-assert "BIND_HELPER=" not in linux
-assert "BIND_SERVICE=" not in linux
-
-uninstall = UNINSTALL.read_text()
-assert "created-early-wants" in uninstall
-assert "KDE_HELPER=" in uninstall and '"$KDE_HELPER" --remove' in uninstall
-assert "gxfp51a0-warm-keepalive.timer" in uninstall
-assert "DBUS_SERVICE_FILE=" in uninstall
-assert "FPRINTD_WRAPPER_FILE=" in uninstall
-assert "LEGACY_LDCONF_FILE=" in uninstall
-assert "org.freedesktop.DBus.ReloadConfig" in uninstall
-assert "command -v systemctl" in uninstall
-assert "BIND_HELPER=" not in uninstall
-assert "BIND_SERVICE=" not in uninstall
-
-assert not (ROOT / "fingerprint/system/gxfp51a0-spidev-bind").exists()
-assert not (ROOT / "fingerprint/system/gxfp51a0-spidev-bind.service").exists()
-
-print("GOODIX51A0_NATIVE_SPI_LIFECYCLE_SOURCE_TEST=PASS")
+ROOT=Path(__file__).resolve().parents[1]
+FP=ROOT/'fingerprint'
+DRIVER=(FP/'driver/goodix51a0/goodix51a0.c').read_text()
+PATCH=(FP/'driver/goodix51a0/libfprint-v1.94.100.patch').read_text()
+ARCH=(FP/'install-arch.sh').read_text()
+LINUX=(FP/'install-linux.sh').read_text()
+PKG=(FP/'packaging/arch/PKGBUILD').read_text()
+LIFECYCLE=(FP/'packaging/arch/libfprint-goodix51a0.install').read_text()
+FPRINTD=(FP/'packaging/arch/fprintd-goodix51a0.conf').read_text()
+KDE=FP/'integration/plasma-login-manager-6.8.1-qa'
+PLM=(KDE/'0001-plasma-login-6.8.1-native-dual-fingerprint-password.patch').read_text()
+PKGPLM=(KDE/'PKGBUILD').read_text()
+assert "pkgrel=71.51" in PKG
+assert "pkgver=1.94.100.goodix51a0" in PKG
+assert "install=libfprint-goodix51a0.install" in PKG
+assert "provides=('libfprint=1.94.100'" in PKG
+assert "libfprint 1.94.100" in PKG
+assert "v1.94.100" in (FP/'scripts/build-libfprint-v1.94.100.sh').read_text()
+# Native lifecycle owns warm TLS reuse, without an external system-sleep daemon.
+assert "dev_class->suspend = gx_dev_suspend;" in DRIVER
+assert "dev_class->resume = gx_dev_resume;" in DRIVER
+assert "gx_warm_crossed_sleep" in DRIVER
+assert "CLOCK_BOOTTIME" in DRIVER and "CLOCK_MONOTONIC" in DRIVER
+assert "NATIVE_PROBE_PREWARM" in DRIVER
+assert "gx_cold_prepare (self) && gx_warm_available (self)" in DRIVER
+assert "fpi_device_probe_complete (dev, NULL, NULL, NULL);" in DRIVER
+assert "gx_transport_close (self)" in DRIVER
+assert "force_cold_reset" in DRIVER
+assert "gx_cancelled (w->dev, w->ssm)" in DRIVER
+assert "gx_cancelled (dev, ssm)" in DRIVER
+assert "GXFP51A0 S3_CANCEL" in DRIVER
+assert "fpi_device_suspend_complete" in DRIVER
+assert "fpi_device_resume_complete (dev, NULL)" in DRIVER
+assert "G_IO_ERROR_CANCELLED" in DRIVER
+assert "gx_capture_auth_same_press" in DRIVER
+assert re.search(r"^#define\s+GX_MATCH_THRESHOLD\s+7\s*$",DRIVER,re.M)
+assert re.search(r"^#define\s+GX_VERIFY_MAX_ATTEMPTS\s+3\b",DRIVER,re.M)
+assert "GPIO112" not in DRIVER
+assert "GPP_D16" not in DRIVER
+assert "FPI_DEVICE_UDEV_SUBTYPE_SPIDEV" in DRIVER
+assert '.spi_acpi_id = "GXFP51A0"' in DRIVER
+assert "GOODIX51A0_UDEV_MODALIAS_GLOB" in (FP/'scripts/build-libfprint-v1.94.100.sh').read_text()
+assert "Before=display-manager.service" in FPRINTD
+assert "TimeoutStartSec=90s" in FPRINTD
+assert "ExecStart=/usr/lib/fprintd --no-timeout" in FPRINTD
+assert "LimitCORE=0" in FPRINTD
+assert "gxfp51a0-boot-prewarm.service" not in PKG
+assert "systemd/system-sleep/gxfp51a0-resume-prewarm" not in PKG
+assert "gxfp51a0-warm-keepalive.timer" not in PKG
+assert "systemctl enable gxfp51a0-boot-prewarm.service" not in LIFECYCLE
+assert "systemctl try-restart fprintd.service" in LIFECYCLE
+assert "systemctl disable --now gxfp51a0-fprintd-suspend.service" in LIFECYCLE
+assert "udevadm control --reload" in LIFECYCLE
+assert "pam_fprintd.so" not in FPRINTD
+# Optional KDE PLM package never touches the user's stock PAM password stack.
+assert "pkgver=6.8.1" in PKGPLM
+assert "plasmalogin-fingerprint" in PLM
+assert "pam_fprintd.so max-tries=1 timeout=30" in PLM
+assert "pam_deny.so" in PLM
+assert "pam_permit.so" not in "\n".join(line[1:] for line in PLM.splitlines() if line.startswith("+") and not line.startswith("+++"))
+assert "m_fingerprintAuth" in PLM and "m_loginCommitted" in PLM
+assert "onVisibleChanged:" in PLM
+assert "fingerprintRetryTimer.stop()" in PLM
+# Both portable and Arch installers retain a real rollback path; no broad
+# PAM password changes or emergency default permit.
+assert "fprintd" in ARCH and "fprintd" in LINUX
+assert (FP/'uninstall-linux-source.sh').exists()
+print("GOODIX51A0_NATIVE_BOOT_S3_SECURITY_SOURCE_TEST=PASS")

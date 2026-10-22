@@ -52,14 +52,14 @@ assert "self->capture_recovery_pending" in open_
 assert "warm_candidate && !self->capture_recovery_pending" in open_
 assert open_.index("self->capture_recovery_pending") < open_.index("gx_warm_fast_ready")
 
-# Recovery remains the validated full MCU reset/A8 boundary, but now with the
-# stronger detached-transport ordering: close -> GPIO264 reset -> reopen -> A8.
+# Recovery remains a detached whole-MCU reset/A8 boundary. Only a real S3
+# selects the rel71.24 short pulse; normal protocol resets are unchanged.
 assert "gx_tls_teardown (self)" in recover
 assert "gx_transport_close (self)" in recover
-assert "gx_gpio_reset (self)" in recover
+assert "gx_reset_detached_s3_boundary (self)" in recover
 assert "gx_transport_open (FP_DEVICE (self)" in recover
-assert recover.index("gx_transport_close (self)") < recover.index("gx_gpio_reset (self)")
-assert recover.index("gx_gpio_reset (self)") < recover.index("gx_transport_open (FP_DEVICE (self)")
+assert recover.index("gx_transport_close (self)") < recover.index("gx_reset_detached_s3_boundary (self)")
+assert recover.index("gx_reset_detached_s3_boundary (self)") < recover.index("gx_transport_open (FP_DEVICE (self)")
 assert recover.index("gx_transport_open (FP_DEVICE (self)") < recover.index("gx_read_fw_version_stage2e")
 
 # Background averaging stops immediately on transport loss instead of producing

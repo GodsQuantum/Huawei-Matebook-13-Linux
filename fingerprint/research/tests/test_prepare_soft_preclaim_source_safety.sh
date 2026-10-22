@@ -30,10 +30,15 @@ assert "gx_recover_capture_context (self)" in wrapper
 assert "gx_prepare_capture_context (self, FALSE)" in cold
 assert "gx_prepare_capture_context_once (self, FALSE)" not in cold
 
-# Enumeration must never start a sensor/TLS/capture session.
-for forbidden in ("gx_gpio_reset", "gx_cold_prepare", "gx_tls_session",
-                  "gx_prepare_capture_context"):
-    assert forbidden not in probe, forbidden
+# Enumeration now runs EXACTLY the full production preparation BEFORE
+# Plasma. Reset is strictly with SPI+IRQ CLOSED; no reduced TLS attempt cap.
+assert "gx_cold_prepare (self)" in probe
+assert "gx_warm_available (self)" in probe
+assert "gx_gpio_reset (self)" in probe
+assert probe.index("gx_transport_close (self)") < probe.index("gx_gpio_reset (self)")
+assert probe.index("gx_gpio_reset (self)") < probe.rindex("gx_transport_open (dev, &err)")
+assert "if (diagnostic)" in probe
+assert "gx_transport_close (self)" in probe
 assert "gx_transport_open" in probe and "gx_transport_close" in probe
 assert "fpi_device_probe_complete (dev, NULL, NULL, NULL)" in probe
 
@@ -44,7 +49,8 @@ assert "fpi_device_open_complete (dev, NULL)" in open_
 assert open_.index("if (!gx_cold_prepare (self))") < open_.rindex("fpi_device_open_complete (dev, NULL)")
 
 assert "gx_tls_teardown (self)" in recover
-assert "gx_gpio_reset (self)" in recover
+assert "gx_reset_detached_s3_boundary (self)" in recover
+assert "gx_gpio_reset (self)" in fn("gx_reset_detached_s3_boundary")
 assert "gx_read_fw_version_stage2e" in recover
 assert "gx_pmk_clear" not in recover
 PY2

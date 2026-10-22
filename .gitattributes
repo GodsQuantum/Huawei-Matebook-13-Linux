@@ -1,0 +1,3 @@
+# Unified-diff patches require a leading space on empty context lines.
+# That is intentional patch syntax, not trailing whitespace in source code.
+fingerprint/integration/plasma-login-manager-6.8.1-qa/*.patch whitespace=-blank-at-eol
