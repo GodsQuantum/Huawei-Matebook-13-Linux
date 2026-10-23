@@ -479,3 +479,8 @@ test_s3_cached_clean_reference_safety:
 test: test_s3_long_sleep_cached_reference_safety
 test_s3_long_sleep_cached_reference_safety:
 	python3 ./tests/test_s3_long_sleep_cached_reference_safety.py
+
+.PHONY: test_hardware_evidence_parser
+test: test_hardware_evidence_parser
+test_hardware_evidence_parser:
+	python3 ./tests/test_hardware_evidence_parser.py
