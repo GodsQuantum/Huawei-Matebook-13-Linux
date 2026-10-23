@@ -2370,7 +2370,12 @@ gx_diag_press_countdown (FpiDeviceGoodix51A0 *self, int off_anchor_mean)
  * short S3 wake. Keeping it across a suspend never keeps the old TLS session:
  * TLS and sensor configuration are rebuilt separately before this function.
  * CLOCK_BOOTTIME includes time actually asleep, unlike monotonic time. */
-#define GX_S3_CLEAN_REFERENCE_MAX_US (G_GINT64_CONSTANT(90) * G_USEC_PER_SEC)
+/* A clean reference is only captured from an authenticated finger-off
+ * baseline, and independently revalidated by LIVE FDT immediately before
+ * issuing the successful S3 sleep command. This allows realistic laptop
+ * sleep periods without treating old background as a fresh calibration. */
+#define GX_S3_CLEAN_REFERENCE_MAX_US (G_GINT64_CONSTANT(12) * 60 * 60 * G_USEC_PER_SEC)
+#define GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US (G_GINT64_CONSTANT(2) * 60 * 60 * G_USEC_PER_SEC)
 
 static gint64
 gx_s3_boottime_us (void)
@@ -2403,7 +2408,7 @@ gx_s3_snapshot_clean_bg (FpiDeviceGoodix51A0 *self)
    * missing or old references from an unfinished biometric operation. */
   if (!self->warm_valid || !self->bg_frame || !self->have_fdt ||
       self->bg_dirty || !self->tls_up || age < 0 ||
-      age > GX_S3_CLEAN_REFERENCE_MAX_US || boot <= 0)
+      age > GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US || boot <= 0)
     return;
 
   self->s3_saved_bg =
@@ -2465,8 +2470,12 @@ gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self)
   /* Preserve the ORIGINAL clean-reference age. When the finger is lifted,
    * warm rebase will acquire a fresh background rather than pretending a
    * recycled image was newly calibrated. */
+  /* Monotonic time excludes deep sleep; a valid 8 h suspend can exceed
+   * current active uptime. Never store negative timestamps. This original
+   * calibration is treated as stale and refreshed once the finger lifts. */
   self->bg_last_refresh_us =
-    g_get_monotonic_time () - (saved_age + elapsed);
+    MAX (G_GINT64_CONSTANT(1),
+         g_get_monotonic_time () - (saved_age + elapsed));
   fp_warn ("GXFP51A0 NATIVE_S3_EARLY_FINGER_VERIFIED_REFERENCE "
            "live_touch=0x%02x mean=%d prev_abs=%d age_ms=%d; "
            "normal strict image/matcher gates still required",
@@ -5044,6 +5053,7 @@ gx_dev_suspend (FpDevice *dev)
   gboolean warm = gx_warm_available (self);
   gboolean attempted = FALSE;
   gboolean parked = FALSE;
+  gboolean pre_sleep_clean = FALSE;
 
   /* The patched native libfprint idle suspend invokes this callback inside
    * fprintd's EXISTING logind delay inhibitor; there is no external service,
@@ -5059,6 +5069,28 @@ gx_dev_suspend (FpDevice *dev)
 
       if (gx_transport_open (dev, &err))
         {
+          /* At suspend time the warm TLS channel still exists. Prove that
+           * the sensor is TRULY clear immediately before sleep, not merely
+           * that a stored ImageBase was clear minutes earlier. If this
+           * optional fast probe fails, proceed with the normal sleep and
+           * leave resume to ordinary full cold calibration. */
+          if (warm && self->have_fdt && !self->bg_dirty)
+            {
+              int park_fdt[GXFP_FDT_ZONE_COUNT];
+              guint8 park_touchflag = 0xff;
+
+              if (gx_fdt_probe_ex (self, park_fdt, &park_touchflag) == 0)
+                {
+                  int park_mean = gx_fdt_mean (park_fdt);
+                  int baseline_mean = gx_fdt_mean (self->fdt_base);
+
+                  pre_sleep_clean = (park_touchflag & 0x3fu) == 0 &&
+                                    park_mean >= GOODIX_FDT_ABS &&
+                                    ABS (park_mean - baseline_mean) <=
+                                    GX_DIAG_BASELINE_MAX_DRIFT;
+                }
+            }
+
           if (gxfp_build_sleep (&packet))
             {
               attempted = TRUE;
@@ -5074,11 +5106,18 @@ gx_dev_suspend (FpDevice *dev)
   /* Capture only an explicitly clean, recent ImageBase at a successfully
    * acknowledged idle S3 park. This RAM-only image is not a biometric print,
    * is never persisted and is discarded after one use or expiration. */
-  if (idle && parked && warm && !self->bg_dirty &&
-      self->bg_frame && self->have_fdt)
+  if (idle && parked && warm && pre_sleep_clean &&
+      !self->bg_dirty && self->bg_frame && self->have_fdt)
     gx_s3_snapshot_clean_bg (self);
   else
-    gx_s3_discard_clean_bg (self);
+    {
+      gx_s3_discard_clean_bg (self);
+      if (warm && idle && parked)
+        fp_warn ("GXFP51A0 NATIVE_S3_CLEAN_REFERENCE_NOT_SAVED "
+                 "pre_sleep_clear=%d recent_reference=%d",
+                 pre_sleep_clean ? 1 : 0,
+                 self->bg_last_refresh_us > 0 ? 1 : 0);
+    }
 
   /* Idle and in-progress actions have different libfprint semantics. Never
    * transmit Sleep during an active biometric capture. A failed park cannot

@@ -1,6 +1,6 @@
 # Goodix GXFP51A0 / GF3658 ST411 on Linux
 
-> **QA branch only (rel71.54, 23 October 2026):** Native S3 cancellation fixes and KDE Plasma Login Manager 6.8.1 dual-PAM code have passed software builds, but **S3, reboot, and cold BOOT are NOT physically certified**. Pegasus retains its proven rel71.49 installation. [QA evidence and conditions](docs/rel71.51-all-states-qa.md).
+> **QA branch only (rel71.55, 23 October 2026):** Native S3 cancellation fixes and KDE Plasma Login Manager 6.8.1 dual-PAM code have passed software builds, but **S3, reboot, and cold BOOT are NOT physically certified**. Pegasus retains its proven rel71.49 installation. [QA evidence and conditions](docs/rel71.51-all-states-qa.md).
 
 
 Native libfprint driver and zero-to-working installer for the SPI Goodix
