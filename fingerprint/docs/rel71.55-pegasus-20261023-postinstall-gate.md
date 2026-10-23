@@ -4,7 +4,8 @@ STATUS: SOFTWARE PASS; HARDWARE NOT CERTIFIED; DO NOT MERGE INTO MAIN.
 
 Current observed installed package: libfprint-goodix51a0
 1.94.100.goodix51a0-71.55 (installed 2026-10-23 11:44:05 +02:00).
-Kernel observed: 7.3.0-2-cachyos. Plasma Login Manager QA 6.8.1-1
+Kernel before reboot: 7.3.0-2-cachyos; after reboot: 7.3.0-3-cachyos.
+Plasma Login Manager QA 6.8.1-1
 is running and password and fingerprint PAM are separate.
 
 Five actual deep S3 cycles on the *same boot* were analyzed; ALL occurred
@@ -12,8 +13,33 @@ before the current package installation and do not validate rel71.55.
 Earlier branches had warm/cancellable issues and sometimes needed repeated
 touches. Never silently carry their results into the current candidate.
 The post-install-only read-only report returned 0 S3 records.
-No cold boot or reboot with this package has yet been physically tested.
-No "first touch" assertion can be derived from logs alone.
+Before the 13:07 reboot on 23 October, no reboot with this build had been
+physically tested. The first supervised warm reboot is now recorded below.
+No cold power-off/on has been physically tested with this package.
+A "first touch" assertion requires a human report; logs alone do not prove it.
+
+## Real hardware evidence — warm reboot trial 1/3 (PASS)
+
+- Date: 2026-10-23, Europe/Paris.
+- Human observation: owner explicitly reports **REBOOT: first physical finger placement OK**.
+- Actual new kernel boot: 13:07:12 +02:00, kernel 7.3.0-3-cachyos.
+- Driver after reboot: libfprint-goodix51a0 1.94.100.goodix51a0-71.55.
+- fprintd started 13:07:20 and PLM started 13:07:28. PLM active executable
+  no longer points to a deleted (pre-package) image.
+- Automatic PLM fingerprint authentication began 13:07:32;
+  native FAST_READY took approximately 83 ms. Until the human touch the
+  greeter performed 30-second auth windows and re-armed after timeouts,
+  retaining password fallback. These timeouts are **not** evidence of
+  physical fingers rejected.
+- Physical fingerprint contact detected at 13:12:03 (touch 0x38; 3 zones);
+  strict enrolled match score 10 against threshold 7, 13:12:04;
+  successful terminal and PLM fingerprint authentication at 13:12:05.
+  The user session then started successfully.
+- Attribution: the human report supports **first-placement success**;
+  fprintd and PLM logs independently confirm the successful fingerprint
+  and session. This is a warm **reboot**, not a cold power-off boot.
+- Certification tally: reboot 1/3; cold boot 0/3; LOCK 0/5 under this
+  candidate; supervised deep S3 0/3. Overall hardware verdict **PENDING**.
 
 Measure only cycles starting after the installed package timestamp:
     python3 fingerprint/scripts/gxfp51a0-hardware-evidence.py --since 2026-10-23T11:44:05+02:00 --json
