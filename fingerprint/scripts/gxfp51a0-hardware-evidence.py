@@ -113,7 +113,7 @@ def summarize_one(entry: dict, exit_event: dict, fprintd: list[dict], end: datet
     }
 
 
-def report(fprintd_raw: str, kernel_raw: str) -> dict:
+def report(fprintd_raw: str, kernel_raw: str, since: datetime | None = None) -> dict:
     fp = parse_events(fprintd_raw, "fingerprint")
     k = parse_events(kernel_raw, "kernel")
     boundaries = []
@@ -125,8 +125,13 @@ def report(fprintd_raw: str, kernel_raw: str) -> dict:
             if event["at"] >= entry["at"]:
                 boundaries.append((entry, event))
             entry = None
+    if since is not None and (since.tzinfo is None or since.utcoffset() is None):
+        raise ValueError("since must be timezone-aware")
     sessions = []
     for index, (start, end) in enumerate(boundaries):
+        # Never attribute a cycle that started under an earlier build to this build.
+        if since is not None and start["at"] < since:
+            continue
         # A positive match hours after a resume belongs to normal login,
         # not this S3 test. Inspect only the first two minutes after wake,
         # and never cross into another kernel suspend cycle.
@@ -135,6 +140,7 @@ def report(fprintd_raw: str, kernel_raw: str) -> dict:
         sessions.append(summarize_one(start, end, fp, min(deadline, next_start)))
     return {
         "driver": "GXFP51A0",
+        "analysis_since": since.isoformat() if since is not None else None,
         "records_examined": len(sessions),
         "deep_s3_sessions": sessions,
         "cold_boot_reboot_verdict": "unverified_requires_human_test",
@@ -149,13 +155,23 @@ def main() -> int:
     parser.add_argument("--fprintd-log", type=Path)
     parser.add_argument("--kernel-log", type=Path)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--since", metavar="ISO8601",
+                        help="Only analyze S3 cycles beginning at or after this timezone-aware driver install timestamp")
     a = parser.parse_args()
     if bool(a.fprintd_log) != bool(a.kernel_log):
         parser.error("--fprintd-log and --kernel-log must be given together")
+    since = None
+    if a.since:
+        try:
+            since = datetime.fromisoformat(a.since.replace("Z", "+00:00"))
+        except ValueError:
+            parser.error("--since must be a valid ISO 8601 timestamp with timezone")
+        if since.tzinfo is None or since.utcoffset() is None:
+            parser.error("--since must include a timezone offset")
     try:
         fptext = a.fprintd_log.read_text() if a.fprintd_log else read_journal(["-u", "fprintd"])
         ktext = a.kernel_log.read_text() if a.kernel_log else read_journal(["-k"])
-        result = report(fptext, ktext)
+        result = report(fptext, ktext, since=since)
     except (OSError, RuntimeError) as exc:
         print(f"Unable to assess journal: {exc}", file=sys.stderr)
         return 2

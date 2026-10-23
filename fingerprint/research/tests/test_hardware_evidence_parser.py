@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 FILE = Path(__file__).resolve().parents[2] / "scripts/gxfp51a0-hardware-evidence.py"
@@ -86,6 +87,25 @@ class EvidenceTests(unittest.TestCase):
         s3 = m.report(fake_fprintd, self.kernel)["deep_s3_sessions"][0]
         self.assertIsNone(s3["successful_match_seconds_after_wake"])
         self.assertIsNone(s3["matched_score"])
+
+    def test_only_post_install_s3_cycles_count(self):
+        later = "\n".join([
+            kernel("20:02", "PM: suspend entry (deep)"),
+            kernel("20:10", "PM: suspend exit"),
+        ])
+        since = datetime.fromisoformat("2026-10-23T11:10:00+02:00")
+        result = m.report("", self.kernel + "\n" + later, since=since)
+        self.assertEqual(result["records_examined"], 1)
+        self.assertEqual(result["analysis_since"], since.isoformat())
+        self.assertEqual(result["deep_s3_sessions"][0]["suspend_entry"],
+                         "2026-10-23T11:20:02+02:00")
+        result = m.report("", self.kernel, since=since)
+        self.assertEqual(result["records_examined"], 0)
+        self.assertEqual(result["hardware_certification"], "PENDING")
+
+    def test_naive_install_timestamp_is_rejected(self):
+        with self.assertRaises(ValueError):
+            m.report("", self.kernel, since=datetime.fromisoformat("2026-10-23T11:10:00"))
 
     def test_non_iso_or_naive_time_is_ignored(self):
         malformed = "Oct 23 11:08:09 user kernel: PM: suspend exit"

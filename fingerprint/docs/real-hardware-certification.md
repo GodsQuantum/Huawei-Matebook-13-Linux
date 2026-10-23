@@ -9,6 +9,17 @@ rejection, and password fallback on actual hardware under human supervision.
 Run `python3 fingerprint/scripts/gxfp51a0-hardware-evidence.py --json`
 as a user authorized to read the system journal.
 
+When different builds were installed during the same boot, filter at the
+exact installation instant to avoid mixing evidence from older versions:
+
+    python3 fingerprint/scripts/gxfp51a0-hardware-evidence.py --since 2026-10-23T11:44:05+02:00 --json
+
+Use the installation timestamp from the package manager. A sleep starting
+before that instant is excluded even if its resume is later. The JSON
+analysis_since field records the selected filter, or null without it.
+This prevents false attribution, but does not prove the installed binary
+was built from the QA commit.
+
 The utility reads only the current boot's fprintd and kernel journal; it
 does not modify GPIO, SPI, kernel, services, PAM, PMK, firmware, or sessions.
 It never initiates sleep or reboot, and contains no persistent task. It emits
