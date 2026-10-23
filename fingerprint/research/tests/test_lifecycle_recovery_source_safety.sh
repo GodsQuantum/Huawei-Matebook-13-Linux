@@ -93,6 +93,7 @@ assert "FP_DEVICE_ERROR_NOT_SUPPORTED" in suspend
 assert "fpi_device_suspend_complete" in suspend
 assert "self->force_cold_reset = TRUE" in suspend
 assert "fpi_device_resume_complete (dev, NULL)" in resume
+assert "g_task_run_in_thread (task, gx_resume_preflight_thread)" in resume
 assert "g_cancellable_cancel" not in resume
 
 assert "dev_class->suspend = gx_dev_suspend" in klass
