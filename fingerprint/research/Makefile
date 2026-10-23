@@ -464,3 +464,8 @@ test_s3_detached_transport_source_safety:
 .PHONY: test_resume_first_prewarm_source_safety
 test_resume_first_prewarm_source_safety:
 	python3 ./tests/test_resume_first_prewarm_source_safety.py
+
+.PHONY: test_idle_cancellable_s3_source_safety
+test: test_idle_cancellable_s3_source_safety
+test_idle_cancellable_s3_source_safety:
+	python3 ./tests/test_idle_cancellable_s3_source_safety.py
