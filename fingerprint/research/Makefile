@@ -484,3 +484,8 @@ test_s3_long_sleep_cached_reference_safety:
 test: test_hardware_evidence_parser
 test_hardware_evidence_parser:
 	python3 ./tests/test_hardware_evidence_parser.py
+
+.PHONY: test_fast_s3_preflight_source_safety
+test: test_fast_s3_preflight_source_safety
+test_fast_s3_preflight_source_safety:
+	python3 ./tests/test_fast_s3_preflight_source_safety.py
