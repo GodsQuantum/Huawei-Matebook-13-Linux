@@ -474,3 +474,8 @@ test_idle_cancellable_s3_source_safety:
 test: test_s3_cached_clean_reference_safety
 test_s3_cached_clean_reference_safety:
 	python3 ./tests/test_s3_cached_clean_reference_safety.py
+
+.PHONY: test_s3_long_sleep_cached_reference_safety
+test: test_s3_long_sleep_cached_reference_safety
+test_s3_long_sleep_cached_reference_safety:
+	python3 ./tests/test_s3_long_sleep_cached_reference_safety.py
