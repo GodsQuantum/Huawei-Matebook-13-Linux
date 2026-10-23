@@ -16,7 +16,7 @@ if [[ -f "$ROOT/EXPERIMENTAL_BUILD_ONLY" ]]; then
 fi
 
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.53-qa1"
+PORTABLE_RELEASE="rel71.54-qa1"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"

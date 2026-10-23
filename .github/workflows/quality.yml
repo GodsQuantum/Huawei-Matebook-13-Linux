@@ -2,7 +2,7 @@ name: Quality
 
 on:
   push:
-    branches: [main, qa/gxfp51a0-rel71.51-plm681-20261023, qa/gxfp51a0-rel71.52-resume-first-20261023, qa/gxfp51a0-rel71.53-safe-cancellable-20261023]
+    branches: [main, qa/gxfp51a0-rel71.51-plm681-20261023, qa/gxfp51a0-rel71.52-resume-first-20261023, qa/gxfp51a0-rel71.53-safe-cancellable-20261023, qa/gxfp51a0-rel71.54-s3-clean-background-20261023]
   pull_request:
 
 permissions:
