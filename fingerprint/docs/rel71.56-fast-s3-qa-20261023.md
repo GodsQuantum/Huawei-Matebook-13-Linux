@@ -1,6 +1,8 @@
 # rel71.56 proposal: faster idle deep-S3 preflight (QA ONLY)
 
-Status: experimental branch; no Pegasus installation or hardware certification.
+Status: experimental branch; installed on Pegasus for human-operated QA
+2026-10-23 14:34:38 Europe/Paris, but NO hardware certification or proven
+performance improvement. Never merge as stable on software results alone.
 
 ## Verified rel71.55 reference measurements
 
@@ -34,8 +36,29 @@ session. This still needs in-vivo S3/first-touch regression tests.
 
 ## Certification gate
 
-Build and source-safety tests must pass first. On Pegasus, only after
-preserving the known-good rel71.55 and KDE stock rollback, run supervised
+Build and source-safety tests passed in CT700, including native libfprint
+compilation; reproducible Arch package built in CT700 Docker, SHA256
+90373bc965a4bb4a3afec2a05a50049010f34f5aaa1cdb3089c97258d9e4db85.
+All 12 CI checks were green at time of activation. It was copied and its
+hash independently verified on Pegasus before pacman -U. Native systemd
+override /etc/systemd/system/fprintd.service.d/80-gxfp51a0-fast-s3-qa.conf
+sets GXFP_S3_FAST_PREFLIGHT=1; fprintd restarted automatically by the
+package upgrade and is active; it reports Environment=GXFP_S3_FAST_PREFLIGHT=1.
+Installed Arch package is rel71.56, kernel 7.3.0-3, KDE PLM unchanged.
+No OS reboot or lock manager restart was performed. Installer invoked the
+ordinary pacman/Snapper before-and-after snapshots.
+
+Known-good EXACT rel71.55 previously installed package pinned root-only
+to /var/lib/gxfp51a0-qa-rollback/rel71.55.pkg.tar.zst
+SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+Separate original KDE+rel71.49 recovery remains available and --check works.
+To revert **only** the driver timing trial while preserving all KDE/PAM,
+first delete the above override, reload systemd, and reinstall the saved
+rel71.55 package via the distro native pacman; never auto-reboot the machine.
+
+Hardware measurement boundary for rel71.56:
+2026-10-23T14:34:38+02:00. Historical successful S3 and LOCK measurements
+before this belong to rel71.55, NOT this version. On Pegasus, run supervised
 S3 repeats including active verification, wake with finger already down,
 finger-off cold background, 3 LOCKs, reboot, negative-finger and password
 fallback; log actual resume latency and compare with rel71.55.
