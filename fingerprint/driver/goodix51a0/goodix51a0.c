@@ -4955,17 +4955,116 @@ gx_dev_suspend (FpDevice *dev)
       dev, fpi_device_error_new (FP_DEVICE_ERROR_NOT_SUPPORTED));
 }
 
+/* After true S3, the normal first Claim may arrive after the user has
+ * already placed a finger.  Cold TLS and ImageBase preparation then compete
+ * with that placement: rejecting contaminated backgrounds is necessary, but
+ * it took four-five placements on the reference MateBook.
+ *
+ * For an IDLE fprintd device libfprint 1.94.100 calls the native resume
+ * vfunc before releasing its suspended flag. Perform the detached SPI/GPIO
+ * and clean ImageBase preparation on a worker thread and COMPLETE resume
+ * only after that worker terminates. Thus a greeter cannot start Verify
+ * before the sensor has finished prewarming. No external systemd hook or
+ * fprintd restart, and no new background acceptance or reduced threshold.
+ *
+ * The normal Claim path remains responsible for recovery if this optional
+ * prewarm could not establish a clean (finger-off) reference. */
+static void
+gx_resume_preflight_thread (GTask *task,
+                            gpointer source,
+                            gpointer task_data,
+                            GCancellable *cancellable)
+{
+  FpDevice *dev = FP_DEVICE (source);
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+  g_autoptr(GError) err = NULL;
+  gboolean ok = FALSE;
+
+  gx_warm_abandon (self);
+  gx_transport_close (self);
+
+  /* The sensor has just resumed from deep sleep. The old host-side TLS
+   * context is never reused, and no GPIO pulse may run with live SPI/IRQ. */
+  g_usleep (G_USEC_PER_SEC);
+  gx_reset_detached_s3_boundary (self);
+  g_usleep (G_USEC_PER_SEC);
+
+  if (gx_transport_open (dev, &err))
+    {
+      ok = gx_cold_prepare (self);
+      gx_transport_close (self);
+    }
+  else
+    {
+      fp_warn ("GXFP51A0 NATIVE_S3_RESUME_PREWARM transport unavailable: %s",
+               err ? err->message : "unknown");
+    }
+
+  if (!ok)
+    {
+      gx_warm_abandon (self);
+      gx_transport_close (self);
+    }
+
+  g_task_return_boolean (task, ok);
+}
+
+static void
+gx_resume_preflight_done (GObject *source,
+                          GAsyncResult *result,
+                          gpointer user_data)
+{
+  FpDevice *dev = FP_DEVICE (source);
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+  gboolean ready = g_task_propagate_boolean (G_TASK (result), NULL);
+
+  if (ready && gx_warm_available (self))
+    {
+      self->force_cold_reset = FALSE;
+      fp_info ("GXFP51A0 NATIVE_S3_RESUME_PREWARM_READY "
+               "clean TLS/ImageBase ready before next fingerprint Claim");
+    }
+  else
+    {
+      /* Do not leave the device in libfprint's suspended state after a
+       * recoverable calibration miss (for example finger already on glass).
+       * The following real Claim uses the established cold path, with
+       * fail-closed PAM and the password always available. */
+      self->force_cold_reset = TRUE;
+      gx_warm_abandon (self);
+      fp_warn ("GXFP51A0 NATIVE_S3_RESUME_PREWARM_FALLBACK "
+               "clean background unavailable; next Claim retries safely");
+    }
+
+  fpi_device_resume_complete (dev, NULL);
+}
+
 static void
 gx_dev_resume (FpDevice *dev)
 {
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+  gboolean idle = fpi_device_get_current_action (dev) == FPI_DEVICE_ACTION_NONE &&
+                  self->spi_fd < 0 && self->irq_fd < 0;
 
-  /* Called for idle devices too; never carry stale TLS/PMK or background
-   * across deep S3. The next genuine Claim executes cold preparation. */
   self->force_cold_reset = TRUE;
+  fp_info ("GXFP51A0 NATIVE_S3_RESUME_BEGIN idle=%d; native prewarm candidate",
+           idle ? 1 : 0);
+
+  if (idle)
+    {
+      /* Keep all blocking SPI/TLS and ~2-second background acquisition
+       * off fprintd's main D-Bus loop, but hold libfprint's resume completion
+       * until the transport has been closed and state is consistent. */
+      GTask *task = g_task_new (dev, NULL, gx_resume_preflight_done, NULL);
+      g_task_run_in_thread (task, gx_resume_preflight_thread);
+      g_object_unref (task);
+      return;
+    }
+
+  /* Active Verify/Enroll cannot be raced by an idle cold-prewarm worker.
+   * Existing suspend cancellation handles it, and the next Claim recovers. */
   if (self->spi_fd < 0 && self->irq_fd < 0)
     gx_warm_abandon (self);
-  fp_info ("GXFP51A0 NATIVE_S3_RESUME cold Claim required");
   fpi_device_resume_complete (dev, NULL);
 }
 

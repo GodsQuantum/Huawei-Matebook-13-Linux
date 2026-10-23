@@ -51,7 +51,10 @@ assert "self->capture_pacing_suppressed = TRUE" in session
 
 assert "self->force_cold_reset = TRUE" in suspend
 assert "fpi_device_suspend_complete" in suspend
-assert "NATIVE_S3_RESUME cold Claim required" in resume
+assert "NATIVE_S3_RESUME_BEGIN" in resume
+assert "g_task_run_in_thread (task, gx_resume_preflight_thread)" in resume
+assert "NATIVE_S3_RESUME_PREWARM_READY" in fn("gx_resume_preflight_done")
+assert "NATIVE_S3_RESUME_PREWARM_FALLBACK" in fn("gx_resume_preflight_done")
 assert "NATIVE_S3_PARK" in suspend
 assert "gxfp_build_sleep (&packet)" in suspend
 

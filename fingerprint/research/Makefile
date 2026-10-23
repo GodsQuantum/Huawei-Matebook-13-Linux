@@ -413,7 +413,7 @@ test_gq_sigfm_fpeval_source_safety:
 	./tests/test_gq_sigfm_fpeval_source_safety.sh
 
 .PHONY: test_fast_ready_source_safety
-test: test_s3_async_cancel_completion
+test: test_resume_first_prewarm_source_safety test_s3_async_cancel_completion
 
 test_s3_async_cancel_completion:
 	python3 ./tests/test_s3_async_cancel_completion.py
@@ -460,3 +460,7 @@ test_s3_tls_detached_retry_source_safety:
 test: test_s3_detached_transport_source_safety
 test_s3_detached_transport_source_safety:
 	python3 ./tests/test_s3_detached_transport_source_safety.py
+
+.PHONY: test_resume_first_prewarm_source_safety
+test_resume_first_prewarm_source_safety:
+	python3 ./tests/test_resume_first_prewarm_source_safety.py
