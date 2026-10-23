@@ -138,6 +138,17 @@ static gboolean gx_cold_prepare (FpiDeviceGoodix51A0 *self);
 static void gx_transport_close (FpiDeviceGoodix51A0 *self);
 static gboolean gx_transport_open (FpDevice *dev, GError **error);
 
+/* fpi_device_get_cancellable() requires a live libfprint action.
+ * Idle S3 resume prewarm must not call it with ACTION_NONE. */
+static GCancellable *
+gx_action_cancellable_if_active (FpiDeviceGoodix51A0 *self)
+{
+  FpDevice *dev = FP_DEVICE (self);
+  if (fpi_device_get_current_action (dev) == FPI_DEVICE_ACTION_NONE)
+    return NULL;
+  return fpi_device_get_cancellable (dev);
+}
+
 static const FpIdEntry goodix51a0_id_table[] = {
   { .udev_types = FPI_DEVICE_UDEV_SUBTYPE_SPIDEV, .spi_acpi_id = "GXFP51A0" },
   { .udev_types = 0 }
@@ -2032,7 +2043,7 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
 
   for (att = 1; att <= max_attempts && !self->tls_up; att++)
     {
-      GCancellable *c = fpi_device_get_cancellable (FP_DEVICE (self));
+      GCancellable *c = gx_action_cancellable_if_active (self);
 
       if (c && g_cancellable_is_cancelled (c))
         {
@@ -2231,7 +2242,7 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
       gint64 now_us;
       int mean;
 
-      GCancellable *c = fpi_device_get_cancellable (FP_DEVICE (self));
+      GCancellable *c = gx_action_cancellable_if_active (self);
       if (c && g_cancellable_is_cancelled (c))
         return FALSE;
 
@@ -2660,7 +2671,7 @@ gx_prepare_capture_context (FpiDeviceGoodix51A0 *self,
 
   for (attempt = 1; attempt <= GX_PREPARE_ATTEMPTS; attempt++)
     {
-      GCancellable *c = fpi_device_get_cancellable (FP_DEVICE (self));
+      GCancellable *c = gx_action_cancellable_if_active (self);
 
       if (c && g_cancellable_is_cancelled (c))
         goto out;
@@ -3403,7 +3414,7 @@ gx_task_free (GxTask *t)
 static gboolean
 gx_cancelled (FpDevice *dev, FpiSsm *ssm)
 {
-  GCancellable *c = fpi_device_get_cancellable (dev);
+  GCancellable *c = gx_action_cancellable_if_active (FPI_DEVICE_GOODIX51A0 (dev));
 
   if (!c || !g_cancellable_is_cancelled (c))
     return FALSE;
@@ -5021,7 +5032,7 @@ gx_resume_preflight_done (GObject *source,
   if (ready && gx_warm_available (self))
     {
       self->force_cold_reset = FALSE;
-      fp_info ("GXFP51A0 NATIVE_S3_RESUME_PREWARM_READY "
+      fp_warn ("GXFP51A0 NATIVE_S3_RESUME_PREWARM_READY "
                "clean TLS/ImageBase ready before next fingerprint Claim");
     }
   else
@@ -5047,7 +5058,7 @@ gx_dev_resume (FpDevice *dev)
                   self->spi_fd < 0 && self->irq_fd < 0;
 
   self->force_cold_reset = TRUE;
-  fp_info ("GXFP51A0 NATIVE_S3_RESUME_BEGIN idle=%d; native prewarm candidate",
+  fp_warn ("GXFP51A0 NATIVE_S3_RESUME_BEGIN idle=%d; native prewarm candidate",
            idle ? 1 : 0);
 
   if (idle)
