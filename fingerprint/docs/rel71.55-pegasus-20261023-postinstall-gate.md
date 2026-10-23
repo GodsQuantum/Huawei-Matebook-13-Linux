@@ -38,8 +38,45 @@ A "first touch" assertion requires a human report; logs alone do not prove it.
 - Attribution: the human report supports **first-placement success**;
   fprintd and PLM logs independently confirm the successful fingerprint
   and session. This is a warm **reboot**, not a cold power-off boot.
-- Certification tally: reboot 1/3; cold boot 0/3; LOCK 0/5 under this
-  candidate; supervised deep S3 0/3. Overall hardware verdict **PENDING**.
+- Reboot 1/3; cold boot 0/3; supervised deep S3 0/3. LOCK outcomes
+  are separately recorded below. Hardware verdict **PENDING**.
+
+## LOCK first-touch validation and performance (2026-10-23)
+
+- LOCK #1: **PASS**, human-reported unlock on first physical touch,
+  approximately 13:17 Europe/Paris; rel71.55, post-reboot kernel 7.3.0-3.
+  fprintd journal: retained context FAST_READY ~83 ms. Full latency must
+  not be inferred from that single fast-ready measurement.
+- LOCK #2: **FAIL first-touch** (unlock SUCCESS on second touch), owner
+  reports this explicitly. Journal confirms at 13:42:50.845+02:00:
+  FAST_READY 84 ms with touch already sensed (0x0f) before auth READY.
+  Background reference aged 1,852,274 ms (30m52s), versus the 20-second
+  freshness limit. Refresh was safely deferred due to finger on sensor,
+  not replaced with finger-contaminated background.
+  - First placement DETECTED 13:42:51.156, usable scored image
+    13:42:52.192 **6 < threshold 7**, completed at 13:42:52.952.
+    Finger RELEASED 13:42:54.779.
+  - Retry rebase requested 13:42:54.780; background capture discarded
+    13:42:55.987 because the next finger landed during calibration.
+  - Second placement DETECTED 13:42:56.188, match scored at
+    13:42:57.170 **10 >= threshold 7**; terminal auth success
+    13:42:58.014.
+  - KDE kscreenlocker logged "Worker did not terminate in time, killing
+    it" at 13:42:58.023 AFTER terminal biometric success. Audit this
+    worker exit timing; do not claim it caused the initial rejection.
+  - KDE greeter started 13:42:49.150; fingerprint FAST_READY occurred
+    ~1.695 seconds later. The first pose was already present at open.
+- **Reliability tally: LOCK attempts 2, first-touch PASS 1 / FAIL 1.
+  Consecutive first-touch streak 0/5; reboot PASS 1/3, cold boot 0/3,
+  true deep S3 0/3. Certification NOT complete.**
+- Performance constraints: source explicitly permits multiple frames only
+  for frames failing *pre-match quality checks*, and forbids doing a
+  score-conditioned best-of-N after a usable subthreshold image. Keep
+  this anti-false-accept boundary and matcher threshold 7 intact.
+  Candidate engineering work: instrument screen-lock-to-PAM-ready time,
+  look at an earlier native KDE fingerprint service activation and a
+  genuinely finger-off calibration window; compare 1st-touch reliability,
+  not just latency. No risky live change should be made without QA.
 
 Measure only cycles starting after the installed package timestamp:
     python3 fingerprint/scripts/gxfp51a0-hardware-evidence.py --since 2026-10-23T11:44:05+02:00 --json
@@ -48,7 +85,8 @@ Rollback verification (read-only) on Pegasus:
     sudo /usr/local/sbin/gxfp51a0-qa-rollback --check
 The fallback archives are root-owned at /var/lib/gxfp51a0-qa-rollback/
 and independently SHA256-verified. Actual rollback has NOT been executed
-on the live session. No reboot/suspend or login-manager restart in QA.
+on the live session. No reboot/suspend or login-manager restart was initiated remotely in QA;
+the reboot above was performed by the owner.
 
 Release requirements: five consecutive 1st-touch LOCK successes,
 three owner-supervised real deep-S3 runs (including in-progress verify),
