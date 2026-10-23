@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - qa/gxfp51a0-rel71.55-s3-long-sleep-20261023
+      - qa/gxfp51a0-rel71.55-hardware-evidence-20261023
     paths:
       - 'fingerprint/**'
       - '.github/workflows/gxfp51a0-all-states-qa.yml'
@@ -31,6 +32,8 @@ jobs:
         run: make -C fingerprint verify
       - name: S3 post-worker cancellation gates
         run: python3 fingerprint/research/tests/test_s3_async_cancel_completion.py
+      - name: Real-S3 evidence classification regression (no hardware)
+        run: python3 fingerprint/research/tests/test_hardware_evidence_parser.py
       - name: No biometric source material
         shell: bash
         run: |
