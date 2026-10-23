@@ -68,7 +68,8 @@ A "first touch" assertion requires a human report; logs alone do not prove it.
     ~1.695 seconds later. The first pose was already present at open.
 - **Reliability tally: LOCK attempts 2, first-touch PASS 1 / FAIL 1.
   Consecutive first-touch streak 0/5; reboot PASS 1/3, cold boot 0/3,
-  true deep S3 0/3. Certification NOT complete.**
+  true deep S3 **1/3** after the real Oct 23 cycle below.
+  Certification NOT complete.**
 - Performance constraints: source explicitly permits multiple frames only
   for frames failing *pre-match quality checks*, and forbids doing a
   score-conditioned best-of-N after a usable subthreshold image. Keep
@@ -77,6 +78,31 @@ A "first touch" assertion requires a human report; logs alone do not prove it.
   look at an earlier native KDE fingerprint service activation and a
   genuinely finger-off calibration window; compare 1st-touch reliability,
   not just latency. No risky live change should be made without QA.
+
+## Deep S3 #1 — natural suspend, verified (PASS first physical pose)
+
+- 2026-10-23 14:05:02.096+02:00: Pegasus entered genuine kernel
+  `PM: suspend entry (deep)`, not s2idle. Wake/exit 14:11:54.797;
+  ~6m53s spent asleep, same rel71.55 install and kernel 7.3.0-3.
+- Owner explicitly reports first physical finger placement succeeded after
+  the natural sleep; journal independently shows 1/3 DETECTED_HOLD and
+  biometric success with score 14 against unchanged threshold 7.
+- Idle pre-suspend packet ACK=true and cached clean RAM-only ImageBase
+  saved 14:04:57.141. Native post-S3 prewarm started 14:11:54.823,
+  used detached GPIO264 short reset 14:11:55.824, reached READY
+  14:11:59.077 (4.254s prewarm). Cached full-six-zone finger reference
+  accepted only after live FDT verification, then real fingerprint
+  matching still required.
+- Physical contact detected 14:11:59.675, score 14 at 14:12:00.736,
+  terminal auth 14:12:01.748. This does NOT mean subsecond login.
+- Independent read-only post-install evidence parser:
+  records_examined=1, sleep_packet_ack=true, clean_reference_saved=true,
+  native_resume_called=true, prewarm_fallback=false,
+  idle_cancellable_assertions=0, matched_score=14.
+- Counts as real deep-S3 hardware test 1/3 and first-touch user evidence.
+  Need two more, including active Verify suspend. Performance still OPEN.
+- Follow-up experimental rel71.56 fast prewarm is a DIFFERENT, opt-in
+  branch/PR #17; remains uninstalled and hardware-UNVERIFIED on Pegasus.
 
 Measure only cycles starting after the installed package timestamp:
     python3 fingerprint/scripts/gxfp51a0-hardware-evidence.py --since 2026-10-23T11:44:05+02:00 --json
