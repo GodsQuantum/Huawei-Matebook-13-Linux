@@ -1407,6 +1407,10 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   g_autofree guint8 *plain = g_malloc0 (GOODIX_RX_MAX);
   gboolean ok = FALSE;
   gsize i;
+  /* Read-only QA telemetry. No additional GPIO/SPI/TLS operations. */
+  gboolean profile =
+    g_strcmp0 (g_getenv ("GXFP_TIMING_DIAGNOSTICS"), "1") == 0;
+  gint64 started_us = profile ? g_get_monotonic_time () : 0;
 
   if (!gxfp_build_capture_cleanup_recipe (&recipe))
     goto out;
@@ -1414,6 +1418,9 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   for (i = 0; i < recipe.count; i++)
     {
       const struct gxfp_target_packet *packet = &recipe.steps[i];
+      gint64 step_start_us = profile ? g_get_monotonic_time () : 0;
+      gint64 tls_end_us = 0;
+      guint gap_us = gx_capture_gap_us (self);
 
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         goto out;
@@ -1440,11 +1447,25 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
             }
         }
 
-      g_usleep (gx_capture_gap_us (self));
+      if (profile)
+        tls_end_us = g_get_monotonic_time ();
+      g_usleep (gap_us);
+      if (profile)
+        fp_warn ("GXFP51A0 LATENCY_TRACE cleanup step=%u/%u cmd=0x%02x "
+                 "transport_tls_ms=%d gap_ms=%u elapsed_ms=%d",
+                 (guint) (i + 1), (guint) recipe.count,
+                 packet->inner[0],
+                 (int) ((tls_end_us - step_start_us) / 1000),
+                 gap_us / 1000,
+                 (int) ((g_get_monotonic_time () - step_start_us) / 1000));
     }
 
   ok = TRUE;
 out:
+  if (profile)
+    fp_warn ("GXFP51A0 LATENCY_TRACE cleanup end ok=%d total_ms=%d",
+             ok ? 1 : 0,
+             (int) ((g_get_monotonic_time () - started_us) / 1000));
   OPENSSL_cleanse (rec, GOODIX_RX_MAX);
   OPENSSL_cleanse (plain, GOODIX_RX_MAX);
   return ok;
