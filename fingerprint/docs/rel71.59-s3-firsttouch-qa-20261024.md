@@ -81,3 +81,47 @@ and supervised hardware LOCK / deep S3 / cold boot tests.
   discovery. If startup readiness fails, revert driver and override
   without reboot. Then request a single human physical LOCK test,
   followed by real S3 tests on this installed version only.
+
+## 2026-10-24 22:55 CEST — package installed after Pacman unlocked
+
+User confirmed arch-update finished. Remote precheck at 22:54:35+02
+verified /var/lib/pacman/db.lck absent and no foreground pacman process,
+installed rel71.58 with active QA override, known-good rel71.55 checksum,
+new package checksum and no kscreenlocker_greet in process list.
+
+Using native pacman -U, rel71.58 upgraded to rel71.59 at 22:55 CEST.
+Package SHA256 d3ab9879c3b3203394ff9ff296092e926524346824e5f84c1af1d42a10f78397
+verified on CT700, Cloud9 transfer, and Pegasus before installation.
+Replaced ONLY the fprintd systemd override; current
+Environment=GXFP_S3_FIRSTTOUCH_QA=1, old
+GXFP_S3_STALE_REBASE_QA=1 override removed.
+Pacman -Qkk: 32 package files, 0 altered. Snapper automatic
+pre/post transaction snapshots 1856 and 1857.
+No reboot, suspend or session logout.
+
+Post-install read-only checks:
+- installed 1.94.100.goodix51a0-71.59, fprintd active PID 93272,
+  ExecMainStartTimestamp 22:55:17 CEST.
+- Actual fprintd process environ contains GXFP_S3_FIRSTTOUCH_QA=1.
+- initial device startup native reset GPIO264 at 22:55:18.693;
+  after MCU/session protocol retries and timing auto-calibration
+  100 -> 150 -> 200 -> 250 -> 300 percent during init,
+  systemd reported Started fprintd at 22:55:25.239:
+  ~7.70 seconds daemon-start to ready. This is init timing only,
+  not authentication performance. Intra-init ACK/FDT retries
+  indicate an unresolved performance variability risk.
+- fprintd-list returned exactly one GXFP51A0 SPI ST411 device
+  and existing right-index-finger template. This checks enrollment
+  persistence but does NOT prove actual biometric matching.
+- The pinned known-good rel71.55 file remains untouched at
+  /var/lib/gxfp51a0-qa-rollback/rel71.55.pkg.tar.zst,
+  SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+  In addition, historical rel71.49 + stock PLM 6.8.1
+  rollback helper --check reports ROLLBACK_READY.
+
+Release gate remains OPEN: no human hardware LOCK, S3 first pose, cold
+boot, reboot, or wrong finger tested yet with rel71.59. Do not claim
+any first-touch or S3 pass merely from successful fprintd-list.
+Next first safe human test: a normal Super+L then first-touch unlock;
+after user response, read exact logs and update HARDWARE_TRIALS.csv,
+regenerate HALL_OF_FAME.md, commit and push.

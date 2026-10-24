@@ -1,3 +1,23 @@
+## 2026-10-24 22:55+02 — rel71.59 now INSTALLED ON PEGASUS
+
+This supersedes ONLY the older 'staged not installed' state below.
+Once arch-update released pacman's lock, installed rel71.59 using
+checksum-pinned native pacman -U. Snapper 1856/1857. 32 files,
+0 altered. fprintd PID 93272 active since 22:55:17, initial
+native setup finished 22:55:25 (~7.7s), confirmed single
+GXFP51A0 SPI sensor and original right-index-finger enrollment.
+Live fprintd process environ GXFP_S3_FIRSTTOUCH_QA=1.
+One-time startup SPI ACK retries raised timing 100->300%, so
+init/performance stability must be measured in future LOCK/S3.
+No host reboot, desktop restart, sleep, kernel/PAM/PMK changes.
+Preserved pinned rel71.55 rollback SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+Do not treat fprintd-list success as a hardware first-touch pass.
+FIRST physical LOCK under 71.59 is PENDING human finger placement.
+When result comes, fetch Pegasus fprintd journal, record timestamps,
+score and latency, update docs/HARDWARE_TRIALS.csv and
+docs/HALL_OF_FAME.md, run tests, commit and push.
+More details in docs/rel71.59-s3-firsttouch-qa-20261024.md.
+
 ## 2026-10-24 rel71.59 — staged, NOT installed on Pegasus
 
 Latest draft GitHub PR #21, branch
