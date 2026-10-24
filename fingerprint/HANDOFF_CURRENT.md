@@ -1,3 +1,21 @@
+## 2026-10-25 rel71.55 optimisation research — no code change
+
+Pegasus runs pinned rel71.55 and must NOT be switched to the rejected
+71.58/71.59/71.60 QA builds. The research branch based on the rel71.55
+certification source is
+research/gxfp51a0-rel71.55-firsttouch-20261025.
+Read docs/RESEARCH_REL7155_FIRSTTOUCH_20261025.md and the latest
+historical Hall of Fame (commit 66d26ff on the failed 71.60 QA branch).
+NEW Oct22 SAME SENSOR real-SIGFM benchmarks suggest offline testing
+20 vs 25 distinct enrolment views, while retaining fixed threshold 7
+and validating many unrelated impostor fingers.
+Do not adopt RootSIFT, score fusion, multiple scored draws per pose,
+or lower threshold based on sibling-model claims.
+Instrument capture vs mandatory TLS cleanup as separate bottlenecks;
+no user biometric images/templates ever in the public repo.
+No driver code or Pegasus configuration was altered by this research.
+Continue only with controlled QA and user-supervised hardware trials.
+
 # Public status — GXFP51A0 / ST411 fingerprint driver
 
 **Default:** [rel71.30 recommended preview](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30).
