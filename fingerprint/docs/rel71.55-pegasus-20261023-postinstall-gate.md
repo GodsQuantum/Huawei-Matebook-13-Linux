@@ -223,3 +223,41 @@ Pegasus journal; no experimental S3 flag.
   certified; rel71.56 experimental mode stays rejected.
 - No changes made to running Pegasus, GPIO, kernel, security,
   matcher threshold 7 or system services by this documentation.
+## 2026-10-24 deep S3 #3 — FAIL first pose, confirmed stale-ImageBase retry loop
+
+- Natural actual S3: kernel `PM: suspend entry (deep)`
+  18:41:23.965+02; `PM: suspend exit` 19:06:06.964+02.
+  Pegasus rel71.55, fprintd active, no QA_FAST env.
+- Native S3 resume began 19:06:06.981; clean TLS/reference ready
+  19:06:10.780, ~3.798s. Already touching the sensor
+  (EARLY_FINGER_VERIFIED_REFERENCE touch=0x3f mean205);
+  retained background age 2,474,109 ms (~41 min).
+  First Claim FAST_READY 83ms, but background refresh was
+  deferred because finger was present.
+- Three fully usable finger images were independently scored
+  **2/7, 2/7, 2/7**:
+  1st DETECTED 19:06:12.251 -> scored 19:06:13.252;
+  2nd DETECTED 19:06:15.709 -> scored 19:06:16.731;
+  3rd DETECTED 19:06:20.109 -> scored 19:06:21.147.
+- Between 1st and 2nd, 2nd and 3rd, driver did request a
+  clean background but user finger returned mid-capture, so
+  warm refresh was discarded at 19:06:15.509 and 19:06:19.906,
+  respectively, and the driver rearmed on the same stale
+  reference for another weak authentication. **THIS is the
+  concrete retry-loop bug to fix**. Do NOT lower matcher 7
+  or accept any scored-2 finger.
+- After fixed 3-score transaction ended, next Verify obtained
+  a successfully finger-OFF fresh ImageBase in 1,227 ms
+  at 19:06:24.591. Next finger image scored **16/7** at
+  19:06:28.432; positive terminal 19:06:29.341.
+  Total kernel resume -> auth ~22.38 seconds.
+- Owner reported approximately 3-4 placements (first-touch FAIL),
+  moderate speed. Previous two deep S3 had first-touch PASS.
+  rel71.55 real deep S3 first-touch reliability **2/3**, so
+  hardware S3 certification FAIL/PENDING, NOT 3/3.
+- Priority fix in QA only: a stale ImageBase may be tried on
+  earliest finger after S3, but after low-score failure do not
+  waste remaining fixed biometric attempts on it if a clean
+  background could not be captured. Require verified no-finger
+  rebase before another authentication, while preserving
+  cancellation, bounded waits and password fallback.
