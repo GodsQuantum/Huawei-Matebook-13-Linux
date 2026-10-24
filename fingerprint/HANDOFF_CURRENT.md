@@ -1,3 +1,27 @@
+## CURRENT 2026-10-25 01:46 — Pegasus rel71.61 QA INSTALLED
+
+This replaces the older note saying rel71.55 is currently installed.
+On Pegasus now: libfprint-goodix51a0 1.94.100.goodix51a0-71.61,
+fprintd PID 130421 active, GXFP_VERIFY_SCORE_CACHE_QA=1 in ACTUAL
+service process Environment. Device GXFP51A0 ST411 enumerated with
+right-index-finger enrolled, 32/32 package files intact.
+Native package installation Snapper 1864/1865; no host reboot, no
+forced S3, no global PAM or kernel/PMK/GPIO112 change.
+12/12 CI software green for source commit d3541e1; isolated Arch
+package SHA256 4ffbb16eee7a440374a7f72fdec4b8ef534d1963be570bb97385f1704e2ed389.
+Rollback pinned rel71.55 SHA256
+f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+
+CANDIDATE STILL QA ONLY. Measured synthetic 20-view SIGFM comparator
+saving ~192ms CPU cannot certify actual KDE unlock. Human physical
+LOCK rel71.61 one-placement latency/score is NOT measured yet.
+Need user physical test; then capture fprintd logs and append
+an exact rel71.61 trial to docs/HARDWARE_TRIALS.csv, regenerate
+docs/HALL_OF_FAME.md, commit/push. If failure, restore rel71.55
+before any more experimentation. Keep PR #23 DRAFT.
+Doc: docs/rel71.61-score-cache-qa-20261025.md.
+No automated reboot or forced S3.
+
 ## CURRENT 2026-10-25 — rel71.61 opt-in score-cache QA development
 
 Live Pegasus is still production fallback rel71.55, not rel71.61.
