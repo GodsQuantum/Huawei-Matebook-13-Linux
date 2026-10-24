@@ -68,3 +68,7 @@ Independent KDE lockscreen measurement: the existing KScreenLocker 6.8
 greeter takes ~1.7-1.8 s to request the fingerprint reader; reducing this
 requires a separate review of upstream PAM worker readiness and should
 not use a blanket QML autostart across suspend (battery regression risk).
+
+## 2026-10-24 cold-boot hardware test
+
+Pegasus kernel 7.3.0-4, libfprint rel71.56. Cold boot reported by owner, first pose rejected (score 4/7 at 12:41:44), second pose accepted (score 7/7 via strict Pixel Rescue at 12:41:49). Login accepted at 12:41:50. Cold boot 0/1 first-touch successes. This was not an S3 test, so S3 acceleration remains unverified. Keep score threshold 7, do not claim hardware certification.
