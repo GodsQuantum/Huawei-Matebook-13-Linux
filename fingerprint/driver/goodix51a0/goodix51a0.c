@@ -5168,14 +5168,27 @@ gx_resume_preflight_thread (GTask *task,
   g_autoptr(GError) err = NULL;
   gboolean ok = FALSE;
 
+  /* Default remains the proven 1 s + 1 s S3 boundary.  A deliberate
+   * QA-only fprintd Environment=GXFP_S3_FAST_PREFLIGHT=1 uses 200 ms
+   * settle windows.  This is NOT an automatic production setting.
+   * The hardware is always reset with SPI and IRQ fully detached. */
+  gboolean fast_prewarm =
+    g_strcmp0 (g_getenv ("GXFP_S3_FAST_PREFLIGHT"), "1") == 0;
+  gint64 begin_us = g_get_monotonic_time ();
+
   gx_warm_abandon (self);
   gx_transport_close (self);
 
+  fp_warn ("GXFP51A0 NATIVE_S3_PREFLIGHT_TIMING mode=%s "
+           "before_reset_ms=%d after_reset_ms=%d",
+           fast_prewarm ? "QA_FAST" : "SAFE_DEFAULT",
+           fast_prewarm ? 200 : 1000, fast_prewarm ? 200 : 1000);
+
   /* The sensor has just resumed from deep sleep. The old host-side TLS
    * context is never reused, and no GPIO pulse may run with live SPI/IRQ. */
-  g_usleep (G_USEC_PER_SEC);
+  g_usleep (fast_prewarm ? 200 * 1000 : G_USEC_PER_SEC);
   gx_reset_detached_s3_boundary (self);
-  g_usleep (G_USEC_PER_SEC);
+  g_usleep (fast_prewarm ? 200 * 1000 : G_USEC_PER_SEC);
 
   if (gx_transport_open (dev, &err))
     {
@@ -5188,12 +5201,42 @@ gx_resume_preflight_thread (GTask *task,
                err ? err->message : "unknown");
     }
 
+  if (fast_prewarm && !ok)
+    {
+      /* A fast attempt is allowed to fail CLOSED.  One independent,
+       * transport-detached conservative retry repeats the proven long
+       * reset and full delays; never reuse partial TLS or image state.
+       * Failed prewarm ultimately falls back to ordinary Claim recovery. */
+      g_autoptr(GError) safe_err = NULL;
+      fp_warn ("GXFP51A0 NATIVE_S3_FAST_PREFLIGHT_FALLBACK "
+               "retrying full conservative detached reset");
+      gx_warm_abandon (self);
+      gx_transport_close (self);
+      g_usleep (G_USEC_PER_SEC);
+      gx_gpio_reset (self);
+      g_usleep (G_USEC_PER_SEC);
+      if (gx_transport_open (dev, &safe_err))
+        {
+          ok = gx_cold_prepare (self);
+          gx_transport_close (self);
+        }
+      else
+        fp_warn ("GXFP51A0 NATIVE_S3_FAST_PREFLIGHT_FALLBACK "
+                 "transport unavailable: %s",
+                 safe_err ? safe_err->message : "unknown");
+    }
+
   if (!ok)
     {
       gx_warm_abandon (self);
       gx_transport_close (self);
     }
 
+  fp_warn ("GXFP51A0 NATIVE_S3_PREFLIGHT_DURATION mode=%s "
+           "ready=%d elapsed_ms=%d",
+           fast_prewarm ? "QA_FAST" : "SAFE_DEFAULT",
+           ok ? 1 : 0,
+           (int) ((g_get_monotonic_time () - begin_us) / 1000));
   g_task_return_boolean (task, ok);
 }
 
