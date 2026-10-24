@@ -1,0 +1,16 @@
+trial_id,datetime_local,version,kind,first_touch,poses,prewarm_ms,fast_ready_ms,press_to_terminal_ms,greeter_to_terminal_ms,wake_to_terminal_ms,score,threshold,evidence
+reboot-20261023-1,2026-10-23T13:12:03+02:00,rel71.55,REBOOT,pass,1,,,,,,10,7,rel71.55-pegasus-20261023-postinstall-gate.md
+lock-20261023-1,2026-10-23T13:17:00+02:00,rel71.55,LOCK,pass,1,,83,,,,15,7,rel71.55-pegasus-20261023-postinstall-gate.md
+lock-20261023-2,2026-10-23T13:42:51.156+02:00,rel71.55,LOCK,fail,2,,84,,,,10,7,rel71.55-pegasus-20261023-postinstall-gate.md
+s3-20261023-1,2026-10-23T14:11:54.797+02:00,rel71.55,S3,pass,1,4254,84,2073,,6951,14,7,rel71.55-pegasus-20261023-postinstall-gate.md
+cold-20261024-1,2026-10-24T12:41:23+02:00,rel71.56,COLD,fail,2,,82,,,,7,7,rel71.56-rejected-evidence-summary.md
+s3-20261024-fast,2026-10-24T15:11:13.860+02:00,rel71.56,S3,fail,multiple,27725,82,1950,,33595,10,7,rel71.56-rejected-evidence-summary.md
+lock-20261024-1,2026-10-24T15:21:10.733+02:00,rel71.55,LOCK,pass,1,,72,1711,3488,,15,7,rel71.55-pegasus-20261023-postinstall-gate.md
+lock-20261024-2,2026-10-24T15:25:02.751+02:00,rel71.55,LOCK,pass,1,,72,1754,4555,,7,7,rel71.55-pegasus-20261023-postinstall-gate.md
+lock-20261024-3,2026-10-24T15:36:11.402+02:00,rel71.55,LOCK,pass,1,,83,1739,4391,,9,7,rel71.55-pegasus-20261023-postinstall-gate.md
+s3-20261024-2,2026-10-24T18:24:49.821+02:00,rel71.55,S3,pass,1,6127,83,1955,,10450,7,7,rel71.55-pegasus-20261023-postinstall-gate.md
+s3-20261024-3,2026-10-24T19:06:06.964+02:00,rel71.55,S3,fail,3-4,3798,83,17090,,22377,16,7,rel71.55-pegasus-20261023-postinstall-gate.md
+lock-20261024-7158,2026-10-24T19:33:31.450+02:00,rel71.58,LOCK,pass,1,,293,1902,4007,,11,7,rel71.58-s3-stale-rebase-qa-20261024.md
+s3-20261024-2015,2026-10-24T20:15:37.851+02:00,rel71.58,S3,fail,4+,7489,82,16392,,34206,21,7,rel71.58-s3-hardware-qa-20261024.md
+s3-20261024-2132,2026-10-24T21:32:18.990+02:00,rel71.58,S3,fail,2,4959,83,4621,,10145,14,7,rel71.58-s3-hardware-qa-20261024.md
+s3-20261024-2143,2026-10-24T21:43:20.848+02:00,rel71.58,S3,unknown,unknown,5096,84,1983,,9829,9,7,rel71.58-s3-hardware-qa-20261024.md

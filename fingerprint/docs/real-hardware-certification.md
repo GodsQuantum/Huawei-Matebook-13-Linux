@@ -1,5 +1,24 @@
 # GXFP51A0 — evidence for real hardware certification
 
+## Durable Hall of Fame and regression gate
+
+Original historic record: [31 pre-existing version/configuration entries](LEGACY_HALL_OF_FAME_20261013.md) and [29 additional candidate workspace folders](LEGACY_CANDIDATES_INVENTORY.md) (folders are not successful trials). The complete private original remains in the CT700 Pegasus workspace.
+
+Current canonical hardware ledger: [HALL_OF_FAME.md](HALL_OF_FAME.md)
+and its machine-readable [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv).
+The metrics are attributed to the exact installed version and kernel
+resume/login boundaries, with human first-placement reporting and
+pointers to written evidence. A fast FDT probe is not a full unlock.
+
+After each physical test: measure log timestamps, append evidence to the
+driver-version report and CSV, regenerate Hall of Fame with
+python3 fingerprint/scripts/gxfp51a0-hall-of-fame.py --write,
+run it again with --check, execute make -C fingerprint verify, and
+push all updates to GitHub. This is an **offline developer workflow**:
+nothing is scheduled, installed as a watcher on Pegasus, or runs
+without explicit interaction.
+
+
 The driver is NOT certified until the **same installed package** passes
 cold BOOT, reboot, true deep S3, repeated first-placement KDE LOCK, wrong-finger
 rejection, and password fallback on actual hardware under human supervision.
