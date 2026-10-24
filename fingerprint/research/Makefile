@@ -489,3 +489,9 @@ test_hardware_evidence_parser:
 test: test_s3_stale_rebase_source_safety
 test_s3_stale_rebase_source_safety:
 	python3 ./tests/test_s3_stale_rebase_source_safety.py
+
+.PHONY: test_hall_of_fame
+test: test_hall_of_fame
+test_hall_of_fame:
+	python3 ./tests/test_hall_of_fame.py
+	python3 ../scripts/gxfp51a0-hall-of-fame.py --check
