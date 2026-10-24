@@ -1,7 +1,7 @@
 CC ?= cc
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -pedantic -O2
 
-BUILD_DIR ?= ../../../temp/research-build
+BUILD_DIR ?= ../../temp/research-build
 
 TEST_ATTEMPT := $(BUILD_DIR)/test_milan_attempt
 TEST_PACKET := $(BUILD_DIR)/test_milan_packet
@@ -413,6 +413,22 @@ test_gq_sigfm_fpeval_source_safety:
 	./tests/test_gq_sigfm_fpeval_source_safety.sh
 
 .PHONY: test_fast_ready_source_safety
+test: test_resume_first_prewarm_source_safety test_s3_async_cancel_completion
+
+test_s3_async_cancel_completion:
+	python3 ./tests/test_s3_async_cancel_completion.py
+
+test: test_first_match_terminal_source_safety
+
+test_first_match_terminal_source_safety:
+	python3 ./tests/test_first_match_terminal_source_safety.py
+
+test: test_calibration_stable_fdt_source_safety
+
+.PHONY: test_calibration_stable_fdt_source_safety
+test_calibration_stable_fdt_source_safety:
+	./tests/test_calibration_stable_fdt_source_safety.sh
+
 test: test_fast_ready_source_safety
 
 test_fast_ready_source_safety:
@@ -432,3 +448,39 @@ test_warm_close_idempotent_source_safety:
 
 .PHONY: test_prestart_spidev_recovery_source_safety
 test: test_prestart_spidev_recovery_source_safety
+
+.PHONY: test_s3_tls_detached_retry_source_safety
+test: test_s3_tls_detached_retry_source_safety
+test_s3_tls_detached_retry_source_safety:
+	./tests/test_s3_tls_detached_retry_source_safety.sh
+
+
+# rel71.49: source-level check for detached reset in active S3/ImageBase paths.
+.PHONY: test_s3_detached_transport_source_safety
+test: test_s3_detached_transport_source_safety
+test_s3_detached_transport_source_safety:
+	python3 ./tests/test_s3_detached_transport_source_safety.py
+
+.PHONY: test_resume_first_prewarm_source_safety
+test_resume_first_prewarm_source_safety:
+	python3 ./tests/test_resume_first_prewarm_source_safety.py
+
+.PHONY: test_idle_cancellable_s3_source_safety
+test: test_idle_cancellable_s3_source_safety
+test_idle_cancellable_s3_source_safety:
+	python3 ./tests/test_idle_cancellable_s3_source_safety.py
+
+.PHONY: test_s3_cached_clean_reference_safety
+test: test_s3_cached_clean_reference_safety
+test_s3_cached_clean_reference_safety:
+	python3 ./tests/test_s3_cached_clean_reference_safety.py
+
+.PHONY: test_s3_long_sleep_cached_reference_safety
+test: test_s3_long_sleep_cached_reference_safety
+test_s3_long_sleep_cached_reference_safety:
+	python3 ./tests/test_s3_long_sleep_cached_reference_safety.py
+
+.PHONY: test_hardware_evidence_parser
+test: test_hardware_evidence_parser
+test_hardware_evidence_parser:
+	python3 ./tests/test_hardware_evidence_parser.py

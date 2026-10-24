@@ -1,6 +1,6 @@
-[Reading 208 lines from start (total: 208 lines, 0 remaining)]
-
 # Goodix GXFP51A0 / GF3658 ST411 sous Linux
+
+> **Branche QA uniquement (rel71.55, 23 octobre 2026) :** les corrections natives S3 et la connexion biométrique parallèle de Plasma Login Manager 6.8.1 ont réussi leurs tests logiciels. **La veille S3, le redémarrage et le démarrage à froid ne sont PAS encore certifiés sur le matériel.** Pegasus teste actuellement rel71.55 sans certification matérielle ; le retour arrière vers rel71.49 et KDE 6.8.1 d'origine est conservé. [Critères de certification](docs/real-hardware-certification.md).
 
 Pilote libfprint natif expérimental pour le Goodix SPI GXFP51A0 présent dans la
 famille Huawei MateBook 13 2021.

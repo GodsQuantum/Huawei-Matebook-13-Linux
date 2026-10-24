@@ -9,7 +9,7 @@ p8="$i/0008-continuous-fingerprint-availability.patch"
 p9="$i/0009-fix-retry-timer-qml-ownership.patch"
 pkg="$i/PKGBUILD"
 
-grep -Fq 'pkgrel=3.9' "$pkg"
+grep -Fq 'pkgrel=3.10' "$pkg"
 grep -Fq '0005-split-fingerprint-password-auth.patch' "$pkg"
 grep -Fq '0006-fingerprint-password-preemption.patch' "$pkg"
 grep -Fq '0007-parallel-password-fingerprint-auth.patch' "$pkg"

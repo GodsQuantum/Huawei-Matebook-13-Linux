@@ -1,6 +1,6 @@
-[Reading 167 lines from start (total: 167 lines, 0 remaining)]
-
 # Goodix GXFP51A0 / GF3658 ST411 Linux 驱动
+
+> **仅供 QA 测试的分支（rel71.55，2026 年 10 月 23 日）：** 原生 S3 取消修复和 Plasma Login Manager 6.8.1 并行指纹/PAM 实现已通过软件构建测试，**但 S3、重新启动和冷启动尚未通过真机认证。** Pegasus 已安装 rel71.55 QA 测试版，尚未通过硬件认证；保留 rel71.49 与原版 KDE 6.8.1 回滚方案。参见 [硬件认证条件](docs/real-hardware-certification.md)。
 
 面向 Huawei MateBook 13 2021 系列中 SPI Goodix GXFP51A0 的实验性原生 libfprint 驱动。
 
