@@ -15,7 +15,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Version | Situation | 1ère pose | Certification de ce scénario |
 |---|---|---:|---|
-| rel71.55 | LOCK | 4/5 | ÉCHEC de première pose |
+| rel71.55 | LOCK | 5/6 | ÉCHEC de première pose |
 | rel71.55 | S3 | 2/3 | ÉCHEC de première pose |
 | rel71.55 | REBOOT | 1/1 | Nombre insuffisant |
 | rel71.56 | S3 | 0/1 | ÉCHEC de première pose |
@@ -46,6 +46,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261024-2143 | 2026-10-24T21:43:20.848+02:00 | rel71.58 | S3 | unknown | unknown | 5.096 | 0.084 | 1.983 | — | 9.829 | 9/7 |
 | s3-20261024-7159 | 2026-10-24T23:17:09.795+02:00 | rel71.59 | S3 | multiple | fail | 4.077 | 0.084 | — | — | — | 0/7 |
 | lock-20261024-7159 | 2026-10-24T23:18:49.328+02:00 | rel71.59 | LOCK | 1 | pass | — | 0.083 | 1.917 | 4.742 | — | 14/7 |
+| lock-20261024-7155-rollback2 | 2026-10-24T23:28:02.582+02:00 | rel71.55 | LOCK | 1 | pass | — | 0.302 | 1.931 | 4.297 | — | 16/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
@@ -55,8 +56,8 @@ Voir [le tableau historique](LEGACY_HALL_OF_FAME_20261013.md) et [le résumé JS
 
 ## Comparaison anti-régression des LOCK
 
-- rel71.55 après rollback : médiane **1.739 s** sur 3 essais (doigt → authentification).
-- rel71.58 : **1.902 s** sur 1 essai(s). Écart **+9.4 %** ; pas de gain revendiqué et échantillon insuffisant.
+- rel71.55 après rollback : médiane **1.746 s** sur 4 essais (doigt → authentification).
+- rel71.58 : **1.902 s** sur 1 essai(s). Écart **+8.9 %** ; pas de gain revendiqué et échantillon insuffisant.
 
 ## Gates obligatoires et politique d'enregistrement
 
