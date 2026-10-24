@@ -188,3 +188,38 @@ Pegasus journal; no experimental S3 flag.
   cold-boot/S3/counterexample biometric certification.
 - No change made to Pegasus hardware, installed driver, PAM, KDE, threshold
   or recovery configuration. rel71.57 timing instrumentation still QA-only.
+## 2026-10-24 post-rollback deep S3 #2 — PASS one touch, moderate latency
+
+- User-reported natural sleep and one physical finger placement, perceived
+  moderately slow. Verified kernel `PM: suspend entry (deep)`
+  15:52:47.857+02 and `PM: suspend exit` 18:24:49.821+02
+  (~2h 32m of suspend). This was **actual S3/deep** rather than s2idle.
+- Current Pegasus kernel 7.3.0-4-cachyos, installed libfprint
+  1.94.100.goodix51a0-71.55, fprintd active,
+  Environment= (no rejected rel71.56 fast option).
+- Native S3 prewarm began 18:24:49.862. Short reset
+  18:24:50.865; GPIO264 FULL 300/600 boundary log at
+  18:24:52.064; FDT `stage=ack attempt=1/3`
+  at 18:24:55.524, then `NATIVE_S3_RESUME_PREWARM_READY`
+  18:24:55.989: **6.127 s** prewarm, versus previous Oct23
+  4.254 s on the same rel71.55. A bounded FDT ACK retry
+  was present, so avoid blaming the score threshold or asserting
+  deterministic prewarm latency.
+- First Claim FAST_READY 83ms at 18:24:56.181;
+  Verify READY at 18:24:56.230; first physical touch DETECTED
+  18:24:58.316, six FDT zones.
+- Single captured image was primary score **4**, rescued to effective
+  **7/7** by current strict Pixel Rescue, view8, inliers3,
+  overlap1773, zncc793 permille, agreement869 permille at
+  18:24:59.375. This should not be mistaken for a primary
+  matcher score 7: Pixel Rescue provided the successful verdict.
+- Mandatory cleanup finished at 18:25:00.132; terminal positive
+  18:25:00.271. Finger detection -> terminal **1.955s**;
+  kernel resume exit -> terminal **10.450s**.
+  No physical release wait on positive.
+- Real rel71.55 deep S3 user-reported one-touch success is
+  **2 of 2** across Oct23 and Oct24, with 1 of remaining
+  3 hardware certification gates. Optimized speed is NOT
+  certified; rel71.56 experimental mode stays rejected.
+- No changes made to running Pegasus, GPIO, kernel, security,
+  matcher threshold 7 or system services by this documentation.
