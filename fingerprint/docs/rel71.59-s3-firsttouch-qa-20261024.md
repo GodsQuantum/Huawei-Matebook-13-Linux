@@ -125,3 +125,54 @@ any first-touch or S3 pass merely from successful fprintd-list.
 Next first safe human test: a normal Super+L then first-touch unlock;
 after user response, read exact logs and update HARDWARE_TRIALS.csv,
 regenerate HALL_OF_FAME.md, commit and push.
+
+## 2026-10-24 23:17+02:00 — real hardware S3 FAILED; subsequent LOCK PASS
+
+This actual incident occurred AFTER Pegasus installed rel71.59 at
+22:55 CEST. Deep S3 kernel entry 23:13:01.806, exit 23:17:09.795
+(4m08s suspend). Native S3 prewarm began 23:17:09.804,
+ready 23:17:13.881, 4.077s preparation. Cached RAM-only
+fingerprint ImageBase was 1,308,879ms old (about 21m49s).
+The user already had a finger resting on sensor when resume
+captured the original live-touch data.
+
+First physical finger detected 23:17:17.095 (FDT 6/6),
+image scored **0/7** at 23:17:18.096. The new rel71.59
+forced rebase actually activated, but:
+- 23:17:24–28: bounded 4000ms finger-off wait timed out;
+- 23:17:31–38: two refreshed backgrounds discarded after retouch;
+- 23:17:41–45: second 4000ms clear wait timed out;
+- 23:17:48–51: finally refreshed clean reference, but the S3
+  verification session ended without a biometric success.
+User explicitly reported S3 **did not unlock despite several
+finger placements**. No S3 acceptance metric is to be recorded.
+The extra repeated 4s blocking waits caused a usability regression
+and cannot be considered a successful safety/performance change.
+
+Separate normal LOCK rel71.59: 1 physical finger placement,
+KDE PAM greeter init 23:18:46.504; FAST_READY 83ms,
+finger detected 23:18:49.328, verified score 14/7 at
+23:18:50.357 and positive terminal 23:18:51.246.
+Finger->terminal ~1.917s; KDE greeter init->terminal ~4.742s.
+Do NOT count this LOCK as a S3 success.
+
+## Immediate rollback 23:21 CEST
+
+Reinstalled pinned rel71.55 using native pacman -U after verifying
+SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+Removed BOTH experimental fprintd overrides,
+daemon environment is now empty; Snapper pre/post
+snapshots 1858 and 1859. pacman -Qkk: 32 files, 0 altered.
+fprintd is active and fprintd-list still shows single
+Goodix ST411 device plus enrolled right-index-finger.
+No host reboot, suspend or PAM/KDE changes made.
+Historical rel71.55 S3 first-touch rate remains only 2/3:
+rollback is safer in current QA, NOT a production-ready
+certificate. rel71.59 PR #21 must remain draft/rejected.
+
+Root cause for next candidate: the first S3 finger received a
+21-minute-old reference and scored zero; mandatory complete finger-OFF
+rebase cannot finish when the user naturally places the finger again,
+producing poor liveness. Do not reintroduce serial multi-second
+synchronous blocking rebase gates on an ordinary lock screen,
+and do not weaken the biometric threshold of 7.

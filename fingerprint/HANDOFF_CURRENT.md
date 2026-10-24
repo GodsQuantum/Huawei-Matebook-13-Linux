@@ -1,3 +1,4 @@
+## CURRENT: 2026-10-24 23:21 CEST rollback to rel71.55 following rel71.59 real S3 FAIL; 71.59 LOCK first touch PASS. Previous installed-rel71.59 note below is historical only.
 ## 2026-10-24 22:55+02 — rel71.59 now INSTALLED ON PEGASUS
 
 This supersedes ONLY the older 'staged not installed' state below.
