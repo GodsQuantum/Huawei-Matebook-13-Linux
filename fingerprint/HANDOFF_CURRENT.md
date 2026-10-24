@@ -2,7 +2,7 @@
 
 On Oct 24 the earlier mini-ledger of 12 tests was found INCOMPLETE.
 The real pre-existing archive was recovered at CT700
-/home/arezki/Projets/Workstations/Pegasus/research/hall-of-fame/FINGERPRINT_DRIVER_HALL_OF_FAME_2026-10-13.json
+CT700 private Pegasus project: research/hall-of-fame/FINGERPRINT_DRIVER_HALL_OF_FAME_2026-10-13.json
 SHA256 4545cf38f7d9a33c25d6d7226e5a4ba56bfaa75f6d3f2aef369cd96d7368ff5e,
 with 31 version/configuration snapshots, 125 private Git references
 and 14 historical rankings. DO NOT delete or overwrite the original.
