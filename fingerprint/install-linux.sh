@@ -16,7 +16,7 @@ if [[ -f "$ROOT/EXPERIMENTAL_BUILD_ONLY" ]]; then
 fi
 
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.59-qa1"
+PORTABLE_RELEASE="rel71.60-qa1"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -30,6 +30,7 @@ EARLY_WANTS_DIR="/etc/systemd/system/graphical.target.wants"
 EARLY_WANTS_LINK="$EARLY_WANTS_DIR/fprintd.service"
 KDE_HELPER_FILE="$LIBEXEC_DIR/gxfp51a0-kde-lockscreen-integrate"
 DOCTOR_FILE="$PREFIX/bin/gxfp51a0-doctor"
+DESKTOP_NATIVE_DOCTOR_FILE="$PREFIX/bin/gxfp51a0-desktop-native-doctor"
 
 INSTALL_DEPS=1
 BUILD_ONLY=0
@@ -400,7 +401,7 @@ if (( SYSTEMD_AVAILABLE )); then
 else
   printf '%s\n' "$DBUS_SERVICE_FILE" "$FPRINTD_WRAPPER_FILE" >> "$TMP_STATE/manifest"
 fi
-printf '%s\n' "$DOCTOR_FILE" >> "$TMP_STATE/manifest"
+printf '%s\n' "$DOCTOR_FILE" "$DESKTOP_NATIVE_DOCTOR_FILE" >> "$TMP_STATE/manifest"
 if (( ! NO_DESKTOP_INTEGRATION )); then
   printf '%s\n' "$KDE_HELPER_FILE" >> "$TMP_STATE/manifest"
 fi
@@ -417,6 +418,7 @@ run_root mkdir -p "$PREFIX"
 run_root cp -a "$STAGE$PREFIX/." "$PREFIX/"
 run_root install -Dm0644 "$UDEV_RULE_SRC" "$UDEV_RULE_FILE"
 run_root install -Dm0755 "$ROOT/gxfp51a0-doctor.sh" "$DOCTOR_FILE"
+run_root install -Dm0755 "$ROOT/scripts/gxfp51a0-desktop-native-doctor.py" "$DESKTOP_NATIVE_DOCTOR_FILE"
 
 if (( ! SYSTEMD_AVAILABLE )); then
   cat > "$TMP_STATE/fprintd-wrapper" <<EOF

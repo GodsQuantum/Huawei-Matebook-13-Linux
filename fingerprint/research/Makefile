@@ -500,3 +500,13 @@ test_hall_of_fame:
 test: test_s3_firsttouch_qa_source_safety
 test_s3_firsttouch_qa_source_safety:
 	python3 ./tests/test_s3_firsttouch_qa_source_safety.py
+
+.PHONY: test_s3_prepark_reference_source_safety
+test: test_s3_prepark_reference_source_safety
+test_s3_prepark_reference_source_safety:
+	python3 ./tests/test_s3_prepark_reference_source_safety.py
+
+.PHONY: test_desktop_native_doctor
+test: test_desktop_native_doctor
+test_desktop_native_doctor:
+	python3 ./tests/test_desktop_native_doctor.py
