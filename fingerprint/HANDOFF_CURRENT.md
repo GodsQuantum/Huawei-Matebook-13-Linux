@@ -1,3 +1,32 @@
+## CURRENT 2026-10-25 — rel71.61 opt-in score-cache QA development
+
+Live Pegasus is still production fallback rel71.55, not rel71.61.
+Source QA branch qa/gxfp51a0-rel71.61-score-cache-20261025
+derived directly from research/gxfp51a0-rel71.55-firsttouch-20261025,
+without any rel71.58/.59/.60 S3 modifications.
+Changed ONLY verification scoring reuse (fixed threshold 7,
+one image per pose, worker-owned exact FpPrint pointer guard and
+mandatory cleanup). Flag GXFP_VERIFY_SCORE_CACHE_QA=1, OFF by
+default. Other desktop/PAM/kernel/firmware/PMK/GPU settings remain
+untouched.
+
+Reused canonical HALL_OF_FAME.md, HARDWARE_TRIALS.csv and historical
+evidence files from prior 71.60 QA documentation commit 66d26ff;
+this is a docs-only migration, NOT an import of failed 71.60 code.
+Full 2026-10-25 real CPU synthetic benchmark at
+docs/rel71.61-score-cache-qa-20261025.md and
+research/eval/bench-verify-score-cache.py: 20 views median double
+386.2613ms, single 194.1066ms, ~192.1546ms saved purely in CPU
+matcher (NOT proven full unlock improvement).
+
+Native libfprint build and software suite must pass at final commit,
+then isolated Arch package SHA256 and 12 cross-distro GitHub CI tests.
+Only afterward install reversible QA onto Pegasus and request one
+human normal first-touch LOCK. No remote reboot, suspend, forced login,
+enrolment, PAM or personal biometric material extraction.
+Keep pinned rel71.55 package for rollback, do not merge to main until
+real first-touch/S3/boot security gate passes.
+
 ## 2026-10-25 rel71.55 optimisation research — no code change
 
 Pegasus runs pinned rel71.55 and must NOT be switched to the rejected
