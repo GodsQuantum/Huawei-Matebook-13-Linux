@@ -2234,13 +2234,14 @@ gx_fdt_clear_stable_sample (guint8 touchflag,
 /* Only called inside a genuine libfprint OPEN/VERIFY action with a valid
  * cancellable. Unlike rejected rel71.39, never invoke this from idle resume. */
 static gboolean
-gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
-                             int anchor_mean,
-                             int *out_mean,
-                             gint64 dwell_us)
+gx_wait_stable_sensor_clear_bounded (FpiDeviceGoodix51A0 *self,
+                                     int anchor_mean,
+                                     int *out_mean,
+                                     gint64 dwell_us,
+                                     guint timeout_ms)
 {
   gint64 deadline_us = g_get_monotonic_time () +
-                       (gint64) GX_CLEAR_WAIT_MS * 1000;
+                       (gint64) timeout_ms * 1000;
   gint64 clean_since_us = 0;
   int cur[GXFP_FDT_ZONE_COUNT];
   gboolean warned = FALSE;
@@ -2290,9 +2291,20 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
     }
 
   fp_warn ("GXFP51A0 calibration could not find a stable clean sensor "
-           "within %d ms (not a TLS/image failure)", GX_CLEAR_WAIT_MS);
+           "within %d ms (not a TLS/image failure)", timeout_ms);
   return FALSE;
 }
+static gboolean
+gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
+                             int anchor_mean,
+                             int *out_mean,
+                             gint64 dwell_us)
+{
+  /* Preserve the production 15 s budget for all existing callers. */
+  return gx_wait_stable_sensor_clear_bounded (self, anchor_mean, out_mean,
+                                               dwell_us, GX_CLEAR_WAIT_MS);
+}
+
 
 static gboolean
 gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean)
@@ -3391,7 +3403,68 @@ gx_session_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
                    "failed usable press before retry %d/%d",
                    t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
 
-          if (gx_warm_validate (self))
+          if (g_strcmp0 (g_getenv ("GXFP_S3_STALE_REBASE_QA"), "1") == 0)
+            {
+              /* QA fail-closed recovery for the 2026-10-24 deep-S3 trace.
+               * A scored 2/7 first press with the old (41-minute) reference
+               * was followed by two more scored 2/7 presses because the
+               * user re-touched mid-background. Wait for genuine finger-OFF
+               * dwell, require a fully clean authenticated new ImageBase,
+               * and only THEN invite another scored press. Neither timeout
+               * nor contaminated capture may rearm against stale reference.
+               *
+               * One worker owns SPI/TLS. Bounded, cancellable 4s clear waits,
+               * at most two complete rebase attempts, and no GPIO reset.
+               * Existing conservative path remains unchanged unless opt-in.
+               */
+              gboolean refreshed = FALSE;
+              gboolean transport_ok = TRUE;
+
+              for (guint pass = 0; pass < 2 && !refreshed; pass++)
+                {
+                  fp_warn ("GXFP51A0 S3_STALE_REBASE_QA waiting finger OFF "
+                           "before retry %d/%d, pass %u/2",
+                           t->tries + 1, GX_VERIFY_MAX_ATTEMPTS, pass + 1);
+
+                  if (!gx_wait_stable_sensor_clear_bounded (
+                        self, -1, NULL, GX_CALIB_RETOUCH_DWELL_US, 4000))
+                    break;
+
+                  if (!gx_warm_validate (self))
+                    {
+                      transport_ok = FALSE;
+                      break;
+                    }
+
+                  refreshed = self->bg_last_refresh_us > previous_refresh;
+                  if (!refreshed)
+                    fp_warn ("GXFP51A0 S3_STALE_REBASE_QA rejected "
+                             "contaminated ImageBase; still no new Verify");
+                }
+
+              if (refreshed)
+                {
+                  fp_warn ("GXFP51A0 S3_STALE_REBASE_QA new clean ImageBase "
+                           "verified; rearming next scored press");
+                  w->ok = gx_wakeup_mcu (self);
+                }
+              else if (!transport_ok)
+                {
+                  fp_warn ("GXFP51A0 S3_STALE_REBASE_QA transport failed; "
+                           "requesting bounded native session recovery");
+                  w->ok = gx_session_start (self);
+                }
+              else
+                {
+                  /* Stop this transaction rather than claim readiness while
+                   * an out-of-date or finger-contaminated image is retained.
+                   * fprintd/KDE password fallback remains independent. */
+                  fp_warn ("GXFP51A0 S3_STALE_REBASE_QA no clean ImageBase "
+                           "after bounded attempts: failing closed");
+                  w->ok = FALSE;
+                }
+            }
+          else if (gx_warm_validate (self))
             {
               if (self->bg_last_refresh_us > previous_refresh)
                 fp_warn ("GXFP51A0 AUTH_TRACE fresh retry background ready; "
