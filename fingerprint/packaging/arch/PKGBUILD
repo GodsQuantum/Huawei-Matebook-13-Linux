@@ -1,12 +1,12 @@
 pkgname=libfprint-goodix51a0
 pkgver=1.94.100.goodix51a0
-pkgrel=71.59
+pkgrel=71.60
 pkgdesc="libfprint 1.94.100 with experimental Goodix GXFP51A0 SPI driver"
 arch=('x86_64')
 url="https://fprint.freedesktop.org/"
 install=libfprint-goodix51a0.install
 license=('LGPL-2.1-or-later')
-depends=('bash' 'glib2' 'glibc' 'libgcc' 'libgudev' 'libgusb' 'openssl' 'pixman' 'kmod' 'systemd')
+depends=('bash' 'glib2' 'glibc' 'libgcc' 'libgudev' 'libgusb' 'openssl' 'pixman' 'kmod' 'systemd' 'python')
 makedepends=('git' 'python' 'pkgconf' 'cairo' 'glib2-devel')
 provides=('libfprint=1.94.100' 'libfprint-2.so')
 conflicts=('libfprint')
@@ -32,6 +32,10 @@ package() {
 
   install -Dm644 "$startdir/fprintd-goodix51a0.conf" \
     "$pkgdir/usr/lib/systemd/system/fprintd.service.d/50-goodix51a0-runtime.conf"
+
+  # Read-only native desktop PAM/fprintd capability doctor; never edit PAM.
+  install -Dm755 "$_fp_root/scripts/gxfp51a0-desktop-native-doctor.py" \
+    "$pkgdir/usr/bin/gxfp51a0-desktop-native-doctor"
 
   # Keep the core driver desktop-agnostic. libfprint/fprintd is the stable
   # cross-distro boundary; KDE/GNOME/display managers consume it through their

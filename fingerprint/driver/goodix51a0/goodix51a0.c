@@ -5272,6 +5272,50 @@ gx_dev_suspend (FpDevice *dev)
                 }
             }
 
+          /* rel71.60 OPT-IN: improve the reference BEFORE true deep S3,
+           * not after the user has touched the sensor during wake.
+           * The Oct24 failure entered S3 with a fully clean but already
+           * 17-minute-old RAM background; at wake finger was present and
+           * no clean rebase could be performed. When entering suspend
+           * with proved-empty sensor, refresh that old ImageBase in the
+           * existing libfprint suspend transaction. No timer/service,
+           * no capture if finger is already present; no condition changed
+           * for normal LOCK or a genuinely fresh background. A failed
+           * warm refresh is NOT permitted to certify the old snapshot.
+           * The driver still sends the normal authenticated MCU SLEEP.
+           * Note that this incurs a ~1s delay at sleep entry when stale,
+           * not at the moment the user attempts to unlock the laptop. */
+          if (warm && pre_sleep_clean &&
+              g_strcmp0 (g_getenv ("GXFP_S3_PREPARK_FRESH_QA"), "1") == 0 &&
+              !gx_background_is_fresh (self))
+            {
+              gint64 prev_refresh = self->bg_last_refresh_us;
+              gint64 refresh_begin = g_get_monotonic_time ();
+              gboolean refreshed = gx_warm_validate (self) &&
+                                   self->bg_last_refresh_us > prev_refresh;
+
+              if (refreshed)
+                {
+                  int refreshed_fdt[GXFP_FDT_ZONE_COUNT];
+                  guint8 refreshed_touch = 0xff;
+                  refreshed =
+                    gx_fdt_probe_ex (self, refreshed_fdt,
+                                     &refreshed_touch) == 0 &&
+                    (refreshed_touch & 0x3fu) == 0 &&
+                    gx_fdt_mean (refreshed_fdt) >= GOODIX_FDT_ABS &&
+                    ABS (gx_fdt_mean (refreshed_fdt) -
+                         gx_fdt_mean (self->fdt_base)) <=
+                    GX_DIAG_BASELINE_MAX_DRIFT;
+                }
+
+              pre_sleep_clean = refreshed;
+              fp_warn ("GXFP51A0 S3_PREPARK_FRESH_QA clean_new_reference=%d "
+                       "capture_ms=%d (only S3 entry; not unlock latency)",
+                       refreshed ? 1 : 0,
+                       (int) ((g_get_monotonic_time () -
+                               refresh_begin) / 1000));
+            }
+
           if (gxfp_build_sleep (&packet))
             {
               attempted = TRUE;
