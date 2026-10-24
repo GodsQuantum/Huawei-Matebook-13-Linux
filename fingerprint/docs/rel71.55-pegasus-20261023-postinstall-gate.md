@@ -261,3 +261,17 @@ Pegasus journal; no experimental S3 flag.
   background could not be captured. Require verified no-finger
   rebase before another authentication, while preserving
   cancellation, bounded waits and password fallback.
+## 2026-10-24 23:28 CEST — rel71.55 post-rollback LOCK PASS
+
+User reported first physical placement success, medium speed.
+Installed rel71.55, active fprintd, no experimental S3 flags.
+KDE PAM authenticator started 23:28:00.215614; FDT FAST_READY 302ms
+at 23:28:02.074911. Background age 408611ms, refresh deferred
+because the finger was present. First physical finger detected
+23:28:02.582191 with six FDT zones. One scored image achieved 16/7
+at 23:28:03.612032. Mandatory cleanup finished 23:28:04.369705;
+positive terminal without release wait 23:28:04.512845.
+Finger-to-terminal 1931ms; KDE-to-terminal 4297ms.
+Successful warm LOCK despite an old ImageBase shows timestamp age
+alone does not predict poor authentication. rel71.55 after-rollback
+LOCKs 4/4 across two installations; deep S3 remains only 2/3.
