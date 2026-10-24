@@ -9,7 +9,7 @@ python3 - "$driver" <<'PY2'
 from pathlib import Path
 import sys
 s=Path(sys.argv[1]).read_text()
-a=s.index("gx_wait_stable_sensor_clear (")
+a=s.index("gx_wait_stable_sensor_clear_bounded (")
 b=s.index("gx_diag_press_countdown (", a)
 f=s[a:b]
 assert "GX_CLEAR_WAIT_MS" in f
