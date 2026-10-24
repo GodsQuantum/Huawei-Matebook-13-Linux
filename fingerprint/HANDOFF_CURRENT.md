@@ -1,3 +1,4 @@
+## CURRENT 2026-10-25: rel71.60 failed real LOCK first-touch (2 poses, 7.885s). Rel71.55 restored at 00:10, fprintd active with no QA environment. Historical 71.60 installed notes below are superseded; PR #22 NO-GO. Recovered evidence in docs/rel71.60-s3-prepark-reference-20261024.md and canonical HARDWARE_TRIALS.csv.
 ## CURRENT 2026-10-24 23:58 CEST — Pegasus rel71.60 QA INSTALLED
 
 Supersedes earlier rel71.55 installed and rel71.59 rollback entries
