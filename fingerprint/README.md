@@ -63,6 +63,27 @@ Full rationale and package hashes: [`docs/validated-checkpoint-71.24.md`](docs/v
 
 The installer is idempotent: an exact current release is a no-op for the live sensor session. A real driver change must pass a fresh semantic prewarm (`PREWARM_RESULT=READY`) before success is reported.
 
+## 24 October 2026 — rel71.60 native integration QA
+
+Hardware Hall of Fame: [measured first-touch trials](docs/HALL_OF_FAME.md)
+plus [31 preserved legacy candidate configurations](docs/LEGACY_HALL_OF_FAME_20261013.md).
+rel71.55 is the safe rollback (4/4 tested normal LOCK, only
+2/3 first-touch deep S3). The 71.58 and 71.59 S3 trials failed
+on real Pegasus hardware. This rel71.60 build is QA-only, with a
+default-OFF pre-sleep clean ImageBase refresh intended to help
+first touch after deep S3 while avoiding serial blocking retry waits.
+
+Standard Linux integration: ACPI SPI / udev / libfprint / fprintd
+system D-Bus / desktop-native PAM. The read-only cross-distro
+capability report is provided as:
+    python3 fingerprint/scripts/gxfp51a0-desktop-native-doctor.py --json
+
+See [NATIVE_DESKTOP_INTEGRATION.md](docs/NATIVE_DESKTOP_INTEGRATION.md).
+No service wrappers, global PAM changes or custom desktop authentication
+GUI. Every application must implement its own PAM/fprintd, Polkit,
+WebAuthn or native platform authentication integration. Biometrics
+cannot derive a password required to decrypt KWallet.
+
 ## Driver-only distribution (no Huawei/GPU manager)
 
 The [driver-only installation guide](DRIVER_ONLY.md) covers the **independent source archive** and prebuilt Arch/CachyOS package attached to the rel71.30 GitHub pre-release. Both use standard libfprint → fprintd → native Linux desktop interfaces and require no HUAWEI Whiptail manager, GPU tools or project-specific enrollment UI. Only the exact GXFP51A0/ST411 hardware profile is in scope; distribution and board differences require independent confirmation.

@@ -1,3 +1,38 @@
+## CURRENT 2026-10-25: rel71.60 failed real LOCK first-touch (2 poses, 7.885s). Rel71.55 restored at 00:10, fprintd active with no QA environment. Historical 71.60 installed notes below are superseded; PR #22 NO-GO. Recovered evidence in docs/rel71.60-s3-prepark-reference-20261024.md and canonical HARDWARE_TRIALS.csv.
+## CURRENT 2026-10-24 23:58 CEST — Pegasus rel71.60 QA INSTALLED
+
+Supersedes earlier rel71.55 installed and rel71.59 rollback entries
+below (those records remain historical).
+Branch qa/gxfp51a0-rel71.60-presleep-reference-20261024,
+GitHub draft PR #22, source commit 6825cb4.
+Verified source compilation, local regression and 12 GitHub
+CI checks PASS. Isolated Arch package SHA256
+c38d0e43973d01cd1938fe70e2d4ea7e264f9674aab28bdc4f8f8ea3ea5aa4e3.
+Native Pacman installed rel71.60 (34 files 0 altered)
+with systemd Env GXFP_S3_PREPARK_FRESH_QA=1,
+Snapper 1860/1861. Package hook 35-systemd-udev-reload
+timed out after 120s because udev worker for unrelated
+sdb blocked; Pacman otherwise committed, subsequent hooks
+ran, and db.lck released. No interference with sdb.
+
+fprintd active, native GXFP51A0 ST411 recognized,
+right-index-finger enrolled intact.
+Read-only desktop doctor new in /usr/bin/gxfp51a0-desktop-native-doctor:
+native KDE lock PAM, PLM fingerprint service, Polkit configured
+and password fallback preserved; sudo unchanged.
+No reboot, sleep, global PAM or GUI intervention.
+Pinned rollback still rel71.55, SHA256
+f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+
+IMPORTANT: rel71.60 first physical LOCK and real S3 still UNTESTED;
+never claim production readiness or performance improvement until
+the user's touch reports and exact timestamped fprintd/kernel logs
+are collected and scored against historical Hall of Fame.
+Test expected opt-in S3_PREPARK_FRESH_QA clean_new_reference
+and age before vs after S3. No automatic host reboot/suspend.
+Refer to docs/rel71.60-s3-prepark-reference-20261024.md
+and docs/NATIVE_DESKTOP_INTEGRATION.md.
+
 ## CURRENT: 2026-10-24 23:21 CEST rollback to rel71.55 following rel71.59 real S3 FAIL; 71.59 LOCK first touch PASS. Previous installed-rel71.59 note below is historical only.
 ## 2026-10-24 22:55+02 — rel71.59 now INSTALLED ON PEGASUS
 

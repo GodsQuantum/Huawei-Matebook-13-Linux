@@ -39,6 +39,16 @@ class HallOfFameTests(unittest.TestCase):
         self.assertEqual([r["first_touch"] for r in v[1:]], ["fail", "fail", "unknown"])
         self.assertFalse(any(r["first_touch"] == "pass" for r in v[1:]))
 
+    def test_rel7160_first_touch_regression_is_blocking(self):
+        v = [r for r in self.rows if r["version"] == "rel71.60"]
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0]["kind"], "LOCK")
+        self.assertEqual(v[0]["first_touch"], "fail")
+        self.assertEqual(v[0]["poses"], "2")
+        self.assertEqual(v[0]["threshold"], "7")
+        self.assertEqual(int(v[0]["press_to_terminal_ms"]), 7885)
+        self.assertEqual(int(v[0]["fast_ready_ms"]), 83)
+
     def test_known_rejected_s3_was_not_concealed(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["version"] == "rel71.55"]
