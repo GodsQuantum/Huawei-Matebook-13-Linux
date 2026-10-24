@@ -49,7 +49,7 @@ assert opn.index("gx_warm_fast_ready (self)") < opn.index("gx_warm_validate (sel
 assert "gx_background_is_fresh (self)" in session
 assert "gx_warm_validate (self)" in session
 assert "refreshing before biometric READY" in session
-prod = session[session.index("if (self->production_ready"): ]
+prod = session[session.index("if (self->production_ready && self->tls_up && self->have_fdt &&"): ]
 assert prod.index("gx_background_is_fresh (self)") < prod.index("gx_wakeup_mcu (self)")
 assert "self->bg_last_refresh_us = g_get_monotonic_time ()" in warm
 assert "GX_BG_FRESH_MAX_US" not in fast
