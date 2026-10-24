@@ -82,3 +82,32 @@ first-touch success. Record individual hardware trials under
 HARDWARE_TRIALS.csv and regenerate HALL_OF_FAME.md without
 mixing rel71.55 baseline measurements. Cold BOOT, reboot, active
 verify suspend and wrong-finger/password checks are still pending.
+## Hardware NO-GO: LOCK rel71.60, 2026-10-25 00:07 CEST
+
+User observed **two physical poses, slow**. Installed rel71.60,
+GXFP_S3_PREPARK_FRESH_QA=1; this was a normal LOCK (not S3).
+
+Native fprintd recorded FAST_READY 83ms at 00:06:59.754.
+Retained ImageBase aged 663969ms (~11m04s); warm refresh was
+deferred because FDT already detected a finger.
+First physical finger DETECTED_HOLD at 00:07:00.252939,
+single image **4/7 rejected** at 00:07:01.274464.
+LIFT_NOW 00:07:02.152; RELEASED 00:07:04.640.
+Clean retry ImageBase discarded 00:07:05.853 because the
+next finger arrived during calibration. Second independent
+physical finger DETECTED_HOLD 00:07:06.242201 and scored
+**8/7 accepted** 00:07:07.259352; final positive terminal
+00:07:08.137697. First physical detection to unlock:
+**7885 ms**; second detection to unlock **1895 ms**.
+This is a confirmed first-touch regression gate FAILURE.
+The presleep-only opt-in was not exercised in this normal LOCK,
+so causality cannot be attributed exclusively to its source changes.
+
+### Rollback confirmed 00:10 CEST
+Pinned rel71.55 package SHA256
+f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb
+reinstalled through native pacman. Snapper 1862/1863;
+32 package files, none altered; fprintd active with no QA Environment.
+No host reboot, forced suspend, or global PAM edits.
+**rel71.60 PR #22 stays draft / NOT production-certified.**
+No rel71.60 S3 hardware success demonstrated; do not merge.
