@@ -128,6 +128,8 @@ struct _FpiDeviceGoodix51A0
   gboolean      force_cold_reset; /* suspend/lifecycle invalidation: never reuse stale sensor state */
   gboolean      s3_first_tls_pending; /* use full recovery promptly after a real S3 failure */
   gboolean      s3_rel61_tls_fallback; /* after one detached recovery, allow historic complete TLS retry sequence */
+  gboolean      s3_first_verify_guard; /* QA only: first S3 verify must be evaluated for quality */
+  gboolean      s3_rebase_required; /* QA only: previous post-S3 verify rejected, require clean ImageBase */
   guint         cold_verify_placement_budget; /* first two auth transactions of this daemon only */
 };
 
@@ -2845,6 +2847,60 @@ out:
   return ok;
 }
 
+/* QA-only mitigation for real S3 first-pose image-quality/rebase failures.
+ * A recent ImageBase timestamp does NOT prove that it produces a usable
+ * contrast image. After one post-S3 verification failed, do not send the
+ * second biometric image against that reference without validating a
+ * fresh *finger-OFF* ImageBase. The untouched initial press remains the
+ * fast rel71.55 path and all matching/security thresholds remain intact.
+ *
+ * Each pass has bounded, cancellable finger-OFF dwell, and a crypto-
+ * authenticated background captured by the existing native operation.
+ * Failure is a fail-closed biometric retry, never an accept or a busy loop.
+ */
+static gboolean
+gx_s3_firsttouch_rebase_qa (FpiDeviceGoodix51A0 *self)
+{
+  gint64 prior = self->bg_last_refresh_us;
+
+  if (g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") != 0 ||
+      !self->s3_rebase_required)
+    return TRUE;
+
+  for (guint pass = 1; pass <= 2; pass++)
+    {
+      fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA genuine no-finger rebase "
+               "pass=%u/2 old_background_ms=%d", pass,
+               (int) (gx_background_age_us (self) / 1000));
+
+      if (!gx_wait_stable_sensor_clear_bounded (
+            self, -1, NULL, GX_CALIB_RETOUCH_DWELL_US, 4000))
+        break;
+
+      if (!gx_warm_validate (self))
+        {
+          fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA TLS/FDT rebase error "
+                   "(no scored retry against old reference)");
+          return FALSE;
+        }
+
+      if (self->bg_last_refresh_us > prior)
+        {
+          self->s3_rebase_required = FALSE;
+          fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA CLEAN_REFERENCE_READY "
+                   "after failed first S3 press");
+          return TRUE;
+        }
+
+      fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA image discarded because "
+               "finger returned during calibration");
+    }
+
+  fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA no clean background within "
+           "bounded window; stop fingerprint retry, password remains");
+  return FALSE;
+}
+
 static gboolean
 gx_session_start (FpiDeviceGoodix51A0 *self)
 {
@@ -2885,6 +2941,26 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
       fp_info ("GXFP51A0 rebuilding capture context after transport desync");
       if (!gx_recover_capture_context (self))
         return FALSE;
+    }
+
+  /* A failed S3 finger image can end the current fprintd Verify operation
+   * (contrast/release retry) and start a NEW Verify transaction. Preserve the
+   * clean rebase obligation across that boundary, even if ImageBase appears
+   * younger than 20 seconds. Never block the main D-Bus thread. */
+  if (self->s3_rebase_required &&
+      g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") == 0)
+    {
+      if (self->production_ready && self->tls_up &&
+          self->have_fdt && self->bg_frame)
+        return gx_s3_firsttouch_rebase_qa (self) && gx_wakeup_mcu (self);
+
+      /* A normal full cold preparation is itself a fresh, validated
+       * background. No attempt to use a compromised warm reference. */
+      if (!gx_prepare_capture_context (self, FALSE))
+        return FALSE;
+      self->s3_rebase_required = FALSE;
+      self->production_ready = TRUE;
+      return gx_wakeup_mcu (self);
     }
 
   /* Diagnostics deliberately retain their interactive preparation so the
@@ -3387,7 +3463,16 @@ gx_session_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
        * even though the reference had been refreshed only seconds earlier.
        * Rebase only when ImageBase has actually exceeded the freshness bound;
        * otherwise rearm immediately for the next physical placement. */
-      if (gx_background_is_fresh (self))
+      if (self->s3_rebase_required &&
+          g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") == 0)
+        {
+          /* Do not trust freshness alone after a failed S3 image.
+           * In Oct24 hardware data, recent backgrounds yielded scored
+           * 2/7,3/7,2/7 before the eventual good image. */
+          w->ok = gx_s3_firsttouch_rebase_qa (self) &&
+                  gx_wakeup_mcu (self);
+        }
+      else if (gx_background_is_fresh (self))
         {
           fp_info ("GXFP51A0 AUTH_TRACE retry ImageBase still fresh age=%d ms; "
                    "rearming MCU immediately for retry %d/%d",
@@ -4268,6 +4353,14 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
 
           if (t->verifying)
             {
+              if (self->s3_first_verify_guard &&
+                  g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") == 0)
+                {
+                  self->s3_rebase_required = TRUE;
+                  fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA first verify had "
+                           "unscorable contrast/short hold; next Verify "
+                           "requires clean ImageBase");
+                }
               fpi_ssm_mark_failed (ssm, fpi_device_retry_new (why));
               return;
             }
@@ -4358,8 +4451,23 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
                        t->tries, GX_VERIFY_MAX_ATTEMPTS, attempt_score, t->best,
                        GX_MATCH_THRESHOLD, base_views, adapt_views);
 
+              if (attempt_score < GX_MATCH_THRESHOLD &&
+                  self->s3_first_verify_guard &&
+                  g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") == 0)
+                {
+                  self->s3_rebase_required = TRUE;
+                  fp_warn ("GXFP51A0 S3_FIRSTTOUCH_QA first S3 score below "
+                           "threshold: %d/%d, require clean ImageBase "
+                           "before another press", attempt_score,
+                           GX_MATCH_THRESHOLD);
+                }
+
               if (attempt_score >= GX_MATCH_THRESHOLD)
                 {
+                  /* No reason to penalize a genuine first-touch success.
+                   * Subsequent ordinary awake LOCKs use stable rel71.55. */
+                  self->s3_first_verify_guard = FALSE;
+                  self->s3_rebase_required = FALSE;
                   fpi_device_verify_report (dev, FPI_MATCH_SUCCESS, NULL, NULL);
                   t->match_reported = TRUE;
                   fp_info ("verify: match reported on attempt %d at %d matches",
@@ -5308,6 +5416,11 @@ gx_dev_resume (FpDevice *dev)
                   self->spi_fd < 0 && self->irq_fd < 0;
 
   self->force_cold_reset = TRUE;
+  /* The flag is only set by the real native S3 resume callback, never
+   * by ordinary LOCK or cold boot. No extra I/O on this path. */
+  self->s3_first_verify_guard =
+    g_strcmp0 (g_getenv ("GXFP_S3_FIRSTTOUCH_QA"), "1") == 0;
+  self->s3_rebase_required = FALSE;
   fp_warn ("GXFP51A0 NATIVE_S3_RESUME_BEGIN idle=%d; native prewarm candidate",
            idle ? 1 : 0);
 
@@ -5504,6 +5617,8 @@ fpi_device_goodix51a0_init (FpiDeviceGoodix51A0 *self)
   self->warm_sleep_delta_us = 0;
   self->warm_sleep_clock_valid = FALSE;
   self->force_cold_reset = FALSE;
+  self->s3_first_verify_guard = FALSE;
+  self->s3_rebase_required = FALSE;
 }
 
 

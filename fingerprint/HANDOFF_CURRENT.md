@@ -1,8 +1,49 @@
+## CURRENT: 2026-10-24 23:21 CEST rollback to rel71.55 following rel71.59 real S3 FAIL; 71.59 LOCK first touch PASS. Previous installed-rel71.59 note below is historical only.
+## 2026-10-24 22:55+02 — rel71.59 now INSTALLED ON PEGASUS
+
+This supersedes ONLY the older 'staged not installed' state below.
+Once arch-update released pacman's lock, installed rel71.59 using
+checksum-pinned native pacman -U. Snapper 1856/1857. 32 files,
+0 altered. fprintd PID 93272 active since 22:55:17, initial
+native setup finished 22:55:25 (~7.7s), confirmed single
+GXFP51A0 SPI sensor and original right-index-finger enrollment.
+Live fprintd process environ GXFP_S3_FIRSTTOUCH_QA=1.
+One-time startup SPI ACK retries raised timing 100->300%, so
+init/performance stability must be measured in future LOCK/S3.
+No host reboot, desktop restart, sleep, kernel/PAM/PMK changes.
+Preserved pinned rel71.55 rollback SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+Do not treat fprintd-list success as a hardware first-touch pass.
+FIRST physical LOCK under 71.59 is PENDING human finger placement.
+When result comes, fetch Pegasus fprintd journal, record timestamps,
+score and latency, update docs/HARDWARE_TRIALS.csv and
+docs/HALL_OF_FAME.md, run tests, commit and push.
+More details in docs/rel71.59-s3-firsttouch-qa-20261024.md.
+
+## 2026-10-24 rel71.59 — staged, NOT installed on Pegasus
+
+Latest draft GitHub PR #21, branch
+qa/gxfp51a0-rel71.59-s3-firsttouch-20261024.
+Native build PASS and all 12 GitHub CI checks PASS at d4f8713.
+Arch package SHA256
+d3ab9879c3b3203394ff9ff296092e926524346824e5f84c1af1d42a10f78397
+is staged on Pegasus in /tmp/gxfp51a0-rel71.59-qa.pkg.tar.zst.
+An attempt at 22:47 CEST did not upgrade the package because a separate
+arch-update had pacman -Syu running from 22:22 with db.lck held.
+Do NOT kill Pacman or delete its database lock. Previous override
+restored: installed version rel71.58, active fprintd with
+GXFP_S3_STALE_REBASE_QA=1. No restart, reboot or suspend by us.
+rel71.55 known-good package still pinned for rollback, SHA256
+f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+When the *separate* system update has finished, resume the exact QA
+installation and hardware certification from the doc
+docs/rel71.59-s3-firsttouch-qa-20261024.md; do not skip version-specific
+Hall of Fame and physical first-touch tests. PR remains draft.
+
 ## ORIGINAL_HOF_RESTORED_20261024 — mandatory source-of-truth
 
 On Oct 24 the earlier mini-ledger of 12 tests was found INCOMPLETE.
 The real pre-existing archive was recovered at CT700
-/home/arezki/Projets/Workstations/Pegasus/research/hall-of-fame/FINGERPRINT_DRIVER_HALL_OF_FAME_2026-10-13.json
+CT700 private Pegasus project: research/hall-of-fame/FINGERPRINT_DRIVER_HALL_OF_FAME_2026-10-13.json
 SHA256 4545cf38f7d9a33c25d6d7226e5a4ba56bfaa75f6d3f2aef369cd96d7368ff5e,
 with 31 version/configuration snapshots, 125 private Git references
 and 14 historical rankings. DO NOT delete or overwrite the original.

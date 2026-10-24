@@ -495,3 +495,8 @@ test: test_hall_of_fame
 test_hall_of_fame:
 	python3 ./tests/test_hall_of_fame.py
 	python3 ../scripts/gxfp51a0-hall-of-fame.py --check
+
+.PHONY: test_s3_firsttouch_qa_source_safety
+test: test_s3_firsttouch_qa_source_safety
+test_s3_firsttouch_qa_source_safety:
+	python3 ./tests/test_s3_firsttouch_qa_source_safety.py
