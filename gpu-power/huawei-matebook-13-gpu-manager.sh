@@ -25,7 +25,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -n "${XDG_RUNTIME_DIR:-}" && -S "$XD
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 
-VERSION="3.2.1"
+VERSION="3.2.2"
 STATE_SCHEMA=3
 INSTALL_SCHEMA=4
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -2298,8 +2298,35 @@ smoke_test() {
     return 0
 }
 
+# SSH-safe live renderer diagnostic. Never restarts KWin or wakes NVIDIA.
+kwin_live_renderer() {
+    command -v qdbus6 >/dev/null 2>&1 || return 1
+    local runtime="/run/user/$(id -u)"
+    [[ -S "$runtime/bus" ]] || return 1
+    XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" qdbus6 org.kde.KWin /KWin org.kde.KWin.supportInformation 2>/dev/null |
+        sed -n 's/^OpenGL renderer string: //p' | head -n1
+}
+classify_kwin_renderer() {
+    local renderer
+    renderer="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$renderer" in
+        "") echo UNKNOWN ;;
+        *llvmpipe*|*softpipe*|*software*raster*) echo SOFTWARE ;;
+        *intel*) echo INTEL ;;
+        *nvidia*) echo NVIDIA_UNEXPECTED ;;
+        *) echo OTHER ;;
+    esac
+}
+# Rootless, single-component repair. No kernel, modules, PCI or fingerprint.
+repair_kwin_only() {
+    [[ -r "$SYSTEM_CONFIG" ]] || { err "GPU Manager not installed."; return 1; }
+    grep -Fqx 'DGPU_DEVICE="0x1d13"' "$SYSTEM_CONFIG" || { err "MX250 identity mismatch."; return 1; }
+    [[ -L "$INTEL_ALIAS" && -e "$INTEL_ALIAS" ]] || { err "Intel DRM alias unavailable."; return 1; }
+    install_kwin_isolation || return
+    doctor
+}
 doctor() {
-    local detected_install=0 legacy current version kwin drift=0 gpu_idle="UNKNOWN"
+    local detected_install=0 legacy current version kwin drift=0 gpu_idle="UNKNOWN" live_renderer renderer_state
     discover_legacy_generations
     if [[ -r "$SYSTEM_CONFIG" ]]; then
         detected_install="$(sed -n 's/^INSTALL_SCHEMA=//p' "$SYSTEM_CONFIG" | head -n1)"
@@ -2336,6 +2363,9 @@ doctor() {
     elif [[ -n "$current" ]]; then gpu_idle="NOT_IDLE"
     fi
 
+    live_renderer="$(kwin_live_renderer 2>/dev/null || true)"
+    renderer_state="$(classify_kwin_renderer "$live_renderer")"
+    case "$renderer_state" in SOFTWARE|NVIDIA_UNEXPECTED) drift=1 ;; esac
     printf 'MANAGER_VERSION=%s\n' "$VERSION"
     printf 'STATE_SCHEMA=%s\n' "$STATE_SCHEMA"
     printf 'INSTALL_SCHEMA=%s\n' "$detected_install"
@@ -2349,6 +2379,8 @@ doctor() {
     printf 'ROOT_RUNTIME=%s\n' "$(root_port_runtime_status)"
     printf 'POWER_PROFILE=%s\n' "$(current_power_profile)"
     printf 'KWIN_ISOLATION=%s\n' "$kwin"
+    printf 'KWIN_RENDERER_STATE=%s\n' "$renderer_state"
+    printf 'KWIN_LIVE_RENDERER=%s\n' "$live_renderer"
     printf 'CONFIG_DRIFT=%s\n' "$([[ "$drift" == 0 ]] && echo NO || echo YES)"
     printf 'GPU_IDLE=%s\n' "$gpu_idle"
     return 0
@@ -2554,6 +2586,7 @@ Usage:
   $0 overview
   $0 status
   $0 doctor
+  $0 repair-kwin      # KWin-only, no package or session changes
   $0 test
   $0 run -- COMMAND [ARGS...]
   $0 menu
@@ -2618,6 +2651,7 @@ case "$cmd" in
     overview|dashboard) overview ;;
     status) status ;;
     doctor) doctor ;;
+    repair-kwin) repair_kwin_only ;;
     test) smoke_test ;;
     run) shift; [[ "${1:-}" == -- ]] && shift; [[ -x "$RUNNER" ]] || { err "Install first"; exit 1; }; exec "$RUNNER" "$@" ;;
     uninstall) uninstall_core ;;
