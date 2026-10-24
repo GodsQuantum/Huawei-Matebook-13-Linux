@@ -168,3 +168,23 @@ Pegasus journal; no experimental S3 flag.
 - To identify the slow command precisely without risking another
   release regression, next QA branch rel71.57 / PR #18 adds
   opt-in read-only per-step cleanup timings. It is NOT deployed.
+## 2026-10-24 post-rollback LOCK #3 — first-touch PASS without finger lift
+
+- Owner held finger steadily through screen unlock and explicitly reports
+  unlock WITHOUT removing the finger. This validates the positive terminal
+  path's lack of a physical release requirement, despite the UI displaying
+  LIFT_NOW immediately before completion.
+- Pegasus was still using rel71.55 with fprintd active and an empty
+  Environment (experimental rel71.56 FAST S3 disabled).
+- FAST_READY at 15:36:10.093 (83 ms internal sensor check).
+  ImageBase age 1,235,527 ms; warm refresh attempted then discarded when
+  finger arrived at 15:36:11.202 (~1.08 s wasted preauth).
+- First actual finger detected at 15:36:11.402, full FDT 6/6.
+  First scored frame **9/7** at 15:36:12.294; mandatory cleanup completed
+  at 15:36:12.994; positive terminal 15:36:13.141; no release wait.
+- Finger detect to success ~1.739 s; match to terminal ~0.847 s.
+  Results across post-rollback LOCK #1, #2 and #3: 3/3 user-reported
+  first physical placements passed. This is not a substitute for
+  cold-boot/S3/counterexample biometric certification.
+- No change made to Pegasus hardware, installed driver, PAM, KDE, threshold
+  or recovery configuration. rel71.57 timing instrumentation still QA-only.
