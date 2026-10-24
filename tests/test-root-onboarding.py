@@ -49,7 +49,7 @@ require("71.24" in doc, "current fingerprint checkpoint missing")
 require("Pascal" in doc and "RTD3" in doc, "MX250 power-management rationale missing")
 require("never flash automatically" in doc.lower(), "firmware safety policy missing")
 
-require('VERSION="3.2.1"' in gpu, "GPU manager v3.2 contract missing")
+require('VERSION="3.2.2"' in gpu, "GPU manager v3.2 contract missing")
 require("install_intel_default_env" in gpu, "Intel-default user-session policy missing")
 require("VK_LOADER_DRIVERS_SELECT=*intel*" in gpu, "Intel Vulkan default missing")
 require("unset VK_LOADER_DRIVERS_SELECT" in gpu, "dGPU runner must remove Intel Vulkan filter")
