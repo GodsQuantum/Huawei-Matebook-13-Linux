@@ -21,6 +21,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.56 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.56 | COLD | 0/1 | ÉCHEC de première pose |
 | rel71.58 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.58 | S3 | 0/2 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -38,6 +39,15 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261024-2 | 2026-10-24T18:24:49.821+02:00 | rel71.55 | S3 | 1 | pass | 6.127 | 0.083 | 1.955 | — | 10.450 | 7/7 |
 | s3-20261024-3 | 2026-10-24T19:06:06.964+02:00 | rel71.55 | S3 | 3-4 | fail | 3.798 | 0.083 | 17.090 | — | 22.377 | 16/7 |
 | lock-20261024-7158 | 2026-10-24T19:33:31.450+02:00 | rel71.58 | LOCK | 1 | pass | — | 0.293 | 1.902 | 4.007 | — | 11/7 |
+| s3-20261024-2015 | 2026-10-24T20:15:37.851+02:00 | rel71.58 | S3 | 4+ | fail | 7.489 | 0.082 | 16.392 | — | 34.206 | 21/7 |
+| s3-20261024-2132 | 2026-10-24T21:32:18.990+02:00 | rel71.58 | S3 | 2 | fail | 4.959 | 0.083 | 4.621 | — | 10.145 | 14/7 |
+| s3-20261024-2143 | 2026-10-24T21:43:20.848+02:00 | rel71.58 | S3 | unknown | unknown | 5.096 | 0.084 | 1.983 | — | 9.829 | 9/7 |
+
+## Registre antérieur au 13 octobre 2026
+
+L'archive d'origine couvre **31 configurations**, **125 références Git**, et **14 classements historiques**.
+Voir [le tableau historique](LEGACY_HALL_OF_FAME_20261013.md) et [le résumé JSON](LEGACY_HALL_OF_FAME_20261013.json). Les 31 configurations ne sont pas 31 essais indépendants.
+
 
 ## Comparaison anti-régression des LOCK
 
@@ -52,4 +62,4 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 4. Comparer uniquement des mesures de même nature. FDT FAST_READY ne mesure ni l'affichage du greeter ni le délai total de sortie de veille. Aucun S3 échoué ne peut détenir un record de vitesse.
 5. À chaque essai : lire journal, calculer les timings, attester les poses avec l'utilisateur, ajouter une ligne au CSV, réviser la fiche de preuve, régénérer cette page avec l'option --write du script gxfp51a0-hall-of-fame.py, lancer --check et make verify, commit et push.
 
-**Statut :** rel71.55 est le rollback de référence mais a échoué à la première pose sur 1 des 3 S3 mesurés. rel71.56 S3 rapide rejeté (27,725 s). rel71.57 instrumentation non installée. rel71.58 correction S3 en QA, un LOCK validé, aucun S3 mesuré. **Aucune version n'est certifiée production.**
+**Statut :** rel71.55 est le rollback de référence mais a échoué à la première pose sur 1 des 3 S3 mesurés. rel71.56 S3 rapide rejeté (27,725 s). rel71.57 instrumentation non installée. rel71.58 correction S3 en QA, un LOCK validé, 3 S3 observés dont 2 à poses multiples et un dernier à attribution humaine incertaine. **Aucune version n'est certifiée production.**

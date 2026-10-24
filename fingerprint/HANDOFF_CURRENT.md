@@ -1,3 +1,31 @@
+## ORIGINAL_HOF_RESTORED_20261024 — mandatory source-of-truth
+
+On Oct 24 the earlier mini-ledger of 12 tests was found INCOMPLETE.
+The real pre-existing archive was recovered at CT700
+/home/arezki/Projets/Workstations/Pegasus/research/hall-of-fame/FINGERPRINT_DRIVER_HALL_OF_FAME_2026-10-13.json
+SHA256 4545cf38f7d9a33c25d6d7226e5a4ba56bfaa75f6d3f2aef369cd96d7368ff5e,
+with 31 version/configuration snapshots, 125 private Git references
+and 14 historical rankings. DO NOT delete or overwrite the original.
+Its public redacted JSON and table are in
+fingerprint/docs/LEGACY_HALL_OF_FAME_20261013.json/.md.
+The separate workspace contains 29 rel71.x candidate directories,
+index: docs/LEGACY_CANDIDATES_INVENTORY.md. Candidate folder != tested.
+Canonical modern measured trials are in docs/HARDWARE_TRIALS.csv
+and auto-rendered docs/HALL_OF_FAME.md.
+
+At 20:15 rel71.58 deep S3, after 7.489s prewarm, scored 2/7,3/7,2/7
+before finally 21/7 at 20:16:12 (wake->success 34.206s). At 21:32
+deep S3, first physical touch quality rejected, next finger 14/7,
+wake->success 10.145s. At 21:43 another real short S3 returned
+first scored match 9/7 wake->success 9.829s but user reports
+second-physical-placement S3; their report could refer to
+21:32 or 21:43. Therefore never classify 21:43 as
+first-touch success. rel71.58 FAILS current S3 robustness gate.
+The opt-in stale rebase code was not activated at 20:15 since
+background age <20sec; initial diagnosis was too narrow.
+No automatic reboot or sleep; do not declare production.
+Record all new trials across branches against this baseline.
+
 ## 2026-10-24 Pegasus current QA and Hall of Fame
 
 CAUTION: the older rel71.30 reference below is historic. This Oct24

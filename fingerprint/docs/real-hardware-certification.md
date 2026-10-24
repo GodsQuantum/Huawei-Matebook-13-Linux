@@ -2,6 +2,8 @@
 
 ## Durable Hall of Fame and regression gate
 
+Original historic record: [31 pre-existing version/configuration entries](LEGACY_HALL_OF_FAME_20261013.md) and [29 additional candidate workspace folders](LEGACY_CANDIDATES_INVENTORY.md) (folders are not successful trials). The complete private original remains in the CT700 Pegasus workspace.
+
 Current canonical hardware ledger: [HALL_OF_FAME.md](HALL_OF_FAME.md)
 and its machine-readable [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv).
 The metrics are attributed to the exact installed version and kernel

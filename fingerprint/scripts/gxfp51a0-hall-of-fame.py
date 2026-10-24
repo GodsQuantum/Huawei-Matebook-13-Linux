@@ -100,6 +100,7 @@ def render(rows):
                      f'{seconds(r["greeter_to_terminal_ms"])} | '
                      f'{seconds(r["wake_to_terminal_ms"])} | '
                      f'{r["score"] or "—"}/7 |')
+    parts += ["", "## Registre antérieur au 13 octobre 2026", "", "L'archive d'origine couvre **31 configurations**, **125 références Git**, et **14 classements historiques**.", "Voir [le tableau historique](LEGACY_HALL_OF_FAME_20261013.md) et [le résumé JSON](LEGACY_HALL_OF_FAME_20261013.json). Les 31 configurations ne sont pas 31 essais indépendants.", ""]
     old = [int(r["press_to_terminal_ms"]) for r in rows
            if r["version"] == "rel71.55" and r["kind"] == "LOCK"
            and r["first_touch"] == "pass" and r["press_to_terminal_ms"]
@@ -141,7 +142,7 @@ def render(rows):
         "à la première pose sur 1 des 3 S3 mesurés. "
         "rel71.56 S3 rapide rejeté (27,725 s). "
         "rel71.57 instrumentation non installée. "
-        "rel71.58 correction S3 en QA, un LOCK validé, aucun S3 mesuré. "
+        "rel71.58 correction S3 en QA, un LOCK validé, 3 S3 observés dont 2 à poses multiples et un dernier à attribution humaine incertaine. "
         "**Aucune version n'est certifiée production.**",
         "",
     ]
