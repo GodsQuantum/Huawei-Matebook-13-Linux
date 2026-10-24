@@ -72,3 +72,43 @@ not use a blanket QML autostart across suspend (battery regression risk).
 ## 2026-10-24 cold-boot hardware test
 
 Pegasus kernel 7.3.0-4, libfprint rel71.56. Cold boot reported by owner, first pose rejected (score 4/7 at 12:41:44), second pose accepted (score 7/7 via strict Pixel Rescue at 12:41:49). Login accepted at 12:41:50. Cold boot 0/1 first-touch successes. This was not an S3 test, so S3 acceleration remains unverified. Keep score threshold 7, do not claim hardware certification.
+## 2026-10-24 hardware S3 regression — rel71.56 FAST QA REJECTED and rolled back
+
+- Owner: natural suspend and resume; many physical finger placements before
+  unlock. Kernel confirms real `PM: suspend entry (deep)` at
+  13:23:50.260+02, exit 15:11:13.860+02; duration ~107 minutes.
+- fprintd native resume began 15:11:13.936 in
+  `QA_FAST before_reset_ms=200 after_reset_ms=200`.
+- Driver performed the short detached GPIO264 reset at 15:11:14.136;
+  `RESET_TRACE GPIO264 300/600 boundary (spi_fd=0)` followed at
+  15:11:14.535 during cold preparation. Review SPI descriptor state,
+  and do not mistake this for a safe speed improvement.
+- Three `CALIBRATION_LIFT_REQUIRED` events at 15:11:17.593,
+  15:11:23.735 and 15:11:35.431. Two of the intervening frames were
+  discarded as `background contaminated by touch`; calibration retries
+  took the resumed device through ~27.725 seconds of preparation.
+- `NATIVE_S3_PREFLIGHT_DURATION mode=QA_FAST ready=1 elapsed_ms=27725`
+  at 15:11:41.662. The retry/fallback on explicit failure did NOT
+  trigger because the slow preflight ultimately returned `ready=1`.
+  This is a latency-gate weakness, not a proved false accept.
+- First recorded biometric finger after readiness was matched once:
+  DETECTED 15:11:45.505, score 10/7 at 15:11:46.550,
+  terminal success 15:11:47.455. User's several earlier placements
+  occurred while the sensor was still calibrating.
+- Contrast: previous rel71.55 full 1s+1s S3 preflight needed just
+  4.254 seconds (Oct 23 14:11:54.823 -> 14:11:59.078), and
+  authenticated on first recorded/user-reported placement, score 14/7.
+  Hardware and elapsed sleep duration differed; the sample size is
+  insufficient to claim the speed option alone caused every delay, but
+  rel71.56 FAST plainly FAILED the speed and UX certification gate.
+- Remediation COMPLETED 2026-10-24 15:15 CEST: on Pegasus,
+  removed `/etc/systemd/system/fprintd.service.d/80-gxfp51a0-fast-s3-qa.conf`,
+  downgraded from rel71.56 to checksum-verified saved rel71.55
+  with native pacman; Snapper snapshots 1834/1835 created automatically.
+  Service active since 15:15:28, `Environment=` empty, package
+  32/32 files intact, daemon startup completed 15:15:34.
+  No power cycle and no changes to PAM/KDE/kernel/fingerprint templates.
+- **DO NOT MERGE PR #17 OR REDEPLOY rel71.56 FAST on Pegasus.**
+  Its test code can remain as research evidence, not a release candidate.
+  Human verification of LOCK and subsequent S3 on rel71.55 is pending.
+  Threshold 7 and password fallback remain unchanged.
