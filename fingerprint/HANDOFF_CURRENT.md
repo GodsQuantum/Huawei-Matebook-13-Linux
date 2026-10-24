@@ -1,3 +1,23 @@
+## 2026-10-24 rel71.59 — staged, NOT installed on Pegasus
+
+Latest draft GitHub PR #21, branch
+qa/gxfp51a0-rel71.59-s3-firsttouch-20261024.
+Native build PASS and all 12 GitHub CI checks PASS at d4f8713.
+Arch package SHA256
+d3ab9879c3b3203394ff9ff296092e926524346824e5f84c1af1d42a10f78397
+is staged on Pegasus in /tmp/gxfp51a0-rel71.59-qa.pkg.tar.zst.
+An attempt at 22:47 CEST did not upgrade the package because a separate
+arch-update had pacman -Syu running from 22:22 with db.lck held.
+Do NOT kill Pacman or delete its database lock. Previous override
+restored: installed version rel71.58, active fprintd with
+GXFP_S3_STALE_REBASE_QA=1. No restart, reboot or suspend by us.
+rel71.55 known-good package still pinned for rollback, SHA256
+f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+When the *separate* system update has finished, resume the exact QA
+installation and hardware certification from the doc
+docs/rel71.59-s3-firsttouch-qa-20261024.md; do not skip version-specific
+Hall of Fame and physical first-touch tests. PR remains draft.
+
 ## ORIGINAL_HOF_RESTORED_20261024 — mandatory source-of-truth
 
 On Oct 24 the earlier mini-ledger of 12 tests was found INCOMPLETE.
