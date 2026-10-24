@@ -141,3 +141,30 @@ repository or installed package as hardware-certified without evidence.
 - Success confirms usable LOCK authentication and no obvious regression
   after the rollback, not completion of repeated S3/boot certification.
   No kernel changes, no PAM bypass, no lowered score threshold.
+## 2026-10-24 post-rollback LOCK #2 — first-touch PASS, perceived latency SLOW
+
+Owner confirmed exactly one physical touch but experienced a delay and
+suspected that lifting the finger was required. Verified rel71.55 from
+Pegasus journal; no experimental S3 flag.
+
+- KDE worker init 15:24:59.950; fprintd FAST_READY=72ms at
+  15:25:01.270. Normal greeter-to-FDT delay ~1.32 seconds.
+- Clean ImageBase aged 566709ms (>20s policy). Warm validation
+  attempted a new background and discarded it when finger arrived
+  at 15:25:02.359, ~1.06 s after refresh began. Old clean
+  ImageBase retained without finger contamination.
+- First physical press detected 15:25:02.751 with all six FDT zones;
+  biometric score **7/7** at 15:25:03.680 (0.929s later).
+- Mandatory target cleanup completed at 15:25:04.383, ~0.703s after
+  match scored. Positive terminal at 15:25:04.505, 0.122s later.
+  Finger detect -> terminal ~1.754s, KDE PAM init -> terminal ~4.555s.
+- User **does not need to remove the finger** for a positive verdict.
+  `LIFT_NOW` and `verified positive terminal without release wait`
+  are logged within microseconds, at 15:25:04.505. The
+  cleanup before this remains essential for a synchronized SPI/TLS
+  and cannot be casually skipped.
+- User first-touch hardware LOCK after rollback: **2 of 2**.
+  The S3/cold-boot certification gates remain pending.
+- To identify the slow command precisely without risking another
+  release regression, next QA branch rel71.57 / PR #18 adds
+  opt-in read-only per-step cleanup timings. It is NOT deployed.
