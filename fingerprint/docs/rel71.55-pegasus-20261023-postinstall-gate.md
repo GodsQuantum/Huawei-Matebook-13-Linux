@@ -122,3 +122,22 @@ credential/bypass regression, bounded startup/wake and energy behavior.
 Retain strict matcher threshold 7 and original enrollment templates.
 Security FAR requires a separate population study. Do not mark this
 repository or installed package as hardware-certified without evidence.
+## 2026-10-24 post-rollback LOCK #1 — first-touch PASS (rel71.55)
+
+- After the experimental rel71.56 S3 performance regression, root-owned package
+  rollback and removal of the QA_FAST override were confirmed. At
+  15:21:48+02:00, installed `libfprint-goodix51a0` was rel71.55, fprintd
+  active, `Environment=` empty.
+- Owner explicitly reports unlock using ONE physical finger placement.
+- KDE lock greeter PAM worker initializing at 15:21:08.955; READY later.
+  fprintd `FAST_READY` 72ms at 15:21:10.241 (full KDE-to-ready is
+  ~1.4 seconds; this 72ms is only fast sensor validation).
+- Finger already on sensor at Claim; previous clean reference aged 335690ms
+  and refresh deferred to avoid a finger-contaminated background.
+- First physical pose detected 15:21:10.733 (FDT 6/6, 0x3f);
+  actual image scored **15 against threshold 7** at 15:21:11.633;
+  verified terminal success 15:21:12.443. Approx finger-detect to terminal
+  1.71 seconds; greeter-PAM initialization to terminal ~3.49 seconds.
+- Success confirms usable LOCK authentication and no obvious regression
+  after the rollback, not completion of repeated S3/boot certification.
+  No kernel changes, no PAM bypass, no lowered score threshold.
