@@ -1,3 +1,23 @@
+## CURRENT 2026-10-25 17:25 CET — rel71.62 fast retry QA source, NOT installed
+
+Pegasus physically powered and verified installed rel71.55, fprintd active,
+original right-index-finger enrollment intact; no experimental service
+Environment. Previous rel71.61 failed first touch (5/7 rejected, second 7/7),
+rollback rel71.55 confirmed, Snapper 1866/1867.
+
+CT700 now has QA rel71.62 opt-in GXFP_FAST_RETRY_QA=1, designed solely to
+skip an approximately 996 ms stale background recalibration during
+second-physical-press recovery when TLS/FDT/production state intact.
+Matcher threshold stays 7, first pose behavior unchanged.
+The 4 focused tests and full native software baseline compiled and PASS.
+DO NOT claim first-touch improvement; this is a second-press recovery
+latency experiment and does not fix original first score 5/7.
+The former rel71.61 score-cache feature remains present but OFF by default;
+never enable both flags together without separate A/B evidence.
+See docs/rel71.62-fast-retry-qa-20261025.md.
+Before any deployment ensure package SHA256, CI, rollback and owner physical
+LOCK after install; no host reboot/suspend, no PAM changes.
+
 ## CURRENT 2026-10-25 02:17 CEST: rel71.61 first-touch NO-GO, rel71.55 restored
 
 Real first LOCK rel71.61 user 2 poses, first 5/7 rejected, second

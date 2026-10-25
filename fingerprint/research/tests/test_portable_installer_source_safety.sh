@@ -87,7 +87,7 @@ grep -Fq 'native graphical Settings' "$a"
 grep -Fq -- '--pre-enroll' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$a"
-grep -Fq 'PORTABLE_RELEASE="rel71.61-qa1"' "$i"
+grep -Fq 'PORTABLE_RELEASE="rel71.62-qa1"' "$i"
 
 # Never delete biometric templates or the validated per-unit PMK cache.
 ! grep -Eq 'rm .*goodix51a0-pmk' "$i"
