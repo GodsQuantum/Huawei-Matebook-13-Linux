@@ -1,3 +1,16 @@
+## CURRENT 2026-10-25 02:17 CEST: rel71.61 first-touch NO-GO, rel71.55 restored
+
+Real first LOCK rel71.61 user 2 poses, first 5/7 rejected, second
+7/7 pixel rescue accepted; first finger->terminal 7453ms, second
+finger->terminal 1761ms. ImageBase 958665ms old, 1s attempted
+retry refresh discarded due quick retouch. Installed rel71.55 restored
+02:16:58, active fprintd/no QA Environment, package 32/32 intact,
+snapshots 1866/1867. PR #23 remains draft NO-GO. Evidence in
+docs/rel71.61-score-cache-qa-20261025.md and complete hardware CSV.
+Previous installed-rel71.61 entries are historical, not current.
+No forced reboot/suspend, use SentinelX only. Keep all Hall of Fame
+and pre-Oct13 31-config evidence intact.
+
 ## CURRENT 2026-10-25 01:46 — Pegasus rel71.61 QA INSTALLED
 
 This replaces the older note saying rel71.55 is currently installed.
