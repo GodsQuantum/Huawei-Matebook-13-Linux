@@ -32,3 +32,6 @@ Snapper root pre/post 1886/1887; pacman package 32 files/0 altered. Native fprin
 All 12 GitHub checks passed on source commit ff514a3, including native libfprint source, KDE 6.8.1, Arch, Fedora, Debian, Alpine, openSUSE, Ubuntu 24.04 and Ubuntu 26.04.
 
 **Hardware gate remains OPEN:** no physical first-touch verification after a genuine natural S3 on rel71.63 has occurred yet. Do not claim S3 fixed, no FAR/FRR proof, no production merge; PR #25 remains DRAFT. When owner naturally resumes from deep sleep and tests first press, inspect scores, prewarm and exact timings; record in docs/HARDWARE_TRIALS.csv and regenerate HALL_OF_FAME.md. If regressions, restore checksum-pinned rel71.55 without reboot.
+
+## Hardware 2026-10-25 22:55
+Real deep S3 first touch rejected by contrast gate before scoring. Second touch scored 15/7 PASS. Resume prewarm 4668ms; positive terminal 12555ms from resume. Early touch 0x3f used pre-existing full-contact path; partial QA branch NOT exercised. Owner reports 2 S3 poses and moderate slowness, first-touch S3 FAIL. Separate ordinary LOCK one touch score 15/7, 1869ms detection-to-success. Keep security threshold 7 and contrast gate.
