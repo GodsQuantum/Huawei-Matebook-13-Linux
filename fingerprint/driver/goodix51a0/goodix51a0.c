@@ -5143,6 +5143,49 @@ gx_dev_suspend (FpDevice *dev)
                 }
             }
 
+          /* Optional native S3 improvement: a 33-minute-old, but otherwise
+           * proven-clean ImageBase was reused after S3 in the rel71.63
+           * hardware trace; the first genuine finger was rejected by the
+           * contrast quality gate before biometric scoring.
+           *
+           * If the sensor is CLEAR at S3 park, take a new background NOW
+           * (while finger-free) using the existing warm validated capture
+           * path. Require both the fresh timestamp AND another independent
+           * clear FDT probe before allowing the snapshot to be preserved.
+           * A failed or touch-contaminated refresh must NOT save any stale
+           * reference: ordinary S3 cold calibration remains the fallback.
+           * Disabled unless explicitly opted in; never changes matcher
+           * threshold, enrollment or capture scoring. */
+          if (pre_sleep_clean &&
+              g_strcmp0 (g_getenv ("GXFP_S3_FRESH_BG_QA"), "1") == 0 &&
+              !gx_background_is_fresh (self))
+            {
+              gint64 old_refresh_us = self->bg_last_refresh_us;
+              int fdt_after[GXFP_FDT_ZONE_COUNT];
+              guint8 touch_after = 0xff;
+
+              if (!gx_warm_validate (self) ||
+                  self->bg_last_refresh_us <= old_refresh_us ||
+                  !gx_background_is_fresh (self) ||
+                  gx_fdt_probe_ex (self, fdt_after, &touch_after) != 0 ||
+                  (touch_after & 0x3fu) != 0 ||
+                  gx_fdt_mean (fdt_after) < GOODIX_FDT_ABS ||
+                  ABS (gx_fdt_mean (fdt_after) -
+                       gx_fdt_mean (self->fdt_base)) >
+                       GX_DIAG_BASELINE_MAX_DRIFT)
+                {
+                  pre_sleep_clean = FALSE;
+                  fp_warn ("GXFP51A0 S3_FRESH_BG_QA no clean refreshed "
+                           "reference; fail closed to native cold S3");
+                }
+              else
+                {
+                  fp_warn ("GXFP51A0 S3_FRESH_BG_QA refreshed ImageBase "
+                           "before SLEEP ACK, age_ms=%d",
+                           (int) (gx_background_age_us (self) / 1000));
+                }
+            }
+
           if (gxfp_build_sleep (&packet))
             {
               attempted = TRUE;

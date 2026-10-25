@@ -1,3 +1,9 @@
+## CURRENT 2026-10-25 — rel71.64 clean presleep ImageBase QA development
+
+On hardware Pegasus STILL runs rel71.63 with optional partial FDT S3 handler, with real first-touch S3 FAIL (2 touches; first pre-scoring contrast reject), regular LOCK 1 touch/15 score PASS. Source branch qa/gxfp51a0-rel71.64-presleep-fresh-bg-20261025 builds only in CT700. New GXFP_S3_FRESH_BG_QA=1 opt-in collects a FINGER-OFF fresh authenticated ImageBase BEFORE native idle S3 sleep command, only if the previous ImageBase was stale, with independent live FDT before/after and deny saving a stale or contaminated snapshot if validation fails. No contrast or biometric threshold loosening. Historical failed rel71.60/61/62/63 trials retained.
+
+DO NOT auto-suspend/reboot; no user fingerprint re-enrolment or PAM/kernel/GPU modifications. Must pass full QA, cross distro CI, isolated Arch build, reversible package and human-observed true deep-S3 first-touch to promote. rel71.63 stays installed until confirmed ready and explicit safe state; pinned rel71.55 rollback remains.
+
 CURRENT 2026-10-25: rel71.63 QA Pegasus; LOCK first touch 15/7 pass 1869ms. Natural deep S3 first press rejected by contrast gate BEFORE score; second press 15/7 passed. Prewarm 4668ms, total native wake-to-positive 12555ms. This first touch was full 0x3f, NOT testing new 4-5-zone branch. S3 first-touch NO-GO. No downgrade yet; rel71.55 pinned. See 71.63 QA doc and HOF.
 
 ## CURRENT 2026-10-25 22:23 CET — rel71.63 QA INSTALLED on Pegasus
