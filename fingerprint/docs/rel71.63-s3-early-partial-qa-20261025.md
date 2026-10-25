@@ -21,3 +21,14 @@ Five source-safety tests and synthetic predicate examples PASS before native bui
 ## History preserved
 
 Historical rel71.62 S3 FAIL at 21:06 with 37.625sec prewarm and separate rel71.62 LOCK 9/7 success (1.956sec DETECT->positive) are recorded in canonical HARDWARE_TRIALS.csv. Rel71.60/.61 failures are retained. Do NOT count a subsequent LOCK as an S3 PASS. Rel71.55 remains currently installed on Pegasus after verified rollback Snapper 1870/1871.
+
+
+## 2026-10-25 22:22 CET — installed on Pegasus, awaiting real hardware S3
+
+Native pacman installation of libfprint-goodix51a0 rel71.63 completed at 22:22:32 CET after the user's unrelated pacman -Syu completed and /var/lib/pacman/db.lck disappeared. SHA256 of the isolated Arch QA package 4c67d31538bed8dc6a6e8ce82f984afc41f0b7caea83959d2ecb4b52f3aaee77 was verified both before transfer and on Pegasus. Pinned rel71.55 rollback SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb was verified.
+
+Snapper root pre/post 1886/1887; pacman package 32 files/0 altered. Native fprintd active PID 256412 since 22:22:19 CET with exactly GXFP_S3_EARLY_PARTIAL_QA=1. No other experimental cache/retry flags, no host reboot, no forced S3, no global PAM or kernel/GPU/PMK changes. Standard fprintd-list returned GXFP51A0 SPI ST411 with original right-index-finger enrollment intact. Pacman free.
+
+All 12 GitHub checks passed on source commit ff514a3, including native libfprint source, KDE 6.8.1, Arch, Fedora, Debian, Alpine, openSUSE, Ubuntu 24.04 and Ubuntu 26.04.
+
+**Hardware gate remains OPEN:** no physical first-touch verification after a genuine natural S3 on rel71.63 has occurred yet. Do not claim S3 fixed, no FAR/FRR proof, no production merge; PR #25 remains DRAFT. When owner naturally resumes from deep sleep and tests first press, inspect scores, prewarm and exact timings; record in docs/HARDWARE_TRIALS.csv and regenerate HALL_OF_FAME.md. If regressions, restore checksum-pinned rel71.55 without reboot.
