@@ -1,3 +1,49 @@
+## CURRENT 2026-10-25 21:18 CET — rel71.62 S3 NO-GO and VERIFIED rel71.55 rollback
+
+Real Pegasus currently runs rel71.55 again (pacman verified 32/32
+intact; active native fprintd PID 198098, empty experimental
+Environment), Snapper 1870/1871; no reboot/forced S3.
+Owner natural deep S3 rel71.62 failed after multiple contacts:
+S3 wake 21:06:08, four touch-contaminated reference attempts,
+no valid biometric Verify before its close, prewarm 37.625s.
+Distinct subsequent LOCK 21:07 first physical finger PASS, score 9/7,
+finger->terminal 1.956s, greeter->terminal 4.843s, subjectively
+very slow. Two other genuine S3 cycles had long initialization and
+a first 4/7 rejection, documented in
+docs/rel71.62-fast-retry-qa-20261025.md. Canonical hardware
+CSV/HOF record S3 FAIL and LOCK PASS separately. PR #24 must
+remain DRAFT, hardware NO-GO, no merge. Do not misclassify
+successful LOCK after S3 as S3 success.
+Pursue early-finger S3 session calibration with strict threshold 7;
+user enrolment and Linux native fprintd/PAM preserved. No automatic
+host suspend/reboot. Use SentinelX via Cloud9 for authorized SSH.
+
+## CURRENT 2026-10-25 17:36 CET — Pegasus rel71.62 QA INSTALLED
+
+Supersedes earlier note claiming rel71.55 currently installed. Pegasus currently runs libfprint-goodix51a0 1.94.100.goodix51a0-71.62 with GXFP_FAST_RETRY_QA=1 (ONLY) in active fprintd, original enrolled right-index-finger intact, package 32 files/0 altered. All 12 GitHub CI PASS for source ae27dd6. SHA256 917502e83a55569236a3a4fe36e4b7916001aacc51b9aa52bc9ac71ea59d953b. Snapper 1868/1869. Native rollback rel71.55 SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb verified. No reboot or suspend, global PAM/kernel/PMK/GPU changes.
+
+REMAINING HARDWARE GATE: user first physical LOCK trial (one/two/multiple, perceived speed). Read exact fprintd journal for score, READY, DETECTED, release, FAST_RETRY_QA and positive terminal; update HARDWARE_TRIALS.csv and HALL_OF_FAME.md. Reject on any regression; restore pinned rel71.55 if necessary. PR #24 DRAFT, not to merge until hardware and wrong-finger/S3/cold-boot/reboot pass. Candidate only reduces an unnecessary second-press rebase and does NOT fix first image quality. Detailed docs/rel71.62-fast-retry-qa-20261025.md.
+
+## CURRENT 2026-10-25 17:25 CET — rel71.62 fast retry QA source, NOT installed
+
+Pegasus physically powered and verified installed rel71.55, fprintd active,
+original right-index-finger enrollment intact; no experimental service
+Environment. Previous rel71.61 failed first touch (5/7 rejected, second 7/7),
+rollback rel71.55 confirmed, Snapper 1866/1867.
+
+CT700 now has QA rel71.62 opt-in GXFP_FAST_RETRY_QA=1, designed solely to
+skip an approximately 996 ms stale background recalibration during
+second-physical-press recovery when TLS/FDT/production state intact.
+Matcher threshold stays 7, first pose behavior unchanged.
+The 4 focused tests and full native software baseline compiled and PASS.
+DO NOT claim first-touch improvement; this is a second-press recovery
+latency experiment and does not fix original first score 5/7.
+The former rel71.61 score-cache feature remains present but OFF by default;
+never enable both flags together without separate A/B evidence.
+See docs/rel71.62-fast-retry-qa-20261025.md.
+Before any deployment ensure package SHA256, CI, rollback and owner physical
+LOCK after install; no host reboot/suspend, no PAM changes.
+
 ## CURRENT 2026-10-25 02:17 CEST: rel71.61 first-touch NO-GO, rel71.55 restored
 
 Real first LOCK rel71.61 user 2 poses, first 5/7 rejected, second

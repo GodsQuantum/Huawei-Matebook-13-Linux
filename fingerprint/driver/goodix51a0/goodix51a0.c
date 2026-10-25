@@ -3384,12 +3384,31 @@ gx_session_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
        * even though the reference had been refreshed only seconds earlier.
        * Rebase only when ImageBase has actually exceeded the freshness bound;
        * otherwise rearm immediately for the next physical placement. */
-      if (gx_background_is_fresh (self))
+      gboolean fast_retry_qa =
+        g_strcmp0 (g_getenv ("GXFP_FAST_RETRY_QA"), "1") == 0 &&
+        self->warm_valid && self->production_ready && self->tls_up &&
+        self->bg_frame && self->have_fdt && !self->bg_dirty &&
+        !self->s3_first_tls_pending;
+      if (gx_background_is_fresh (self) || fast_retry_qa)
         {
-          fp_info ("GXFP51A0 AUTH_TRACE retry ImageBase still fresh age=%d ms; "
-                   "rearming MCU immediately for retry %d/%d",
-                   (int) (gx_background_age_us (self) / 1000),
-                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+          /* This is a RE-ARM optimisation for a second physical pose only,
+           * not a new biometric decision. In two genuine LOCK failures the
+           * expensive stale background refresh was discarded because the
+           * finger returned during its capture, and the retained background
+           * nonetheless scored the second pose successfully. Do not block
+           * quick re-placement on a calibration already doomed by touch.
+           * Never apply while S3 TLS recovery remains pending or TLS is dirty.
+           * The default remains the original 71.55 stale-refresh policy. */
+          if (fast_retry_qa && !gx_background_is_fresh (self))
+            fp_warn ("GXFP51A0 FAST_RETRY_QA skip stale retry ImageBase "
+                     "refresh; rearming with intact authenticated "
+                     "background age_ms=%d",
+                     (int) (gx_background_age_us (self) / 1000));
+          else
+            fp_info ("GXFP51A0 AUTH_TRACE retry ImageBase still fresh age=%d ms; "
+                     "rearming MCU immediately for retry %d/%d",
+                     (int) (gx_background_age_us (self) / 1000),
+                     t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
           w->ok = gx_wakeup_mcu (self);
         }
       else
