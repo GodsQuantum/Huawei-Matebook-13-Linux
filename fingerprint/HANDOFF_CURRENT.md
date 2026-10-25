@@ -1,3 +1,11 @@
+## CURRENT 2026-10-25 23:50 CET — rel71.64 QA INSTALLED on Pegasus
+
+Pegasus actual libfprint-goodix51a0 rel71.64, active fprintd PID 276490, ONE opt-in GXFP_S3_FRESH_BG_QA=1, retained enrolled right-index finger. No reboot or forced S3. Root snapshots 1888/1889, pacman integrity 32/32, QA package SHA256 c3df31e8dd06bfc778c661a023333a632f2824b4e841bbdf524ea1c4aa46e932. Pinned rel71.55 native rollback intact SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb. rel71.63 partial flag removed.
+
+Code on branch qa/gxfp51a0-rel71.64-presleep-fresh-bg-20261025, driver hardening fc3f32e, 7 specific safety tests PASS, native compile/baseline PASS, cross distro CI 12/12 PASS. Source improvement opportunistically refreshes a PROVEN CLEAN reference before S3 with 2.3s hard deadline inside 5s native logind inhibitor; fail-closed on incomplete TLS. No matcher threshold reduction, no enrollment changes.
+
+Genuine natural deep S3 hardware test under rel71.64 NOT DONE. Need physical user observation of first pose after natural resume; inspect S3_FRESH_BG_QA, image quality, scored biometric decision and native timestamps. Do not claim resolved or merge PR #26. Prior rel71.63 S3 first image contrast failed, second finger 15/7 pass; prior S3 lock performance is not proof for the new candidate.
+
 ## CURRENT 2026-10-25 — rel71.64 clean presleep ImageBase QA development
 
 On hardware Pegasus STILL runs rel71.63 with optional partial FDT S3 handler, with real first-touch S3 FAIL (2 touches; first pre-scoring contrast reject), regular LOCK 1 touch/15 score PASS. Source branch qa/gxfp51a0-rel71.64-presleep-fresh-bg-20261025 builds only in CT700. New GXFP_S3_FRESH_BG_QA=1 opt-in collects a FINGER-OFF fresh authenticated ImageBase BEFORE native idle S3 sleep command, only if the previous ImageBase was stale, with independent live FDT before/after and deny saving a stale or contaminated snapshot if validation fails. No contrast or biometric threshold loosening. Historical failed rel71.60/61/62/63 trials retained.
