@@ -2453,10 +2453,62 @@ gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self)
    * previously clean reference. For partial/absent contact, recalibrate
    * normally. This does NOT relax quality/matcher thresholds, which still
    * require actual fingerprint evidence after the image is captured. */
-  if ((touchflag & 0x3fu) != 0x3fu ||
-      mean >= GOODIX_FDT_ABS - 30 ||
+  if (mean >= GOODIX_FDT_ABS - 30 ||
       mean >= self->s3_saved_abs)
     return FALSE;
+
+  /* On real natural S3 the FIRST arriving finger frequently activates
+   * 0x3c (four zones), then evolves to full 0x3f. Refusing even to
+   * consider a proven-clean, S3-saved ImageBase trapped the greeter in
+   * repeated 15-second finger-OFF calibrations (37.6 seconds recorded).
+   *
+   * Keep the original 6/6 gate unless QA is explicitly opted in.
+   * A 4-5 zone contact may reuse the saved, age-bounded, finger-OFF
+   * reference ONLY with two independent FDT measurements and a >=50 ADC
+   * mean drop against the preserved finger-OFF FDT baseline. This is
+   * hardware preparation, NOT biometric acceptance: the single real
+   * captured image still has to pass full quality, SIGFM and strict
+   * threshold=7 with no extra draw or template change. */
+  {
+    guint mask = touchflag & 0x3fu;
+    guint n = 0;
+    gboolean partial_qa;
+
+    for (guint bits = mask; bits; bits >>= 1)
+      n += bits & 1u;
+    partial_qa =
+      g_strcmp0 (g_getenv ("GXFP_S3_EARLY_PARTIAL_QA"), "1") == 0 &&
+      self->s3_first_tls_pending && n >= 4 && n < 6 &&
+      gx_fdt_mean (self->s3_saved_fdt) - mean >= 50;
+    if (mask != 0x3fu && !partial_qa)
+      return FALSE;
+    if (partial_qa)
+      {
+        int confirm[GXFP_FDT_ZONE_COUNT];
+        guint8 confirm_touch = 0;
+        guint confirm_n = 0;
+        guint confirm_mask;
+
+        g_usleep (GX_CALIB_POLL_US);
+        if (gx_fdt_probe_ex (self, confirm, &confirm_touch) != 0)
+          return FALSE;
+
+        confirm_mask = confirm_touch & 0x3fu;
+        for (guint bits = confirm_mask; bits; bits >>= 1)
+          confirm_n += bits & 1u;
+        mean = gx_fdt_mean (confirm);
+        if (confirm_n < 4 ||
+            mean >= GOODIX_FDT_ABS - 30 ||
+            mean >= self->s3_saved_abs ||
+            gx_fdt_mean (self->s3_saved_fdt) - mean < 50)
+          return FALSE;
+        touchflag = confirm_touch;
+        fp_warn ("GXFP51A0 S3_EARLY_PARTIAL_QA confirmed 2 FDT "
+                 "samples, zones=%u mean=%d; trusted saved background "
+                 "still requires strict biometric match",
+                 confirm_n, mean);
+      }
+  }
 
   if (!self->bg_frame)
     self->bg_frame = g_malloc (sizeof (guint16) * GOODIX_IMG_PIXELS);
