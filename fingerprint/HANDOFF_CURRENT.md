@@ -1,3 +1,9 @@
+## CURRENT 2026-10-25 17:36 CET — Pegasus rel71.62 QA INSTALLED
+
+Supersedes earlier note claiming rel71.55 currently installed. Pegasus currently runs libfprint-goodix51a0 1.94.100.goodix51a0-71.62 with GXFP_FAST_RETRY_QA=1 (ONLY) in active fprintd, original enrolled right-index-finger intact, package 32 files/0 altered. All 12 GitHub CI PASS for source ae27dd6. SHA256 917502e83a55569236a3a4fe36e4b7916001aacc51b9aa52bc9ac71ea59d953b. Snapper 1868/1869. Native rollback rel71.55 SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb verified. No reboot or suspend, global PAM/kernel/PMK/GPU changes.
+
+REMAINING HARDWARE GATE: user first physical LOCK trial (one/two/multiple, perceived speed). Read exact fprintd journal for score, READY, DETECTED, release, FAST_RETRY_QA and positive terminal; update HARDWARE_TRIALS.csv and HALL_OF_FAME.md. Reject on any regression; restore pinned rel71.55 if necessary. PR #24 DRAFT, not to merge until hardware and wrong-finger/S3/cold-boot/reboot pass. Candidate only reduces an unnecessary second-press rebase and does NOT fix first image quality. Detailed docs/rel71.62-fast-retry-qa-20261025.md.
+
 ## CURRENT 2026-10-25 17:25 CET — rel71.62 fast retry QA source, NOT installed
 
 Pegasus physically powered and verified installed rel71.55, fprintd active,
