@@ -1,3 +1,5 @@
+CURRENT 2026-10-25: rel71.63 QA Pegasus; LOCK first touch 15/7 pass 1869ms. Natural deep S3 first press rejected by contrast gate BEFORE score; second press 15/7 passed. Prewarm 4668ms, total native wake-to-positive 12555ms. This first touch was full 0x3f, NOT testing new 4-5-zone branch. S3 first-touch NO-GO. No downgrade yet; rel71.55 pinned. See 71.63 QA doc and HOF.
+
 ## CURRENT 2026-10-25 22:23 CET — rel71.63 QA INSTALLED on Pegasus
 
 This supersedes historical rel71.55-installed entries. Pegasus currently runs libfprint-goodix51a0 1.94.100.goodix51a0-71.63; fprintd PID 256412 active with GXFP_S3_EARLY_PARTIAL_QA=1 only. Original right-index-finger enrollment intact; native D-Bus fprintd-list successful, package 32 files 0 altered, Snapper 1886/1887, no reboot or forced sleep. QA package SHA256 4c67d31538bed8dc6a6e8ce82f984afc41f0b7caea83959d2ecb4b52f3aaee77. Pinned rel71.55 rollback SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb verified. All 12 GitHub checks on driver commit ff514a3 pass.
