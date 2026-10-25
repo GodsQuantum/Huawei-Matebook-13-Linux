@@ -75,3 +75,36 @@ If any first-touch regression or failed fprintd init, immediately
 roll back to pinned rel71.55 with no host reboot.
 Next gates: 5/5 physical LOCK, 3 deep-S3, 3 cold boots, 3 reboots,
 unknown-finger and password fallback, and active-Verify suspend.
+## 2026-10-25 02:02:04 CEST — real Pegasus LOCK first-touch NO-GO
+
+User confirmed two actual physical poses and uncertain speed. Installed
+rel71.61 with GXFP_VERIFY_SCORE_CACHE_QA=1 in real fprintd environment.
+FAST_READY=82ms 02:02:04.189611. Stored background aged 958665ms
+(15m59s), cold rebase deferred by already-present finger.
+First touch DETECTED_HOLD 02:02:04.683483, six zones, mean=229,
+drop=123; valid image scored 5/7 negative 02:02:05.748933.
+Cleanup finished 02:02:06.505180; RELEASED 02:02:08.990589.
+Existing stale background refresh began immediately on release but
+was discarded 02:02:09.986705 when second finger landed,
+adding ~996ms blocking time without changing the background.
+Second touch DETECTED_HOLD 02:02:10.375454 with six zones;
+primary SIGFM score=5, per-view strict photometric PIXEL_RESCUE
+passed view0 (4 inliers, overlap3426, zncc756, agreement864permille),
+effective score 7/7 positive at 02:02:11.378924; required capture
+cleanup done 02:02:12.136347, positive terminal 02:02:12.136520.
+First DETECTED to terminal 7453ms; second DETECTED to terminal
+1761ms. NO-GO first-touch, not an accepted first-pose success.
+Score-cache was configured but its fp_info reuse log was absent;
+do not claim demonstrable real-time speed benefit or causal
+responsibility for the scored mismatch. S3, cold BOOT and REBOOT
+remain UNTESTED under rel71.61.
+
+## Rollback 2026-10-25 02:16:58 CEST
+
+Native pacman downgraded to pinned verified rel71.55 package,
+SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb.
+Removed rel71.61 fprintd override, systemd daemon-reload and
+native fprintd restart. Snapper 1866/1867; 32/32 package
+files intact; active fprintd, Environment empty. No host reboot,
+forced S3, enrollment deletion or PAM/KDE/kernel/GPU/PMK changes.
+Rel71.55 is a prior functional fallback, NOT fully S3-certified.

@@ -49,6 +49,18 @@ class HallOfFameTests(unittest.TestCase):
         self.assertEqual(int(v[0]["press_to_terminal_ms"]), 7885)
         self.assertEqual(int(v[0]["fast_ready_ms"]), 83)
 
+    def test_rel7161_failed_first_touch_is_immutable(self):
+        v = [r for r in self.rows if r["version"] == "rel71.61"]
+        self.assertEqual(len(v), 1)
+        trial = v[0]
+        self.assertEqual(trial["kind"], "LOCK")
+        self.assertEqual(trial["first_touch"], "fail")
+        self.assertEqual(trial["poses"], "2")
+        self.assertEqual(trial["score"], "7")
+        self.assertEqual(trial["threshold"], "7")
+        self.assertEqual(int(trial["press_to_terminal_ms"]), 7453)
+        self.assertEqual(int(trial["fast_ready_ms"]), 82)
+
     def test_known_rejected_s3_was_not_concealed(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["version"] == "rel71.55"]
