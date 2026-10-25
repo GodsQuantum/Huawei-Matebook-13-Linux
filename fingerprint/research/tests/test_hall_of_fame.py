@@ -61,6 +61,20 @@ class HallOfFameTests(unittest.TestCase):
         self.assertEqual(int(trial["press_to_terminal_ms"]), 7453)
         self.assertEqual(int(trial["fast_ready_ms"]), 82)
 
+    def test_rel7162_s3_fail_is_distinct_from_next_lock(self):
+        a = [r for r in self.rows if r["trial_id"] == "s3-20261025-7162-natural-2106"]
+        b = [r for r in self.rows if r["trial_id"] == "lock-20261025-7162-after-s3-2107"]
+        self.assertEqual(len(a), 1)
+        self.assertEqual(len(b), 1)
+        self.assertEqual((a[0]["kind"], a[0]["first_touch"], a[0]["poses"]),
+                         ("S3", "fail", "multiple"))
+        self.assertEqual((a[0]["prewarm_ms"], a[0]["score"]), ("37625", ""))
+        self.assertEqual((b[0]["kind"], b[0]["first_touch"], b[0]["poses"]),
+                         ("LOCK", "pass", "1"))
+        self.assertEqual((b[0]["press_to_terminal_ms"],
+                          b[0]["greeter_to_terminal_ms"], b[0]["score"]),
+                         ("1956", "4843", "9"))
+
     def test_known_rejected_s3_was_not_concealed(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["version"] == "rel71.55"]
