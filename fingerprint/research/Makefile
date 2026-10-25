@@ -484,3 +484,14 @@ test_s3_long_sleep_cached_reference_safety:
 test: test_hardware_evidence_parser
 test_hardware_evidence_parser:
 	python3 ./tests/test_hardware_evidence_parser.py
+
+.PHONY: test_s3_early_partial_qa
+test: test_s3_early_partial_qa
+test_s3_early_partial_qa:
+	python3 ./tests/test_s3_early_partial_qa_source_safety.py
+
+.PHONY: test_hall_of_fame
+test: test_hall_of_fame
+test_hall_of_fame:
+	python3 ./tests/test_hall_of_fame.py
+	python3 ../scripts/gxfp51a0-hall-of-fame.py --check
