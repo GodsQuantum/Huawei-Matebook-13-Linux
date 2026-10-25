@@ -1,0 +1,496 @@
+{
+  "schema": "gxfp51a0-public-legacy-summary-v1",
+  "source_sha256": "4545cf38f7d9a33c25d6d7226e5a4ba56bfaa75f6d3f2aef369cd96d7368ff5e",
+  "source_date": "2026-10-13 Europe/Paris",
+  "source_version_count": 31,
+  "source_git_refs_count": 125,
+  "source_leaderboard_count": 14,
+  "versions": [
+    {
+      "version": "rel20",
+      "outcomes": {
+        "normal_lock": "reported_not_independently_verified",
+        "deep_s3": "unknown",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel23",
+      "outcomes": {
+        "normal_lock": "mixed",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": "warm Claim 100–120ms after >65s"
+    },
+    {
+      "version": "rel24-rc1",
+      "outcomes": {
+        "normal_lock": "pass_repeated",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": "2020 stable 626ms mean capture"
+    },
+    {
+      "version": "rel25",
+      "outcomes": {
+        "normal_lock": "mixed",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel48",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "pass_once",
+        "cold_boot_biometric": "pass_once"
+      },
+      "scores_as_documented": [
+        [
+          "S3",
+          11
+        ],
+        [
+          "cold biometric",
+          23
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel59",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "S3 after retries",
+          8
+        ]
+      ],
+      "latency_as_documented": "7.8s to READY once"
+    },
+    {
+      "version": "rel61",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "deep S3",
+          20
+        ]
+      ],
+      "latency_as_documented": "21.5s from resume to READY"
+    },
+    {
+      "version": "rel62",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "bad post S3",
+          3
+        ]
+      ],
+      "latency_as_documented": "17.37s resume to READY"
+    },
+    {
+      "version": "rel63",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "unknown",
+        "cold_boot_biometric": "fail"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": "cold prepare 4.3s, PAM→READY 1.8s"
+    },
+    {
+      "version": "rel66",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "true S3",
+          7
+        ]
+      ],
+      "latency_as_documented": "4.434s READY after wake in one conditional run"
+    },
+    {
+      "version": "rel71 LLVM22 7.2.8-1",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "pass_once",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "deep S3",
+          15
+        ]
+      ],
+      "latency_as_documented": "7.77s wake→READY; ~9s wake→match"
+    },
+    {
+      "version": "rel71 GCC 7.2.8-1",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "pass_once",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "deep S3",
+          11
+        ]
+      ],
+      "latency_as_documented": "17.44s wake→READY"
+    },
+    {
+      "version": "rel71 LLVM23 7.2.8-2",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "post S3 weak",
+          3
+        ],
+        [
+          "post S3 weak",
+          4
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.18",
+      "outcomes": {
+        "normal_lock": "pass_repeated",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK",
+          8
+        ],
+        [
+          "LOCK",
+          11
+        ],
+        [
+          "LOCK",
+          12
+        ]
+      ],
+      "latency_as_documented": "FAST_READY 82–83ms"
+    },
+    {
+      "version": "rel71.24",
+      "outcomes": {
+        "normal_lock": "pass_repeated",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "reported_not_independently_verified"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK genuine",
+          9
+        ],
+        [
+          "other enrolled finger",
+          8
+        ]
+      ],
+      "latency_as_documented": "FAST_READY 83ms"
+    },
+    {
+      "version": "rel71.30",
+      "outcomes": {
+        "normal_lock": "pass_repeated",
+        "deep_s3": "not_tested",
+        "cold_boot_biometric": "not_tested"
+      },
+      "scores_as_documented": [
+        [
+          "Pegasus verification 8/8",
+          [
+            7,
+            10,
+            7,
+            13,
+            9,
+            11,
+            11,
+            19
+          ]
+        ]
+      ],
+      "latency_as_documented": "FAST_READY 82–84ms; detect→decision ~0.8–1.2s 2020"
+    },
+    {
+      "version": "rel71.31",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.33-34",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.35",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "normal",
+          7
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.36",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "fail"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK",
+          14
+        ],
+        [
+          "true S3",
+          26
+        ]
+      ],
+      "latency_as_documented": "~25s wake→READY on successful S3"
+    },
+    {
+      "version": "rel71.37",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "unknown",
+        "cold_boot_biometric": "fail"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.38",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": "3/3 startup 7.4/14.4/15.5s; Claims ~106ms"
+    },
+    {
+      "version": "rel71.39",
+      "outcomes": {
+        "normal_lock": "unknown",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.40",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK",
+          11
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.41",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK",
+          8
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.43",
+      "outcomes": {
+        "normal_lock": "fail",
+        "deep_s3": "unknown",
+        "cold_boot_biometric": "unknown"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.44",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "mixed",
+        "cold_boot_biometric": "fail"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK first pose",
+          13
+        ],
+        [
+          "true S3 first SCORED pose",
+          8
+        ]
+      ],
+      "latency_as_documented": "83ms FAST_READY; S3 +10s READY +11s match"
+    },
+    {
+      "version": "rel71.45",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "not_tested"
+      },
+      "scores_as_documented": [
+        [
+          "LOCK first pose",
+          11
+        ]
+      ],
+      "latency_as_documented": "82ms warm, 1.2s ImageBase rebase"
+    },
+    {
+      "version": "rel71.46",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "pass_once"
+      },
+      "scores_as_documented": [
+        [
+          "BOOT 2026-10-13 16:02:06 first pose",
+          18
+        ],
+        [
+          "LOCK 2026-10-13 16:16:34 first pose",
+          7
+        ]
+      ],
+      "latency_as_documented": "boot fprintd cold prepare 16:01:36 to 16:01:57 (~21s, 2 transient TLS failures); warm FAST_READY 83ms at 16:02:01; first finger detected 16:02:05; accepted 16:02:06; PAM session 16:02:07; normal KDE LOCK 16:16:31 FAST_READY 83ms, WARM_REBASE 1222ms, READY 16:16:32, first pose 16:16:33, score7/7 ACCEPT at 16:16:34"
+    },
+    {
+      "version": "rel71.47",
+      "outcomes": {
+        "normal_lock": "pass_once",
+        "deep_s3": "fail",
+        "cold_boot_biometric": "fail"
+      },
+      "scores_as_documented": [
+        [
+          "BOOT 18:01:04 press1 partial 3zones",
+          3
+        ],
+        [
+          "BOOT 18:01:10 press2 full 6zones",
+          5
+        ],
+        [
+          "BOOT 18:01:16 press3 6zones",
+          3
+        ],
+        [
+          "BOOT retry 18:01:27 press1 2zones",
+          3
+        ],
+        [
+          "BOOT retry 18:01:31 press2 4zones",
+          3
+        ],
+        [
+          "BOOT retry 18:01:35 press3 6zones",
+          4
+        ],
+        [
+          "LOCK 2026-10-13 18:17:33 first pose full 6zones",
+          13
+        ]
+      ],
+      "latency_as_documented": null
+    },
+    {
+      "version": "rel71.48",
+      "outcomes": {
+        "normal_lock": "not_tested",
+        "deep_s3": "not_tested",
+        "cold_boot_biometric": "not_tested"
+      },
+      "scores_as_documented": [],
+      "latency_as_documented": null
+    }
+  ],
+  "legacy_leaderboard": {
+    "best_original_cold_and_deep_evidence": "rel48, tiny sample, cold score23 + S3 score11",
+    "latest_current_kernel_first_boot_match": "rel71.46 first BOOT placement 18/7 2026-10-13 16:02:06, warm READY 83ms but cold start ~21s; repeatability not established",
+    "latest_current_kernel_first_normal_lock": "rel71.46 first LOCK placement 7/7 2026-10-13 16:16:34; FAST_READY 83ms and WARM_REBASE 1222ms, repeatability not established",
+    "latest_current_kernel_real_s3_failure": "rel71.46 deep S3 16:28:37-16:28:59 FAIL; park ACK=1, postwake FDT touch0x3f contaminated calibration (no scored image) and KDE fingerprint unavailable after rearm; not robust",
+    "latest_current_kernel_cold_boot_failure": "rel71.47 after true reboot 18:00:39; prewarm ready +15s, FAST_READY 83ms; six human presses two cycles score3,5,3,3,3,4 threshold7; password fallback success; kernel unchanged 7.2.9-2, CachyOS update unrelated image libraries. BOOT=fail.",
+    "latest_current_kernel_normal_lock_success": "rel71.47 18:17:33 KDE LOCK FIRST pose 13/7, FDT touch0x3f 6 zones, FAST_READY82ms and clean WARM_REBASE1218ms. Later true deep S3 rel71.47 FAILED.",
+    "latest_current_kernel_s3_rel7147_failure": "rel71.47 real deep S3 18:51:19-18:51:23 FAIL. 0x60 park ACK, postwake FDT0x3f, 8s first calibration timeout, detached full reset, two TLS digest failures and FDT0x3f persistent. No scored image. KDE rearm unavailable.",
+    "best_single_current_kernel_real_s3": "rel71.44, score8 on 7.2.9-2, NOT robust",
+    "best_single_kernel_experiment": "rel71 LLVM22 7.2.8-1, score15 and READY +7.77s",
+    "highest_s3_score": "rel71.36 26/7, 7.2.9-1, slow25s, BOOT failed after kernel change",
+    "fastest_conditional_s3": "rel66 +4.434s READY, caveat MCU park one hour",
+    "best_independent_warm_repeatability": "rel71.30 18/20 first pose and 20/20 by 2, S3 BOOT unknown",
+    "best_hard_Tls_recovery_source": "rel71.24, targeted spidev rebind before device enumeration, S3 mixed",
+    "no_full_triple_mode_certification": true
+  }
+}
