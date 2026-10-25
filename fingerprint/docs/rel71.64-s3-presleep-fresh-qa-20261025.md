@@ -29,3 +29,14 @@ External contemporary Goodix reference projects (Sigfrodr/libfprint-goodixtls, s
 Existing natural S3 rel71.63 is first-touch FAIL (two poses) despite eventual success, while ordinary LOCK rel71.63 is first-touch PASS. This is kept in the canonical CSV. The new rel71.64 must never be marked tested/accepted simply because its source compiles.
 
 Source context: https://github.com/Sigfrodr/libfprint-goodixtls and https://github.com/szlukabence/goodix-fingerprint-spi-linux
+
+## Review 2026-10-25 of upstream suspend and image handling
+Checked Pegasus native D-Bus logind InhibitDelayMaxUSec=5000000 (5s).
+Official systemd doc: https://www.freedesktop.org/software/systemd/man/latest/logind.conf.html
+Delay-inhibitor rules: https://systemd.io/INHIBITOR_LOCKS/
+libfprint FpDevice suspend/resume lifecycle: https://fprint.freedesktop.org/libfprint-dev/FpDevice.html
+Goodix SPI imaging references: https://github.com/Sigfrodr/libfprint-goodixtls and https://github.com/szlukabence/goodix-fingerprint-spi-linux
+SIGFM small 80x64 matcher: https://github.com/goodix-fp-linux-dev/sigfm
+Opt-in 71.64 fresh finger-off ImageBase is only allowed under native S3 suspend with clean FDT.
+Follow-up safety review limited this new pre-sleep image refresh to 2.3 seconds, enforced inside plain drain, capture recipe, TLS poll and cleanup. On timeout, do not send SLEEP ACK into potentially desynchronized TLS; leave conservative cold S3 fallback. Deadline resets to zero before leaving presleep path.
+Seven targeted safety tests plus full native libfprint source and Hall of Fame baseline PASS. Isolated Arch build and fresh exact-commit CI still required. No physical S3 first-touch proof; DO NOT MERGE/PRODUCTION CERTIFY.

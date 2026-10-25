@@ -32,6 +32,28 @@ class S3PreSleepQA(unittest.TestCase):
   self.assertIn("GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US",S)
   self.assertIn("GX_S3_CLEAN_REFERENCE_MAX_US",S)
   self.assertIn("gx_s3_discard_clean_bg (self)",self.part)
+ def test_suspend_inhibitor_has_bounded_capture_deadline(self):
+  part=self.part
+  self.assertIn("G_GINT64_CONSTANT(2300000)",part)
+  self.assertIn("self->s3_presleep_deadline_us = started_us +",part)
+  self.assertIn("qa_presleep_interrupted =",part)
+  self.assertIn("self->s3_presleep_deadline_us = 0",part)
+  self.assertIn("if (!qa_presleep_interrupted && !self->capture_recovery_pending &&",part)
+  self.assertIn("pre_sleep_clean = FALSE",part)
+  a=S.index("gx_send_plain_drain (")
+  b=S.index("gx_send_capture_recipe (",a)
+  self.assertIn("self->s3_presleep_deadline_us",S[a:b])
+  a=S.index("gx_take_tls_frame (")
+  b=S.index("gx_tls_decrypt_record (",a)
+  self.assertIn("self->s3_presleep_deadline_us",S[a:b])
+  self.assertIn("self->s3_presleep_deadline_us > 0",S)
+ def test_deadline_only_live_during_presleep_refresh(self):
+  self.assertEqual(S.count("self->s3_presleep_deadline_us = started_us +"),1)
+  self.assertEqual(S.count("self->s3_presleep_deadline_us = 0;"),1)
+  self.assertIn("gx_warm_validate (self)",self.part)
+  self.assertLess(self.part.index("self->s3_presleep_deadline_us = 0"),
+                  self.part.index("gxfp_build_sleep (&packet)"))
+
  def test_security_and_native_s3_no_custom_daemon(self):
   self.assertIn("GX_MATCH_THRESHOLD            7",S)
   self.assertIn("decision=final-for-pose",S)

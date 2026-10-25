@@ -129,6 +129,7 @@ struct _FpiDeviceGoodix51A0
   gboolean      s3_first_tls_pending; /* use full recovery promptly after a real S3 failure */
   gboolean      s3_rel61_tls_fallback; /* after one detached recovery, allow historic complete TLS retry sequence */
   guint         cold_verify_placement_budget; /* first two auth transactions of this daemon only */
+  gint64        s3_presleep_deadline_us; /* QA-only hard deadline for extra presleep image */
 };
 
 G_DECLARE_FINAL_TYPE (FpiDeviceGoodix51A0, fpi_device_goodix51a0, FPI,
@@ -377,6 +378,9 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
 
   for (attempt = 1; attempt <= attempts; attempt++)
     {
+      if (self->s3_presleep_deadline_us > 0 &&
+          g_get_monotonic_time () >= self->s3_presleep_deadline_us)
+        return FALSE;
       guint8 ty;
       gboolean ack_seen = FALSE;
       gboolean tls_seen = FALSE;
@@ -406,6 +410,9 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
 
       for (i = 0; i < 120; i++)
         {
+          if (self->s3_presleep_deadline_us > 0 &&
+              g_get_monotonic_time () >= self->s3_presleep_deadline_us)
+            return FALSE;
           errno = 0;
           if (gx51_wait_irq_gpio48 (self->irq_fd, GX_DRAIN_IRQ_POLL_MS) < 0)
             {
@@ -1325,6 +1332,9 @@ gx_send_capture_recipe (FpiDeviceGoodix51A0 *self, GxCaptureKind kind)
     {
       const struct gxfp_target_packet *packet = &recipe.steps[i];
       gint64 t0 = g_get_monotonic_time ();
+      if (self->s3_presleep_deadline_us > 0 &&
+          t0 >= self->s3_presleep_deadline_us)
+        return FALSE;
 
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         return FALSE;
@@ -1356,6 +1366,9 @@ gx_take_tls_frame (FpiDeviceGoodix51A0 *self, guint8 *rec, gsize cap)
   for (k = 0; k < GX_TLS_IRQ_POLLS; k++)
     {
       guint8 ty;
+      if (self->s3_presleep_deadline_us > 0 &&
+          g_get_monotonic_time () >= self->s3_presleep_deadline_us)
+        return -1;
 
       errno = 0;
       if (gx51_wait_irq_gpio48 (self->irq_fd, GX_TLS_IRQ_POLL_MS) < 0)
@@ -1414,6 +1427,9 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   for (i = 0; i < recipe.count; i++)
     {
       const struct gxfp_target_packet *packet = &recipe.steps[i];
+      if (self->s3_presleep_deadline_us > 0 &&
+          g_get_monotonic_time () >= self->s3_presleep_deadline_us)
+        goto out;
 
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         goto out;
@@ -5106,6 +5122,7 @@ gx_dev_suspend (FpDevice *dev)
   gboolean attempted = FALSE;
   gboolean parked = FALSE;
   gboolean pre_sleep_clean = FALSE;
+  gboolean qa_presleep_interrupted = FALSE;
 
   /* The patched native libfprint idle suspend invokes this callback inside
    * fprintd's EXISTING logind delay inhibitor; there is no external service,
@@ -5163,8 +5180,22 @@ gx_dev_suspend (FpDevice *dev)
               gint64 old_refresh_us = self->bg_last_refresh_us;
               int fdt_after[GXFP_FDT_ZONE_COUNT];
               guint8 touch_after = 0xff;
+              gboolean refreshed;
+              gint64 started_us = g_get_monotonic_time ();
 
-              if (!gx_warm_validate (self) ||
+              /* systemd-logind defaults to only 5 seconds of delay-inhibit.
+               * Cap the extra QA refresh at 2.3s, leaving headroom for the
+               * native SLEEP ACK and post-transaction handling. Every GET_IMAGE
+               * drain and TLS poll checks this deadline. Incomplete images are
+               * never accepted or saved as new ImageBase. */
+              self->s3_presleep_deadline_us = started_us +
+                                             G_GINT64_CONSTANT(2300000);
+              refreshed = gx_warm_validate (self);
+              qa_presleep_interrupted =
+                g_get_monotonic_time () >= self->s3_presleep_deadline_us;
+              self->s3_presleep_deadline_us = 0;
+
+              if (!refreshed || qa_presleep_interrupted ||
                   self->bg_last_refresh_us <= old_refresh_us ||
                   !gx_background_is_fresh (self) ||
                   gx_fdt_probe_ex (self, fdt_after, &touch_after) != 0 ||
@@ -5186,7 +5217,12 @@ gx_dev_suspend (FpDevice *dev)
                 }
             }
 
-          if (gxfp_build_sleep (&packet))
+          /* If the presleep image did not finish by the bounded deadline,
+           * the TLS record may still be in flight. Do NOT send an unrelated
+           * SLEEP command into a possibly desynced transport; the following
+           * native S3 resume will cold-reset and prepare a clean context. */
+          if (!qa_presleep_interrupted && !self->capture_recovery_pending &&
+              gxfp_build_sleep (&packet))
             {
               attempted = TRUE;
               parked = gx_target_send_ack (self, &packet, 0x60, NULL);
