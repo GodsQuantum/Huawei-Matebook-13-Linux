@@ -1,3 +1,13 @@
 # rel71.65 cleanup settling QA
 
 Opt-in 30..90ms gap before FDT_UP cleanup GET_IMAGE, retains ACK/TLS/NAV/FDT_DOWN, match threshold 7, native fprintd. Hypothesis: reduce occasional 1000ms missing GET_IMAGE ACK observed after score20/7 on natural S3. No proven speedup; hardware A/B pending. No forced reboot or S3. Based on rel71.64 fresh pre-S3 ImageBase; previous failed experiments disabled. Five focused and native software tests PASS; Arch and GitHub CI still required.
+
+## 2026-10-26 12:20 CET — real Pegasus QA installation
+
+The exact candidate on branch qa/gxfp51a0-rel71.65-cleanup-settle-20261026, source commit 69ebe09, passed all 12 GitHub CI checks (KDE/PAM and distro matrix), all 5 dedicated cleanup tests and a complete native libfprint verify. Its isolated native Arch package SHA256 was checked both on CT700 and Pegasus: 5db44952796634540e55896292c9be1cfea31993d5c31bef7ea02347737058a1. Contents verified to include native libfprint and exclude unrelated global PAM writes.
+
+Installed with pacman on Pegasus as libfprint-goodix51a0 1.94.100.goodix51a0-71.65 at 12:20:17 CET. Snapper root 1912/1913. Native fprintd is active PID 58124 with TWO intentional, separate opt-ins: GXFP_S3_FRESH_BG_QA=1 (the already-successful 71.64 fresh presleep background behavior is PRESERVED) and GXFP_CLEANUP_SETTLE_QA=1 (new optional additional 30..90ms before required cleanup GET_IMAGE). NO rejected 71.61/71.62 flags enabled. Package pacman -Qkk: 32 files, 0 altered.
+
+Return-to-known-baseline archive rel71.64 was staged on Pegasus at /var/lib/gxfp51a0-qa-rollback/rel71.64.pkg.tar.zst (SHA256 c3df31e8dd06bfc778c661a023333a632f2824b4e841bbdf524ea1c4aa46e932); the independent historical 71.55 archive remains pinned SHA256 f1432414c19fd13bf5abbde9b8b713b3a606e18af89dcdb85d0c6334e5a14deb. Both were verified before upgrade. No reboot/S3 forced, no re-enrolment, no kernel/PMK/GPU/other host services changed.
+
+Physical post-install LOCK, genuine S3, and prior missing-ACK cleanup reduction remain NOT MEASURED. Historical 71.64 real S3 was a single scored Verify success 20/7 but physical pose count user-uncertain; never claim first-touch S3 certification from that alone. To compare 71.65, require human physical pose count and native journal timing from DETECTED to successful positive, the count of cleanup GET_IMAGE no-ACK retries, current pre-sleep reference age, and greeter readiness. Do not claim 71.65 speedup without those direct A/B observations. PR #27 stays DRAFT until real hardware evidence.
