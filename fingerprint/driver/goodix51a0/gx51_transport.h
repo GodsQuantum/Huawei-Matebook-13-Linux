@@ -2,6 +2,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include <linux/spi/spidev.h>
 
 #define GX51_MAX_FRAME 65535u
 #define GX51_RESET_LINE 264u
@@ -15,6 +16,9 @@ struct gx51_outer {
     uint8_t checksum;
 };
 
+/* SPI plan with an optional, zero-length CS-assert delay transaction.
+ * Return 0 on successful payload transfer, -1 on error; no silent fallback. */
+int gx51_spi_message_fd(int fd, const struct spi_ioc_transfer *payload);
 int gx51_make_outer(uint8_t type, size_t len, struct gx51_outer *out);
 uint8_t gx51_body_checksum(const uint8_t *data, size_t len);
 size_t gx51_read_chunk_size(size_t remaining);
