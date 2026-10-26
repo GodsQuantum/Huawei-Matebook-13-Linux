@@ -500,3 +500,9 @@ test_hall_of_fame:
 test: test_s3_presleep_fresh_bg_qa
 test_s3_presleep_fresh_bg_qa:
 	python3 ./tests/test_s3_presleep_fresh_bg_qa.py
+
+
+.PHONY: test_fdt_down_proof_tls_observability_qa
+test: test_fdt_down_proof_tls_observability_qa
+test_fdt_down_proof_tls_observability_qa:
+	python3 ./tests/test_fdt_down_proof_tls_observability_qa.py

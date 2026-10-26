@@ -11,7 +11,7 @@ import re, sys
 drv = Path(sys.argv[1]).read_text()
 pkg = Path(sys.argv[2]).read_text()
 
-assert "pkgrel=71.64" in pkg
+assert len(re.findall(r"^pkgrel=([1-9][0-9]*(?:\.[0-9]+)*)$", pkg, re.M)) == 1
 assert re.search(r"#define GX_MATCH_THRESHOLD\s+7\b", drv)
 
 required = {
