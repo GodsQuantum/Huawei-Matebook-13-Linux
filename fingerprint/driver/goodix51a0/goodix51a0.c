@@ -198,7 +198,7 @@ gx_wakeup_mcu (FpiDeviceGoodix51A0 *self)
 
   xfer.tx_buf = (unsigned long) wake;
   xfer.len = sizeof wake;
-  if (ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) < 1)
+  if (gx51_spi_message_fd (self->spi_fd, &xfer) < 0)
     {
       fp_warn ("GXFP51A0 AUTH_TRACE WakeupMCU raw SPI write failed");
       return FALSE;
@@ -222,7 +222,7 @@ gx_write_frame (FpiDeviceGoodix51A0 *self, guint8 type,
 
   xfer.tx_buf = (unsigned long) &hdr;
   xfer.len = sizeof hdr;
-  if (ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) < 1)
+  if (gx51_spi_message_fd (self->spi_fd, &xfer) < 0)
     return FALSE;
 
   g_usleep (2000);
@@ -230,7 +230,7 @@ gx_write_frame (FpiDeviceGoodix51A0 *self, guint8 type,
   memset (&xfer, 0, sizeof xfer);
   xfer.tx_buf = (unsigned long) body;
   xfer.len = n;
-  return ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) >= 1;
+  return gx51_spi_message_fd (self->spi_fd, &xfer) == 0;
 }
 
 
@@ -250,7 +250,7 @@ gx_read_frame (FpiDeviceGoodix51A0 *self, guint8 *out_type,
 
   xfer.rx_buf = (unsigned long) hdr;
   xfer.len = sizeof hdr;
-  if (ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) < 1)
+  if (gx51_spi_message_fd (self->spi_fd, &xfer) < 0)
     return -1;
 
   if (hdr[0] == 0xff && hdr[1] == 0xff &&
@@ -275,7 +275,7 @@ gx_read_frame (FpiDeviceGoodix51A0 *self, guint8 *out_type,
       memset (&xfer, 0, sizeof xfer);
       xfer.rx_buf = (unsigned long) (rx + off);
       xfer.len = (guint32) chunk;
-      if (ioctl (self->spi_fd, SPI_IOC_MESSAGE (1), &xfer) < 1)
+      if (gx51_spi_message_fd (self->spi_fd, &xfer) < 0)
         return -1;
       off += chunk;
     }

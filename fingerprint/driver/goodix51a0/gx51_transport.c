@@ -10,6 +10,7 @@
 #include <linux/ioctl.h>
 #include <linux/spi/spidev.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -27,6 +28,30 @@ static int gx51_sleep_us(long usec)
             return -1;
     }
     return 0;
+}
+
+/* 2026 macOS GXFP51A0 report: 50 us CS assertion before first SCLK
+ * eliminated TLS digest/no-IRQ failures on that board. Linux spidev has
+ * no direct pre-CS setup field: delay_usecs acts AFTER a transfer.
+ * Experimental two-transfer message: zero bytes, 50 us delay while CS
+ * stays asserted, followed by unchanged one-payload transfer.
+ * Only opt-in, strictly no fallback/replay if controller refuses the
+ * message (an initial transfer may already have changed MCU state).
+ * This is a lab hypothesis until actual pxa2xx trace verifies CS
+ * behavior on Pegasus. No separate GPIO CS or custom daemon. */
+int gx51_spi_message_fd(int fd, const struct spi_ioc_transfer *payload)
+{
+    const char *qa;
+    if (fd < 0 || !payload || payload->len == 0)
+        return -1;
+    qa = getenv("GXFP_SPI_CS_SETUP_QA");
+    if (qa && strcmp(qa, "1") == 0) {
+        struct spi_ioc_transfer x[2] = {{0}};
+        x[0].delay_usecs = 50;
+        x[1] = *payload;
+        return ioctl(fd, SPI_IOC_MESSAGE(2), x) >= 1 ? 0 : -1;
+    }
+    return ioctl(fd, SPI_IOC_MESSAGE(1), payload) >= 1 ? 0 : -1;
 }
 
 int gx51_make_outer(uint8_t type, size_t len, struct gx51_outer *out)
@@ -70,7 +95,7 @@ int gx51_write_frame_fd(int spi_fd, uint8_t type,
 
     x.tx_buf = (uintptr_t)&hdr;
     x.len = sizeof hdr;
-    if (ioctl(spi_fd, SPI_IOC_MESSAGE(1), &x) < 1)
+    if (gx51_spi_message_fd(spi_fd, &x) < 0)
         return -1;
 
     /* Windows GXFP51A0 mode 5: separate synchronous writes, ~2 ms gap. */
@@ -80,7 +105,7 @@ int gx51_write_frame_fd(int spi_fd, uint8_t type,
     memset(&x, 0, sizeof x);
     x.tx_buf = (uintptr_t)body;
     x.len = (uint32_t)len;
-    return ioctl(spi_fd, SPI_IOC_MESSAGE(1), &x) < 1 ? -1 : 0;
+    return gx51_spi_message_fd(spi_fd, &x);
 }
 
 int gx51_read_frame_fd(int spi_fd, int irq_gpio_fd, uint8_t *type,
@@ -99,7 +124,7 @@ int gx51_read_frame_fd(int spi_fd, int irq_gpio_fd, uint8_t *type,
     memset(&hdr, 0, sizeof hdr);
     x.rx_buf = (uintptr_t)&hdr;
     x.len = sizeof hdr;
-    if (ioctl(spi_fd, SPI_IOC_MESSAGE(1), &x) < 1)
+    if (gx51_spi_message_fd(spi_fd, &x) < 0)
         return -1;
 
     /* Interpret all-FF before header checksum: this is the target's proven
@@ -121,7 +146,7 @@ int gx51_read_frame_fd(int spi_fd, int irq_gpio_fd, uint8_t *type,
         memset(&x, 0, sizeof x);
         x.rx_buf = (uintptr_t)(body + off);
         x.len = (uint32_t)chunk;
-        if (ioctl(spi_fd, SPI_IOC_MESSAGE(1), &x) < 1)
+        if (gx51_spi_message_fd(spi_fd, &x) < 0)
             return -1;
         off += chunk;
     }
