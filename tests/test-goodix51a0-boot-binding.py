@@ -14,7 +14,7 @@ FPRINTD=(FP/'packaging/arch/fprintd-goodix51a0.conf').read_text()
 KDE=FP/'integration/plasma-login-manager-6.8.1-qa'
 PLM=(KDE/'0001-plasma-login-6.8.1-native-dual-fingerprint-password.patch').read_text()
 PKGPLM=(KDE/'PKGBUILD').read_text()
-assert "pkgrel=71.64" in PKG
+assert "pkgrel=71.65" in PKG
 assert "pkgver=1.94.100.goodix51a0" in PKG
 assert "install=libfprint-goodix51a0.install" in PKG
 assert "provides=('libfprint=1.94.100'" in PKG

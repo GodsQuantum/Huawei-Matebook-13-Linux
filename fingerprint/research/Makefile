@@ -500,3 +500,8 @@ test_hall_of_fame:
 test: test_s3_presleep_fresh_bg_qa
 test_s3_presleep_fresh_bg_qa:
 	python3 ./tests/test_s3_presleep_fresh_bg_qa.py
+
+.PHONY: test_cleanup_settle_qa
+test: test_cleanup_settle_qa
+test_cleanup_settle_qa:
+	python3 ./tests/test_cleanup_settle_qa.py
