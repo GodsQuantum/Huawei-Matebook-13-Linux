@@ -74,6 +74,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261026-7166-natural-2225 | 2026-10-26T22:25:48.846794+01:00 | rel71.66 | S3 | multiple | fail | 5.844 | 0.083 | — | — | — | —/7 |
 | lock-20261026-7167-2323 | 2026-10-26T23:22:51.043754+01:00 | rel71.67 | LOCK | 1 | pass | — | 0.291 | 1.898 | 5.523 | — | 7/7 |
 | lock-20261026-7167-2332 | 2026-10-26T23:32:13.237443+01:00 | rel71.67 | LOCK | 1 | pass | — | 0.083 | 1.878 | 4.757 | — | 14/7 |
+| s3-20261026-7167-natural-2339 | 2026-10-26T23:39:41.921373+01:00 | rel71.67 | S3 | ~2 uncertain | unknown | 9.665 | 0.082 | 1.993 | — | 13.129 | 13/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
