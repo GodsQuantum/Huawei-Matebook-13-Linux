@@ -1431,6 +1431,13 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
           g_get_monotonic_time () >= self->s3_presleep_deadline_us)
         goto out;
 
+      /* QA only: one extra native FDT_UP->GET_IMAGE settling gap.
+       * ACK, authenticated TLS image drain, NAV and FDT_DOWN remain mandatory. */
+      if (packet->inner[0] == 0x20u &&
+          g_strcmp0 (g_getenv ("GXFP_CLEANUP_SETTLE_QA"), "1") == 0 &&
+          self->tls_up && !self->capture_recovery_pending)
+        g_usleep (gx_capture_gap_us (self));
+
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         goto out;
 
