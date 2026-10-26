@@ -475,6 +475,25 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       if (out_tls_seen && tls_seen)
         *out_tls_seen = TRUE;
 
+      /* Windows returns a 0x32 ACK *and* a separate finger/FDT report
+       * before the following GET_IMAGE.  Historically this drain accepted
+       * an incomplete FDT-down as success, then sent GET_IMAGE into a sensor
+       * that might not have armed a frame, reproducing the post-S3 ACK with
+       * no subsequent TLS image.  Opt-in: require both plain replies and
+       * a validated ACK.  An incomplete 0x32 may already have executed:
+       * NEVER replay it or the next image request; recover the whole
+       * transport with the existing bounded strict TLS path. */
+      if (body[0] == 0x32u &&
+          g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0 &&
+          (got < expected_plain_replies || !ack_seen))
+        {
+          fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
+                   "replies=%d expected=%d ack=%d; bounded session recovery",
+                   got, expected_plain_replies, ack_seen ? 1 : 0);
+          gx_capture_transport_desync (self);
+          return FALSE;
+        }
+
       if (body[0] != 0x20u)
         return TRUE;
 
@@ -1352,6 +1371,7 @@ static int
 gx_take_tls_frame (FpiDeviceGoodix51A0 *self, guint8 *rec, gsize cap)
 {
   int raw, k;
+  int irq_high = 0, read_error = 0, plain_frame = 0;
 
   if (self->tls_rxlen > self->tls_rxpos)
     {
@@ -1378,10 +1398,22 @@ gx_take_tls_frame (FpiDeviceGoodix51A0 *self, guint8 *rec, gsize cap)
           continue;
         }
 
+      irq_high++;
       raw = gx_read_frame (self, &ty, rec, cap);
       if (raw > 0 && ty == GOODIX_PKT_TLS)
         return raw;
+      if (raw <= 0)
+        read_error++;
+      else if (ty == GOODIX_PKT_PLAIN)
+        plain_frame++;
     }
+  /* Only counts and frame classes: no raw frames, fingerprint pixels,
+   * TLS records, keys or personally identifying data are logged.  On
+   * genuine S3 this separates an IRQ that never rises from an invalid
+   * SPI frame or a delayed plain response after GET_IMAGE ACK. */
+  fp_warn ("GXFP51A0 TLS_FRAME_TIMEOUT_DIAG irq_high=%d "
+           "read_error=%d plain_frame=%d polls=%d",
+           irq_high, read_error, plain_frame, GX_TLS_IRQ_POLLS);
   return -1;
 }
 
