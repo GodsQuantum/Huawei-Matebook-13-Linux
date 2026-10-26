@@ -14,7 +14,11 @@ FPRINTD=(FP/'packaging/arch/fprintd-goodix51a0.conf').read_text()
 KDE=FP/'integration/plasma-login-manager-6.8.1-qa'
 PLM=(KDE/'0001-plasma-login-6.8.1-native-dual-fingerprint-password.patch').read_text()
 PKGPLM=(KDE/'PKGBUILD').read_text()
-assert "pkgrel=71.64" in PKG
+# The release is intentionally incremented for each QA candidate. Require a
+# single strictly numeric pacman pkgrel, never a version-specific hardcode.
+rel_matches = re.findall(r"^pkgrel=([1-9][0-9]*(?:\.[0-9]+)*)$", PKG, re.M)
+assert len(rel_matches) == 1, "Expected one valid positive numeric pkgrel"
+assert all(part.isdecimal() for part in rel_matches[0].split("."))
 assert "pkgver=1.94.100.goodix51a0" in PKG
 assert "install=libfprint-goodix51a0.install" in PKG
 assert "provides=('libfprint=1.94.100'" in PKG
