@@ -26,7 +26,7 @@ def load():
         assert at.tzinfo is not None and at.utcoffset() is not None
         assert last is None or last <= at, rid
         last = at
-        assert r["kind"] in {"LOCK", "S3", "COLD", "REBOOT"}, rid
+        assert r["kind"] in {"LOCK", "S3", "COLD", "REBOOT", "BOOT"}, rid
         assert r["version"].startswith("rel71."), rid
         assert r["threshold"] == "7", rid
         assert r["first_touch"] in {"pass", "fail", "unknown"}, rid
@@ -77,7 +77,7 @@ def render(rows):
               "| Version | Situation | 1ère pose | Certification de ce scénario |",
               "|---|---|---:|---|"]
     for version in dict.fromkeys(r["version"] for r in rows):
-        for kind in ("LOCK", "S3", "COLD", "REBOOT"):
+        for kind in ("LOCK", "S3", "COLD", "REBOOT", "BOOT"):
             group = [r for r in rows if r["version"] == version and
                      r["kind"] == kind and r["first_touch"] != "unknown"]
             if not group:

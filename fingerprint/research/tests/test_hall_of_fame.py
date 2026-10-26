@@ -75,6 +75,16 @@ class HallOfFameTests(unittest.TestCase):
                           b[0]["greeter_to_terminal_ms"], b[0]["score"]),
                          ("1956", "4843", "9"))
 
+    def test_rel7164_unknown_physical_pose_remains_unknown(self):
+        ids = {r["trial_id"]:r for r in self.rows}
+        s3 = ids["s3-20261026-7164-1120"]
+        boot = ids["boot-20261026-7164-0844"]
+        lock = ids["lock-20261026-7164-0846"]
+        self.assertEqual((s3["kind"],s3["first_touch"],s3["poses"]),("S3","unknown","unknown"))
+        self.assertEqual((s3["score"],s3["press_to_terminal_ms"],s3["wake_to_terminal_ms"]),("20","2995","9541"))
+        self.assertEqual((boot["kind"],boot["first_touch"],boot["poses"]),("BOOT","pass","1"))
+        self.assertEqual((lock["kind"],lock["first_touch"],lock["poses"],lock["score"]),("LOCK","pass","1","17"))
+
     def test_known_rejected_s3_was_not_concealed(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["version"] == "rel71.55"]
