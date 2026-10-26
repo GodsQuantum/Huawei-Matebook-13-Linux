@@ -35,7 +35,7 @@ class ProtocolSafety(unittest.TestCase):
         self.assertRegex(S, r"#define\s+GX_MATCH_THRESHOLD\s+7\b")
         self.assertIn("GXFP51A0 NATIVE_S3_RESUME_PREWARM_READY",S)
         self.assertIn("GXFP_S3_FRESH_BG_QA",S)
-        self.assertNotIn("GXFP_S3_LONG_FIRST_QA",S)
+        self.assertIn("GXFP_S3_LONG_FIRST_QA",S)
         self.assertNotIn("GXFP_CLEANUP_SETTLE_QA",S)
 if __name__=="__main__":
     unittest.main()
