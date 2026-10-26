@@ -638,6 +638,19 @@ gx_reset_detached_s3_boundary (FpiDeviceGoodix51A0 *self)
   if (self->s3_first_tls_pending && !self->s3_rel61_tls_fallback &&
       self->spi_fd < 0 && self->irq_fd < 0)
     {
+      /* Controlled S3-only experiment, NOT a general reset change.
+       * rel71.67 true-S3 short-first TLS failed digest; its detached
+       * long recovery later completed.  rel71.66 proved the long-first
+       * pulse can bring up TLS at once, but later image capture failed.
+       * We retain rel71.67 FDT-down 2-response proof to avoid accepting
+       * an incomplete image-arming transition, plus bounded TLS recovery.
+       * User-present hardware S3 remains the required acceptance gate. */
+      if (g_strcmp0 (g_getenv ("GXFP_S3_LONG_FIRST_QA"), "1") == 0)
+        {
+          fp_warn ("GXFP51A0 NATIVE_S3_LONG_FIRST_QA detached GPIO264 HIGH300/LOW600");
+          gx_gpio_reset (self);
+          return;
+        }
       fp_warn ("GXFP51A0 NATIVE_S3_SHORT_RESET detached GPIO264 HIGH10/LOW150");
       if (gx51_reset_gpio264_short () == 0)
         return;
