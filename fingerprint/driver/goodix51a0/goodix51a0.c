@@ -619,6 +619,17 @@ gx_reset_detached_s3_boundary (FpiDeviceGoodix51A0 *self)
   if (self->s3_first_tls_pending && !self->s3_rel61_tls_fallback &&
       self->spi_fd < 0 && self->irq_fd < 0)
     {
+      /* Opt-in reliability trial after a measured true-S3 short-reset TLS
+       * failure. The reviewed HIGH300/LOW600 reset can be selected on the
+       * first resume boundary, with SPI and IRQ ALREADY closed. No protocol
+       * reset is changed during normal LOCK or an active biometric action.
+       * Previous clean RAM-only ImageBase and TLS match gates stay strict. */
+      if (g_strcmp0 (g_getenv ("GXFP_S3_LONG_FIRST_QA"), "1") == 0)
+        {
+          fp_warn ("GXFP51A0 NATIVE_S3_LONG_FIRST_QA detached GPIO264 HIGH300/LOW600");
+          gx_gpio_reset (self);
+          return;
+        }
       fp_warn ("GXFP51A0 NATIVE_S3_SHORT_RESET detached GPIO264 HIGH10/LOW150");
       if (gx51_reset_gpio264_short () == 0)
         return;

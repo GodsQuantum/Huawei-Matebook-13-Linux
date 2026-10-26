@@ -500,3 +500,9 @@ test_hall_of_fame:
 test: test_s3_presleep_fresh_bg_qa
 test_s3_presleep_fresh_bg_qa:
 	python3 ./tests/test_s3_presleep_fresh_bg_qa.py
+
+
+.PHONY: test_s3_long_first_qa
+test: test_s3_long_first_qa
+test_s3_long_first_qa:
+	python3 ./tests/test_s3_long_first_qa.py
