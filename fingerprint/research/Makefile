@@ -520,3 +520,14 @@ test_cs_setup_spi_plan:
 test: test_s4_midcapture_saved_background_qa
 test_s4_midcapture_saved_background_qa:
 	python3 ./tests/test_s4_midcapture_saved_background_qa.py
+
+
+.PHONY: test_resume_fast_settle_qa
+test: test_resume_fast_settle_qa
+test_resume_fast_settle_qa:
+	python3 ./tests/test_resume_fast_settle_qa.py
+
+.PHONY: test_capture_performance_qa
+test: test_capture_performance_qa
+test_capture_performance_qa:
+	python3 ./tests/test_capture_performance_qa.py

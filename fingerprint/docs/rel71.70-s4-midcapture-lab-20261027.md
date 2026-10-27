@@ -14,3 +14,10 @@ No new service, sleeps, GPIO reset, global PAM, fingerprint enrollment, native m
 - Regression source tests test_s4_midcapture_saved_background_qa.py (3 cases) and full make verify (includes native libfprint compile) PASS.
 - Required next gate: genuine user-initiated S4 with *both* early finger-like contact and normal finger-off scenario, time-to-ready, first-touch success, detector/retry logs, plus ordinary LOCK and S3 to exclude regression. Do not auto-suspend Pegasus.
 - Release rel71.69 remains marked experimental publicly; issue #32 open. Candidate PR must remain DRAFT until actual hardware validation.
+
+## Additional independent performance investigation
+
+- GXFP_RESUME_FAST_SETTLE_QA=1 reduces the two historical artificial waits around the already-proven short detached reset from 1000/1000 milliseconds to **250/500 ms**, an unproven **1.25 s theoretical saving**. It preserves the exact GPIO264 HIGH10/LOW150 pulse and TLS, and defaults off. Requires real S3/S4 hardware verification; could regress on a slower power rail. Do not enable merely because CI passes.
+- GXFP_RESUME_PERF_QA=1 emits only reset+settle, cold TLS/background and full-prewarm durations; GXFP_CAPTURE_PERF_QA=1 emits image transfer, SIFT feature extraction and matching times, never raw pixels or biometric templates. Both opt-in (slight log overhead). Neither makes any authentication decision.
+- Source regression checks test_resume_fast_settle_qa.py and test_capture_performance_qa.py pass. The complete native compile and fingerprint verify PASS on isolated CT700.
+- Hardware trial protocol, once QA package installed with verified rollback: (1) ordinary LOCK first physical press, (2) naturally entered S4, keep finger off sensor until asked; then repeat with early press, (3) naturally entered S3, (4) compare per-stage logging and only then decide whether faster settle is safe. Do not auto-hibernate/reboot or assume a software pass is a physical acceptance.
