@@ -16,7 +16,7 @@ if [[ -f "$ROOT/EXPERIMENTAL_BUILD_ONLY" ]]; then
 fi
 
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.69"
+PORTABLE_RELEASE="rel71.74"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -138,7 +138,6 @@ portable_exact_installed() {
   installed_libdir="$(cat "$STATE_DIR/libdir" 2>/dev/null || true)"
   [[ -n "$installed_libdir" &&
      -f "$installed_libdir/libfprint-2.so.2.0.0" &&
-     -x "$PRESTART_RECOVERY_FILE" &&
      -x "$DOCTOR_FILE" ]] || return 1
   grep -aFq 'GXFP51A0' "$installed_libdir/libfprint-2.so.2.0.0" 2>/dev/null || return 1
 }
@@ -463,7 +462,7 @@ ExecStart=
 ExecStart=$FPRINTD_BIN --no-timeout
 TimeoutStartSec=90s
 Environment=LD_LIBRARY_PATH=$LIBDIR
-Environment=GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1
+Environment=GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1 GXFP_S4_MIDCAPTURE_REUSE_QA=1 GXFP_RESUME_PERF_QA=1 GXFP_CAPTURE_PERF_QA=1 GXFP_RESUME_FAST_SETTLE_QA=1 GXFP_RESUME_STAGE_QA=1 GXFP_PMK_CACHE_SKIP_RESET_QA=1 GXFP_HELD_FINGER_ROLLING_BG_QA=1 GXFP_POSTAUTH_CLEANUP_DEFER_QA=1
 DeviceAllow=char-gpiochip rw
 LimitCORE=0
 EOF

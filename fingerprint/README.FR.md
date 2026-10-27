@@ -1,4 +1,6 @@
-**Avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
+**Version actuelle sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
+
+**Ancien avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
 
 # Goodix GXFP51A0 / GF3658 ST411 sous Linux
 
