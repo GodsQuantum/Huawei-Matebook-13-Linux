@@ -4098,6 +4098,10 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
   guint images = 0;
   gboolean cleanup_needed = FALSE;
   const gchar *mode = gallery ? "identify" : "verify";
+  /* Stage timings, no pixels, fingerprints or templates in observability.
+   * Opt-in so normal hot capture avoids even one extra logfile write. */
+  gboolean perf_qa =
+    g_strcmp0 (g_getenv ("GXFP_CAPTURE_PERF_QA"), "1") == 0;
 
   for (guint attempt = 1; attempt <= GX_SAME_PRESS_CAPTURE_ATTEMPTS; attempt++)
     {
@@ -4106,6 +4110,9 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       gboolean ok;
       int score;
       guint candidate = 0;
+      gint64 t_start = perf_qa ? g_get_monotonic_time () : 0;
+      gint64 t_frame = 0;
+      gint64 t_features = 0;
 
       if (attempt == 1)
         {
@@ -4141,7 +4148,11 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
         }
 
       images++;
+      if (perf_qa)
+        t_frame = g_get_monotonic_time ();
       probe = gx_features_from_pixels (self, px);
+      if (perf_qa)
+        t_features = g_get_monotonic_time ();
       if (!probe)
         {
           fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
@@ -4168,6 +4179,18 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
         score = gx_score_probe_against_print (tmpl, probe, NULL, NULL);
+
+      if (perf_qa)
+        {
+          gint64 t_score = g_get_monotonic_time ();
+          fp_warn ("GXFP51A0 CAPTURE_PERF_QA mode=%s image=%u "
+                   "frame_ms=%ld sift_ms=%ld match_ms=%ld total_ms=%ld",
+                   mode, attempt,
+                   (long) ((t_frame - t_start) / 1000),
+                   (long) ((t_features - t_frame) / 1000),
+                   (long) ((t_score - t_features) / 1000),
+                   (long) ((t_score - t_start) / 1000));
+        }
 
       fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
                "score=%d threshold=%d candidate=%u decision=final-for-pose",
@@ -5354,15 +5377,28 @@ gx_resume_preflight_thread (GTask *task,
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   g_autoptr(GError) err = NULL;
   gboolean ok = FALSE;
+  gboolean fast_settle =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_FAST_SETTLE_QA"), "1") == 0;
+  gboolean profile =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_PERF_QA"), "1") == 0;
+  gint64 t_start = g_get_monotonic_time ();
+  gint64 t_prepare;
 
   gx_warm_abandon (self);
   gx_transport_close (self);
 
   /* The sensor has just resumed from deep sleep. The old host-side TLS
-   * context is never reused, and no GPIO pulse may run with live SPI/IRQ. */
-  g_usleep (G_USEC_PER_SEC);
+   * context is never reused, and no GPIO pulse may run with live SPI/IRQ.
+   *
+   * QA-only timing A/B, independently opt-in. Rel71.69 waited 1000ms on
+   * either side of the native detached reset (2000ms artificial latency).
+   * An unproven faster variant uses 250ms before and 500ms after and retains
+   * the already-hardware-validated HIGH10/LOW150 reset. No change to the
+   * default or device semantics before a real hardware A/B. */
+  g_usleep (fast_settle ? (250 * 1000) : G_USEC_PER_SEC);
   gx_reset_detached_s3_boundary (self);
-  g_usleep (G_USEC_PER_SEC);
+  g_usleep (fast_settle ? (500 * 1000) : G_USEC_PER_SEC);
+  t_prepare = g_get_monotonic_time ();
 
   if (gx_transport_open (dev, &err))
     {
@@ -5380,6 +5416,15 @@ gx_resume_preflight_thread (GTask *task,
       gx_warm_abandon (self);
       gx_transport_close (self);
     }
+
+  if (profile)
+    fp_warn ("GXFP51A0 RESUME_PERF_QA fast_settle=%d stage_reset_ms=%ld "
+             "cold_tls_background_ms=%ld total_ms=%ld success=%d",
+             fast_settle ? 1 : 0,
+             (long) ((t_prepare - t_start) / 1000),
+             (long) ((g_get_monotonic_time () - t_prepare) / 1000),
+             (long) ((g_get_monotonic_time () - t_start) / 1000),
+             ok ? 1 : 0);
 
   g_task_return_boolean (task, ok);
 }
