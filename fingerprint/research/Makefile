@@ -541,3 +541,8 @@ test_cached_score_cleanup_qa:
 test: test_resume_stage_profiling_qa
 test_resume_stage_profiling_qa:
 	python3 ./tests/test_resume_stage_profiling_qa.py
+
+.PHONY: test_pmk_cache_fast_boundary_qa
+test: test_pmk_cache_fast_boundary_qa
+test_pmk_cache_fast_boundary_qa:
+	python3 ./tests/test_pmk_cache_fast_boundary_qa.py
