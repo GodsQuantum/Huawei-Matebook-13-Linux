@@ -1226,22 +1226,44 @@ gx_upload_config_and_reqtls (FpiDeviceGoodix51A0 *self, gboolean allow_cache)
       if (!gx_factory_acquire_staging_pmk (self, allow_cache))
         return FALSE;
 
-      /* Rejected F2 staging reads are intentionally outside the normal 14115
-       * command flow. Keep the recovered PMK host-side, but return the MCU to a
-       * pristine boot state before target init. The exact reference MateBook config probe
-       * that passed starts a fresh hardware reset with A8 -> A2 -> chip-id ->
-       * OTP, so reproduce that boundary here instead of continuing after F2/E4. */
-      fp_info ("GXFP51A0 PMK retained; performing post-PMK reset before target init");
-      if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
-        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_post_stage");
-      gx_gpio_reset (self);
-      if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
-          g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
+      /* The reviewed full MCU reset is essential AFTER actual F2/E4
+       * factory boot-staging extraction: its RAM state is transient and
+       * must not reach target initialization.
+       *
+       * By contrast, an already validated 48-byte PMK read from the secure,
+       * owner-only local CACHE did NOT send any staging command to the MCU.
+       * In that case the current native S3/S4 initial reset, DriverState,
+       * FW A8 and bounded TLS preparation have already established the
+       * fresh boundary. Resetting the MCU a SECOND time solely because the
+       * host loaded a file added ~900ms and another A8 cycle on real S4.
+       *
+       * The cache-only optimization stays explicitly QA opt-in until repeated
+       * hardware tests. Failed TLS/config still runs the original bounded
+       * GPIO recovery; TLS-GCM and the real matcher cannot be bypassed. */
+      gboolean cached_pmk_fast =
+        self->psk_from_cache &&
+        g_strcmp0 (g_getenv ("GXFP_PMK_CACHE_SKIP_RESET_QA"), "1") == 0;
+      if (cached_pmk_fast)
         {
-          fp_warn ("GXFP51A0 target init failed: post-PMK reset/A8");
-          return FALSE;
+          fp_warn ("GXFP51A0 cached PMK QA: skipping unnecessary post-stage "
+                   "reset after secure cache load; full TLS validation next");
+          if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
+            fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cached_skip_post_reset");
         }
-      fp_info ("GXFP51A0 post-PMK reset/A8 confirmed: %s", fw);
+      if (!cached_pmk_fast)
+        {
+          fp_info ("GXFP51A0 PMK retained; performing reviewed post-PMK reset");
+          if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
+            fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_post_stage");
+          gx_gpio_reset (self);
+          if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
+              g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
+            {
+              fp_warn ("GXFP51A0 target init failed: post-PMK reset/A8");
+              return FALSE;
+            }
+          fp_info ("GXFP51A0 post-PMK reset/A8 confirmed: %s", fw);
+        }
     }
 
   if (!gx_target_configure (self))
