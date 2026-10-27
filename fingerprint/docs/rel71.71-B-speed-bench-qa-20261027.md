@@ -15,3 +15,19 @@
 ## Hardware certification required
 
 Physical LOCK first-touch, genuine S4 with early and normal finger contact, genuine deep S3, and repeated trials. Record ms stage timings and actual operator pose counts separately. Only ship as stable after sufficient repeatability. No automatic reboot/suspend.
+
+
+## Actual 71.71-B hardware — 27 October 2026 22:35 and 22:38 CET
+
+User: LOCK 1 physical pose, natural S3 2 physical poses. S4 not tested: user cannot interrupt ongoing work; never auto-hibernate or reboot.
+
+- LOCK 22:35:29: FAST_READY52ms; score 15/7 on first image. User-attested first pose success. Detection22:35:30.395620, first frame571ms, SIFT3ms, match119ms, mandatory cleanup559ms, positive22:35:31.649984. Finger→positive1.254s. Previous rel71.70-A 1.400s, a single observed ~146ms improvement.
+- ACPI-kernel confirmed true deep S3 (not s2idle/S4). Clean RAM snapshot and acknowledged native park at22:38:15. Resume22:38:19.843832; SHORT RESET with fast_settle=1: reset/settle910ms, cold TLS/ImageBase1493ms, automatic PREWARM_READY22:38:22.248, total2403ms. Early finger-like sensor contact FDT6/6, mean221 detected by native snapshot reuse at22:38:22.247 (before any new biometric Claim). Source gx_dev_resume/gx_resume_preflight_thread already primes transport, TLS and background automatically before fingerprint Claim: NO new service needed.
+- KDE/fingerprint greeter Claim only later: FAST_READY72ms at22:38:25.213, VERIFY_READY22:38:25.248, first pose DETECTED_HOLD22:38:25.620. First encrypted image rejected at22:38:26.392 by strict contrast quality gate, BEFORE scoring. Finger was not detected when RetryCaptureIMG probed at22:38:26.700; mandatory cleanup744ms, rearmed. Second physical pose DETECTED_HOLD22:38:27.729, capture772ms, SIFT5ms, score109ms = 11/7, required cleanup675ms, positive22:38:29.292. Second pose detection→success1.563s. True wake→success9.448s includes greeter delay and first rejected image.
+- Different-mode warning: rel71.70 previous 5.493s prewarm trial was S4, not directly comparable with current S3 2.403s. Earlier rel71.69 actual S3 prewarm was5.153s, vs2.403s here (~53% reduction across individual trials, not a stability guarantee). S4 rel71.71 remains untested.
+- KDE logged Worker not ready yet while native prewarm was running at22:38:20, then requested fingerprint about3s after sensor prewarm finished. This could be separate UI/PAM setup delay; no evidence a second custom prewarm service would improve it.
+- IMPORTANT: First failed S3 press was a contrast/hold or finger-off issue, not score below threshold7, therefore lowering the matcher threshold is unjustified. Do not accept rejected images, weaken TLS, or cache fingerprint authentication from before PAM Verify. Better future study: acquire and align FDT state/quality timing without modifying pass gates.
+
+## S4 first-touch at 23:02 — 27 October 2026
+
+Operator attests one physical pose, a little slow. Genuine ACPI S4 hibernate resumed at 23:02:20. Native prewarm starts23:02:21.003, fast GPIO reset23:02:21.258, then unexpectedly another **full GPIO264 300/600 reset** logged23:02:21.957 (source contains both PMK staging and TLS retry paths; the trigger remains unknown). Reset/settle910ms, cold TLS/background3915ms, total native prewarm **4826ms** (READY23:02:25.835). FDT initial ACK retry before ready. Native warm FDT FAST_READY83ms at23:02:27.339 with early sensor contact touch0x3f. Verified finger DETECTED23:02:27.562905. Finger image frame894ms + SIFT3ms + matcher93ms -> score8/7; four mandatory cleanup steps755ms (no timeout), terminal positive23:02:29.310581. Finger→positive1748ms and wake→positive8308ms, real first human press. Observations are single-trial, not reliable multi-S4 certification. Avoid unsafe reduction of SPI delays, PMK or encrypted cleanup.
