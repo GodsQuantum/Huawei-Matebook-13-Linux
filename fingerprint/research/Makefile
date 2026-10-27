@@ -531,3 +531,8 @@ test_resume_fast_settle_qa:
 test: test_capture_performance_qa
 test_capture_performance_qa:
 	python3 ./tests/test_capture_performance_qa.py
+
+.PHONY: test_cached_score_cleanup_qa
+test: test_cached_score_cleanup_qa
+test_cached_score_cleanup_qa:
+	python3 ./tests/test_cached_score_cleanup_qa.py

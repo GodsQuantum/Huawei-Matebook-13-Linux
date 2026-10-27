@@ -41,6 +41,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.69 | LOCK | 1/1 | Nombre insuffisant |
 | rel71.69 | S3 | 1/1 | Nombre insuffisant |
 | rel71.69 | S4 | 1/2 | ÉCHEC de première pose |
+| rel71.70 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.70 | S4 | 0/1 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -88,6 +90,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261027-7169-natural-1458 | 2026-10-27T14:58:45.886110+01:00 | rel71.69 | S3 | 1 | pass | 5.153 | 0.083 | 2.054 | — | 8.218 | 15/7 |
 | s4-20261027-7169-1719-unknown | 2026-10-27T17:19:09.649000+01:00 | rel71.69 | S4 | unknown | unknown | — | 0.083 | — | — | — | 20/7 |
 | s4-20261027-7169-1754-fail | 2026-10-27T17:54:03.206357+01:00 | rel71.69 | S4 | unknown | fail | 38.689 | 0.083 | — | — | — | —/7 |
+| lock-20261027-7170-2034 | 2026-10-27T20:34:32.356875+01:00 | rel71.70 | LOCK | 1 | pass | — | 0.053 | 1.400 | — | — | 7/7 |
+| s4-20261027-7170-2053 | 2026-10-27T20:53:04.622000+01:00 | rel71.70 | S4 | 2 (operator) | fail | 5.493 | 0.083 | 3.052 | — | — | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

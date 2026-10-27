@@ -1451,6 +1451,8 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   g_autofree guint8 *rec = g_malloc0 (GOODIX_RX_MAX);
   g_autofree guint8 *plain = g_malloc0 (GOODIX_RX_MAX);
   gboolean ok = FALSE;
+  gboolean perf_qa =
+    g_strcmp0 (g_getenv ("GXFP_CAPTURE_PERF_QA"), "1") == 0;
   gsize i;
 
   if (!gxfp_build_capture_cleanup_recipe (&recipe))
@@ -1459,6 +1461,7 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   for (i = 0; i < recipe.count; i++)
     {
       const struct gxfp_target_packet *packet = &recipe.steps[i];
+      gint64 t_step = perf_qa ? g_get_monotonic_time () : 0;
       if (self->s3_presleep_deadline_us > 0 &&
           g_get_monotonic_time () >= self->s3_presleep_deadline_us)
         goto out;
@@ -1488,6 +1491,11 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
             }
         }
 
+      if (perf_qa)
+        fp_warn ("GXFP51A0 CAPTURE_PERF_QA cleanup_step=%lu cmd=0x%02x "
+                 "processing_ms=%ld",
+                 (unsigned long) i, packet->inner[0],
+                 (long) ((g_get_monotonic_time () - t_step) / 1000));
       g_usleep (gx_capture_gap_us (self));
     }
 
@@ -3464,6 +3472,8 @@ typedef struct
   GPtrArray      *identify_gallery; /* worker-owned FpPrint refs for 1:N */
   GxSiftFeatures *feat;            /* best capture result, NULL on failure */
   guint           same_press_images;
+  int             worker_score;
+  guint           worker_candidate, worker_base, worker_adapt;
   gboolean        ok;
 } GxWork;
 
@@ -3471,7 +3481,11 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images);
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_candidate,
+                            guint                *out_base,
+                            guint                *out_adapt);
 
 static void
 gx_work_free (GxWork *w)
@@ -3552,10 +3566,15 @@ gx_capture_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
   GxWork *w = data;
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (w->dev);
 
+  w->worker_score = -1;
   if (w->verify_print || w->identify_gallery)
     w->feat = gx_capture_auth_same_press (self, w->verify_print,
                                           w->identify_gallery,
-                                          &w->same_press_images);
+                                          &w->same_press_images,
+                                          &w->worker_score,
+                                          &w->worker_candidate,
+                                          &w->worker_base,
+                                          &w->worker_adapt);
   else
     w->feat = gx_capture_features (self);
   w->ok = (w->feat != NULL);
@@ -4091,10 +4110,15 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images)
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_candidate,
+                            guint                *out_base,
+                            guint                *out_adapt)
 {
   GxSiftFeatures *best_probe = NULL;
   int best_score = -1;
+  guint best_candidate = 0, best_base = 0, best_adapt = 0;
   guint images = 0;
   gboolean cleanup_needed = FALSE;
   const gchar *mode = gallery ? "identify" : "verify";
@@ -4110,6 +4134,7 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       gboolean ok;
       int score;
       guint candidate = 0;
+      guint base_views = 0, adapt_views = 0;
       gint64 t_start = perf_qa ? g_get_monotonic_time () : 0;
       gint64 t_frame = 0;
       gint64 t_features = 0;
@@ -4178,7 +4203,8 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe, NULL, NULL);
+        score = gx_score_probe_against_print (tmpl, probe,
+                                              &base_views, &adapt_views);
 
       if (perf_qa)
         {
@@ -4201,6 +4227,9 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       best_probe = probe;
       probe = NULL;
       best_score = score;
+      best_candidate = candidate;
+      best_base = base_views;
+      best_adapt = adapt_views;
 
       /*
        * Security boundary: the first usable image is the only scored draw for
@@ -4213,7 +4242,13 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
 
   if (cleanup_needed && !self->capture_recovery_pending)
     {
-      if (!gx_send_capture_cleanup (self))
+      gint64 t_cleanup = perf_qa ? g_get_monotonic_time () : 0;
+      gboolean cleanup_ok = gx_send_capture_cleanup (self);
+      if (perf_qa)
+        fp_warn ("GXFP51A0 CAPTURE_PERF_QA cleanup_ms=%ld ok=%d",
+                 (long) ((g_get_monotonic_time () - t_cleanup) / 1000),
+                 cleanup_ok ? 1 : 0);
+      if (!cleanup_ok)
         {
           fp_warn ("GXFP51A0 same-press final cleanup failed");
           g_clear_pointer (&best_probe, gx_sift_free);
@@ -4229,6 +4264,14 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
 
   if (out_images)
     *out_images = images;
+  if (out_score)
+    *out_score = best_probe ? best_score : -1;
+  if (out_candidate)
+    *out_candidate = best_probe ? best_candidate : 0;
+  if (out_base)
+    *out_base = best_probe ? best_base : 0;
+  if (out_adapt)
+    *out_adapt = best_probe ? best_adapt : 0;
 
   fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press completed "
            "images=%u best=%d threshold=%d",
@@ -4365,23 +4408,31 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
               int best = 0;
 
               fpi_device_get_identify_data (dev, &gallery);
-              for (guint i = 0; gallery && i < gallery->len; i++)
+              if (gallery && gallery->len > 0)
                 {
-                  FpPrint *candidate = g_ptr_array_index (gallery, i);
-                  guint base_views = 0, adapt_views = 0;
-                  int score = gx_score_probe_against_print (candidate, t->probe,
-                                                            &base_views,
-                                                            &adapt_views);
-
-                  fp_info ("identify: candidate=%u score=%d threshold=%d views=%u+%u",
-                           i, score, GX_MATCH_THRESHOLD,
-                           base_views, adapt_views);
-                  if (!best_print || score > best)
+                  if (!w->identify_gallery ||
+                      w->identify_gallery->len != gallery->len ||
+                      w->worker_candidate >= gallery->len ||
+                      w->worker_score < 0)
                     {
-                      best = score;
-                      best_print = candidate;
+                      fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                        FP_DEVICE_ERROR_PROTO, "identify gallery changed"));
+                      return;
                     }
+                  for (guint i = 0; i < gallery->len; i++)
+                    if (g_ptr_array_index (gallery, i) !=
+                        g_ptr_array_index (w->identify_gallery, i))
+                      {
+                        fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                          FP_DEVICE_ERROR_PROTO, "identify gallery reordered"));
+                        return;
+                      }
+                  best = w->worker_score;
+                  best_print = g_ptr_array_index (gallery,
+                                                  w->worker_candidate);
                 }
+              fp_info ("identify: cached score=%d candidate=%u threshold=%d",
+                       best, w->worker_candidate, GX_MATCH_THRESHOLD);
 
               t->best = MAX (t->best, best);
               if (best_print && best >= GX_MATCH_THRESHOLD)
@@ -4419,13 +4470,20 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
             }
           else
             {
-              FpPrint *tmpl = NULL;
-              guint base_views = 0, adapt_views = 0;
+              /* The authenticated capture worker already scored the
+               * exact first usable frame against the held verify template.
+               * Repeating the same comparison in this callback added
+               * measured CPU latency without changing the decision. */
+              int attempt_score = w->worker_score;
+              guint base_views = w->worker_base;
+              guint adapt_views = w->worker_adapt;
 
-              fpi_device_get_verify_data (dev, &tmpl);
-              int attempt_score = gx_score_probe_against_print (tmpl, t->probe,
-                                                                  &base_views,
-                                                                  &adapt_views);
+              if (attempt_score < 0)
+                {
+                  fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                    FP_DEVICE_ERROR_PROTO, "worker score unavailable"));
+                  return;
+                }
               t->best = MAX (t->best, attempt_score);
 
               fp_info ("verify: attempt %d/%d -> %d matches (best=%d threshold=%d, %u views + %u acquired)",
