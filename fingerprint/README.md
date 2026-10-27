@@ -1,6 +1,6 @@
 # Goodix GXFP51A0 / GF3658 ST411 on Linux
 
-> **QA branch only (rel71.55, 23 October 2026):** Native S3 cancellation fixes and KDE Plasma Login Manager 6.8.1 dual-PAM code have passed software builds, but **S3, reboot, and cold BOOT are NOT physically certified**. Pegasus is running the rel71.55 QA package, not a certified release. The known-good rel71.49 driver and stock KDE 6.8.1 rollback are preserved. [Hardware certification gates](docs/real-hardware-certification.md).
+> **Historical QA note (rel71.55, 23 October 2026):** Native S3 cancellation fixes and KDE Plasma Login Manager 6.8.1 dual-PAM code have passed software builds, but **S3, reboot, and cold BOOT are NOT physically certified**. Pegasus is running the rel71.55 QA package, not a certified release. The known-good rel71.49 driver and stock KDE 6.8.1 rollback are preserved. [Hardware certification gates](docs/real-hardware-certification.md).
 
 
 Native libfprint driver and zero-to-working installer for the SPI Goodix
@@ -8,7 +8,13 @@ GXFP51A0 found in the Huawei MateBook 13 2021 family.
 
 > Français: [README.FR.md](README.FR.md) · 简体中文: [README.ZH-CN.md](README.ZH-CN.md)
 
-## Status — 2026-10-08
+## Current recommended reference — rel71.69 (27 October 2026)
+
+Native Linux/libfprint GXFP51A0 with verified 50 µs Chip Select setup. Three user-attested first-touch authentications on the reference MateBook 13 (LOCK, hibernation S4 resume and genuine deep-S3 resume); S3 wake-to-positive 8.218 s, finger-to-positive 2.054 s, score 15/7. Native fprintd and KDE/Polkit integration, password fallback, TLS-GCM, fixed matcher threshold7. Hardware evidence: [rel71.69](docs/rel71.69-hardware-final-20261027.md), [Hall of Fame](docs/HALL_OF_FAME.md). Not independently certified across machines, cold boots or repeated S3 cycles. Install from this repository's [driver-only installer](install.sh) or the standard Arch package.
+
+Earlier rel71.30 and rel71.24 reference notes below are historical, not the current package release.
+
+## Historical status — 2026-10-08
 
 ### Recommended preview: rel71.30 (reference-machine field test)
 

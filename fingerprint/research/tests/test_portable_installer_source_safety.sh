@@ -87,7 +87,7 @@ grep -Fq 'native graphical Settings' "$a"
 grep -Fq -- '--pre-enroll' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$a"
-grep -Fq 'PORTABLE_RELEASE="rel71.64-qa1"' "$i"
+grep -Fq 'PORTABLE_RELEASE="rel71.69"' "$i"
 
 # Never delete biometric templates or the validated per-unit PMK cache.
 ! grep -Eq 'rm .*goodix51a0-pmk' "$i"
@@ -114,3 +114,11 @@ grep -Fq 'org.freedesktop.DBus.ReloadConfig' "$u"
 ! grep -Fq 'integration/systemd/gxfp51a0-fprintd-suspend.service' "$root/packaging/arch/PKGBUILD"
 
 echo 'test_portable_installer_source_safety: OK (production zero-to-working path)'
+
+
+# Production rel71.69 native runtime config must be identical across distro
+# package and source installers and include all three proven opt-ins.
+for knob in GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1; do
+  grep -Fq "$knob" "$root/packaging/arch/fprintd-goodix51a0.conf"
+  grep -Fq "$knob" "$i"
+done
