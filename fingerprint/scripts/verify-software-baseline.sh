@@ -61,7 +61,14 @@ echo "SOURCE_MANIFEST=PASS"
 if ((DO_BUILD)); then
   echo ""
   echo "===== 5. REPRODUCIBLE LIBFPRINT BUILD ====="
-  "$SCRIPT_DIR/build-libfprint-v1.94.100.sh"
+  # Verification builds belong in a unique, disposable workspace, never
+  # in a persistent sibling "temp/" directory beside the canonical source.
+  # The named archive and source release are created by explicit packaging,
+  # not by this one-shot verifier. No sensor or production files are touched.
+  VERIFY_BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/gxfp51a0-verify.XXXXXXXX")"
+  trap 'if [[ -n "${VERIFY_BUILD_ROOT:-}" && -d "$VERIFY_BUILD_ROOT" ]]; then rm -rf -- "$VERIFY_BUILD_ROOT"; fi' EXIT
+  GXFP51A0_BUILD_ROOT="$VERIFY_BUILD_ROOT" "$SCRIPT_DIR/build-libfprint-v1.94.100.sh" --clean-after
+  echo "EPHEMERAL_BUILD_CLEANUP=ON_EXIT"
 else
   echo "LIBFPRINT_BUILD=SKIPPED_BY_USER"
 fi

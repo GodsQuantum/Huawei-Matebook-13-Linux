@@ -16,6 +16,8 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 
 </div>
 
+**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/HANDOFF_CURRENT.md). rel71.69 est la référence, les versions antérieures sont historiques.
+
 ## Choisir son installation
 
 **Pilote d’empreintes seul :** `./fingerprint/install.sh` ([archive autonome](fingerprint/DRIVER_ONLY.md)). **Configuration complète (empreintes + MX250) :** `./install.sh`. **Vérification du matériel sans modification :** `./install.sh --doctor-only`.

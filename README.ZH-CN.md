@@ -16,6 +16,8 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 
 </div>
 
+**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/HANDOFF_CURRENT.md)。rel71.69 是参考版本，旧版本资料仅供历史查阅。
+
 ## 选择安装方式
 
 **仅安装指纹驱动：** `./fingerprint/install.sh`（[独立源码包](fingerprint/DRIVER_ONLY.md)）。**完整 MateBook 13 配置（指纹 + MX250）：** `./install.sh`。**只读硬件检查：** `./install.sh --doctor-only`。
