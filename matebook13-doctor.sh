@@ -138,10 +138,18 @@ fi
 if [[ -e /sys/bus/spi/devices/spi-GXFP51A0:00 ]]; then
   ok "GXFP51A0 SPI fingerprint device detected"
   command -v fprintd-list >/dev/null 2>&1 && ok "fprintd client installed" || note "fprintd client missing"
-  if [[ -x /usr/libexec/gxfp51a0-prestart-recover || -x /usr/local/libexec/gxfp51a0-prestart-recover ]]; then
-    ok "GXFP51A0 pre-enumeration recovery helper installed"
+  # Current rel71.69 handles reset, S3 and prewarm inside native libfprint /
+  # resident fprintd. The old external recovery helper was intentionally
+  # removed, so its absence must not be reported as a failed requirement.
+  if command -v systemctl >/dev/null 2>&1 &&
+     systemctl is-active --quiet fprintd.service &&
+     [[ -r /usr/lib/systemd/system/fprintd.service.d/50-goodix51a0-runtime.conf ]]; then
+    ok "GXFP51A0 native fprintd lifecycle active (no external helper needed)"
+  elif [[ -x /usr/libexec/gxfp51a0-prestart-recover ||
+          -x /usr/local/libexec/gxfp51a0-prestart-recover ]]; then
+    info "Legacy external fingerprint recovery helper detected"
   else
-    note "GXFP51A0 recovery helper not installed"
+    note "GXFP51A0 native fprintd service or package integration missing"
   fi
 else
   info "GXFP51A0 not present; fingerprint module skipped"
