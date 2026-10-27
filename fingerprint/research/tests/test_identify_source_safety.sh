@@ -19,7 +19,8 @@ b=s.index("else\n        {", a)
 auth=s[a:b]
 assert "t->identifying" in auth
 assert "GX_MATCH_THRESHOLD" in auth
-assert "gx_score_probe_against_print" in auth
+assert "w->worker_score" in auth
+assert "worker_score < 0" in auth
 assert "fpi_device_identify_report" in auth
 assert "fpi_device_verify_report" in auth
 
