@@ -513,3 +513,10 @@ test_cs_setup_spi_plan:
 	cc -D_GNU_SOURCE -std=c11 -Wall -Wextra -Werror -I./../driver/goodix51a0 ./tests/test_cs_setup_spi_plan.c ../driver/goodix51a0/gx51_transport.c -Wl,--wrap=ioctl -o /tmp/gxfp-cs-setup-lab-test
 	/tmp/gxfp-cs-setup-lab-test
 	rm -f /tmp/gxfp-cs-setup-lab-test
+
+
+# Explicit S4 mid-capture rescue safety gate (lab-only, runtime option default off).
+.PHONY: test_s4_midcapture_saved_background_qa
+test: test_s4_midcapture_saved_background_qa
+test_s4_midcapture_saved_background_qa:
+	python3 ./tests/test_s4_midcapture_saved_background_qa.py
