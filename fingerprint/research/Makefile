@@ -536,3 +536,8 @@ test_capture_performance_qa:
 test: test_cached_score_cleanup_qa
 test_cached_score_cleanup_qa:
 	python3 ./tests/test_cached_score_cleanup_qa.py
+
+.PHONY: test_resume_stage_profiling_qa
+test: test_resume_stage_profiling_qa
+test_resume_stage_profiling_qa:
+	python3 ./tests/test_resume_stage_profiling_qa.py
