@@ -61,7 +61,7 @@ class ManagerV3Tests(unittest.TestCase):
             env = test_env(Path(d))
             p = bash(self.source_cmd('printf "%s|%s|%s\\n" "$VERSION" "$STATE_SCHEMA" "$INSTALL_SCHEMA"'), env)
             self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertEqual(p.stdout.strip(), "3.2.1|3|4")
+            self.assertEqual(p.stdout.strip(), "3.2.2|3|4")
 
     def test_01_state_round_trip(self):
         with tempfile.TemporaryDirectory() as d:
@@ -647,6 +647,50 @@ class ManagerV3Tests(unittest.TestCase):
             """)
             x = bash(code,env)
             self.assertEqual(x.returncode,0,x.stderr)
+
+    def test_32d_kwin_only_repair_without_packages(self):
+        with tempfile.TemporaryDirectory() as d:
+            td = Path(d); env = test_env(td)
+            conf = Path(env["HUAWEI_GPU_SYSTEM_CONFIG"])
+            conf.parent.mkdir(parents=True)
+            conf.write_text('DGPU_DEVICE="0x1d13"\n')
+            card = td / "card"
+            card.write_text("")
+            alias = td / "alias"
+            alias.symlink_to(card)
+            code = self.source_cmd(f"""
+                INTEL_ALIAS='{alias}'
+                plasma_wayland_detected(){{ return 0; }}
+                kwin_version(){{ echo 6.8.1; }}
+                load_discovered(){{ :; }}
+                systemctl(){{ :; }}
+                doctor(){{ echo DOCTOR_OK; }}
+                repair_kwin_only
+                grep -Fqx 'Environment=KWIN_DRM_DEVICES={alias}' "$KWIN_DROPIN"
+            """)
+            p = bash(code, env)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertIn("DOCTOR_OK", p.stdout)
+
+    def test_32e_kwin_only_repair_refuses_missing_install(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = test_env(Path(d))
+            p = bash(self.source_cmd("repair_kwin_only"), env)
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("not installed", p.stderr)
+
+    def test_32f_kwin_renderer_classification(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = test_env(Path(d))
+            p = bash(self.source_cmd("""
+                classify_kwin_renderer 'Mesa Intel(R) UHD Graphics'
+                classify_kwin_renderer 'llvmpipe LLVM'
+                classify_kwin_renderer 'NVIDIA GeForce'
+                classify_kwin_renderer ''
+            """), env)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertEqual(p.stdout.strip().splitlines(),
+                             ["INTEL", "SOFTWARE", "NVIDIA_UNEXPECTED", "UNKNOWN"])
 
     def test_33_dashboard_is_no_wake_and_source_checkout_is_not_rewritten(self):
         text = SCRIPT.read_text()
