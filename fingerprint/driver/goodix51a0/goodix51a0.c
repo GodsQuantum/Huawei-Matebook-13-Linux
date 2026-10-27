@@ -2511,15 +2511,28 @@ gx_s3_snapshot_clean_bg (FpiDeviceGoodix51A0 *self)
   gint64 age = self->bg_last_refresh_us > 0 ?
                now - self->bg_last_refresh_us : G_MAXINT64;
 
-  gx_s3_discard_clean_bg (self);
+  gboolean rolling =
+    g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0;
+
+  /* A clean backup is separate from transport/TLS reliability. If a previous
+   * image cleanup broke the TLS stream, keep the last independently proven
+   * clean background: later S3/S4 cannot create one with the finger already
+   * on the glass. Non-QA behavior still discards as before. */
   /* The only accepted backgrounds were captured with a fully clear sensor
    * AND a valid subsequent FDT baseline. Never retain pending, dirty,
    * missing or old references from an unfinished biometric operation. */
-  if (!self->warm_valid || !self->bg_frame || !self->have_fdt ||
+  if ((!self->warm_valid && !rolling) ||
+      !self->bg_frame || !self->have_fdt ||
       self->bg_dirty || !self->tls_up || age < 0 ||
-      age > GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US || boot <= 0)
-    return;
+      age > GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US || boot <= 0 ||
+      gx_fdt_mean (self->fdt_base) < GOODIX_FDT_ABS)
+    {
+      if (!rolling || !self->s3_saved_bg)
+        gx_s3_discard_clean_bg (self);
+      return;
+    }
 
+  gx_s3_discard_clean_bg (self);
   self->s3_saved_bg =
     g_memdup2 (self->bg_frame, sizeof (guint16) * GOODIX_IMG_PIXELS);
   memcpy (self->s3_saved_fdt, self->fdt_base,
@@ -2642,7 +2655,12 @@ gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self)
            "normal strict image/matcher gates still required",
            touchflag, mean, self->fdt_abs,
            (int) ((saved_age + elapsed) / 1000));
-  gx_s3_discard_clean_bg (self);
+  /* Normally this is a single-use S3 snapshot. QA-only rolling cache keeps
+   * a known clean ImageBase RAM-only across successive wake/transport errors
+   * until the next independently clean background replaces it or 12h expire.
+   * The next encrypted finger frame STILL has to pass full quality + 7 score. */
+  if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") != 0)
+    gx_s3_discard_clean_bg (self);
   return TRUE;
 }
 
@@ -2689,6 +2707,26 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
    * real finger. Longer sleep or partial contact retains cold calibration. */
   if (!capture_diagnostic && gx_s3_try_early_finger_reference (self))
     return TRUE;
+
+  /* The first post-S4 FDT request can be lost once (ACK retry observed).
+   * Without another chance we enter a long finger-OFF calibration loop,
+   * even though a clean RAM-only background exists. In QA mode retry only
+   * the read-only FDT proof; do not acquire/accept a touched ImageBase. */
+  if (!capture_diagnostic &&
+      g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0 &&
+      self->s3_saved_bg)
+    {
+      for (guint proof_attempt = 0; proof_attempt < 2; proof_attempt++)
+        {
+          g_usleep (35 * 1000);
+          if (gx_s3_try_early_finger_reference (self))
+            {
+              fp_warn ("GXFP51A0 HELD_FINGER_QA early contact "
+                       "proved on retry=%u without lift", proof_attempt + 1);
+              return TRUE;
+            }
+        }
+    }
 
   /* Both the background and the detection baseline are only meaningful with
    * the finger LIFTED. A finger left resting on the sensor when the operation
@@ -2855,7 +2893,17 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
     return FALSE;
 
   if (self->have_fdt)
-    gx_s3_discard_clean_bg (self);
+    {
+      if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0)
+        {
+          /* The background was captured with no finger, and the following
+           * four FDT baselines individually proved no-contact. Copy it
+           * BEFORE any later biometric/TLS cleanup can fail. */
+          gx_s3_snapshot_clean_bg (self);
+        }
+      else
+        gx_s3_discard_clean_bg (self);
+    }
   return self->have_fdt;
 }
 
@@ -4304,7 +4352,23 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (!cleanup_ok)
         {
           fp_warn ("GXFP51A0 same-press final cleanup failed");
-          g_clear_pointer (&best_probe, gx_sift_free);
+          /* Authenticated TLS image + completed biometric match came BEFORE
+           * the protocol cleanup. A missing post-capture FDT response must
+           * retire this TLS session, but not retroactively erase valid
+           * positive biometric evidence. Never apply to enroll, a negative
+           * score, missing/partial image or a cancelled operation. */
+          if (g_strcmp0 (g_getenv ("GXFP_POSTAUTH_CLEANUP_DEFER_QA"), "1") == 0 &&
+              (tmpl || gallery) && best_probe &&
+              best_score >= GX_MATCH_THRESHOLD &&
+              self->capture_recovery_pending)
+            {
+              self->force_cold_reset = TRUE;
+              fp_warn ("GXFP51A0 POSTAUTH_CLEANUP_DEFER_QA "
+                       "authenticated score=%d; retiring failed TLS context "
+                       "at Close; positive first press preserved", best_score);
+            }
+          else
+            g_clear_pointer (&best_probe, gx_sift_free);
         }
       else
         {
@@ -5461,7 +5525,17 @@ gx_dev_suspend (FpDevice *dev)
     gx_s3_snapshot_clean_bg (self);
   else
     {
-      gx_s3_discard_clean_bg (self);
+      /* If a cleanup/desync made warm=0 just before suspend, preserve the
+       * last independently verified no-finger RAM baseline. It remains
+       * age-bounded, only becomes active on a live 6/6 finger FDT proof,
+       * and is never reused as a TLS session or a biometric image. */
+      if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0 &&
+          self->s3_saved_bg)
+        fp_warn ("GXFP51A0 HELD_FINGER_QA retaining proven clean RAM "
+                 "reference despite warm=%d parked=%d",
+                 warm ? 1 : 0, parked ? 1 : 0);
+      else
+        gx_s3_discard_clean_bg (self);
       if (warm && idle && parked)
         fp_warn ("GXFP51A0 NATIVE_S3_CLEAN_REFERENCE_NOT_SAVED "
                  "pre_sleep_clear=%d recent_reference=%d",

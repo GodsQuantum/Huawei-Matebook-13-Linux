@@ -546,3 +546,8 @@ test_resume_stage_profiling_qa:
 test: test_pmk_cache_fast_boundary_qa
 test_pmk_cache_fast_boundary_qa:
 	python3 ./tests/test_pmk_cache_fast_boundary_qa.py
+
+.PHONY: test_held_finger_resume_qa
+test: test_held_finger_resume_qa
+test_held_finger_resume_qa:
+	python3 ./tests/test_held_finger_resume_qa.py
