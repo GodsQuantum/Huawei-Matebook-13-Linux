@@ -2692,6 +2692,30 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 
         fp_warn ("GXFP51A0 background contaminated by touch: mean=%d anchor=%d touch=0x%02x; discarding",
                  mean, off_anchor_mean, touchflag);
+
+        /* LAB ONLY, default off: the validated pre-S4 clean RAM background
+         * may have been available before this image capture, but the sensor
+         * was clear on our first early-reference check and the user placed
+         * a finger DURING the background capture.  The original sequence
+         * then spent repeated 15s cycles waiting for an empty sensor.
+         *
+         * Re-evaluate the existing age-bounded, independently validated
+         * clean S3/S4 snapshot only on explicit opt-in.  This helper
+         * rejects absent/partial finger and stale saved calibration, then
+         * restores the old verified finger-OFF ImageBase, never the frame
+         * contaminated above.  The next real TLS image, full image-quality
+         * tests and unchanged matcher threshold 7 remain mandatory.
+         *
+         * If no trusted snapshot/full-contact proof exists, preserve the
+         * old strict finger-off wait and rejection. No GPIO or PAM change. */
+        if (g_strcmp0 (g_getenv ("GXFP_S4_MIDCAPTURE_REUSE_QA"), "1") == 0 &&
+            gx_s3_try_early_finger_reference (self))
+          {
+            fp_warn ("GXFP51A0 S4_MIDCAPTURE_SAVED_REFERENCE strict prior "
+                     "background restored after rejecting touched image");
+            return TRUE;
+          }
+
         /* Wait for a genuinely STABLE lift before spending another whole
          * image cycle; a quick release/re-press was the S3 failure pattern. */
         if (!gx_wait_sensor_clear_stable (self, off_anchor_mean, NULL,
