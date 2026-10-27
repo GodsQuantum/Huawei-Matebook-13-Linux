@@ -962,11 +962,23 @@ gx_factory_acquire_staging_pmk (FpiDeviceGoodix51A0 *self, gboolean allow_cache)
 {
   int attempt;
 
+  gboolean stage_qa =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
   if (allow_cache && gx_pmk_cache_load (self))
-    return TRUE;
+    {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cache hit=1");
+      return TRUE;
+    }
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cache hit=0 "
+             "cache_allowed=%d", allow_cache ? 1 : 0);
 
   for (attempt = 1; attempt <= GXFP_PMK_ACQUIRE_ATTEMPTS; attempt++)
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_staging "
+                 "attempt=%d", attempt);
       gx_gpio_reset (self);
       fp_info ("GXFP51A0 PMK staging attempt %d/%d after hardware reset",
                attempt, GXFP_PMK_ACQUIRE_ATTEMPTS);
@@ -1220,6 +1232,8 @@ gx_upload_config_and_reqtls (FpiDeviceGoodix51A0 *self, gboolean allow_cache)
        * that passed starts a fresh hardware reset with A8 -> A2 -> chip-id ->
        * OTP, so reproduce that boundary here instead of continuing after F2/E4. */
       fp_info ("GXFP51A0 PMK retained; performing post-PMK reset before target init");
+      if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_post_stage");
       gx_gpio_reset (self);
       if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
           g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
@@ -2116,8 +2130,21 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
           break;
         }
 
-      if (gx_upload_config_and_reqtls (self, TRUE) &&
-          gx_tls_handshake (self))
+      gboolean stage_qa =
+        g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
+      gint64 qa_start = stage_qa ? g_get_monotonic_time () : 0;
+      gboolean config_ok = gx_upload_config_and_reqtls (self, TRUE);
+      gint64 qa_config = stage_qa ? g_get_monotonic_time () : 0;
+      gboolean handshake_ok = config_ok && gx_tls_handshake (self);
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=tls_attempt attempt=%d "
+                 "config_ok=%d handshake_ok=%d pmk_cache=%d "
+                 "config_ms=%ld handshake_ms=%ld",
+                 att, config_ok ? 1 : 0, handshake_ok ? 1 : 0,
+                 self->psk_from_cache ? 1 : 0,
+                 (long) ((qa_config - qa_start) / 1000),
+                 (long) ((g_get_monotonic_time () - qa_config) / 1000));
+      if (handshake_ok)
         break;
 
       gx_tls_teardown (self);
@@ -2169,6 +2196,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
 
             fp_warn ("GXFP51A0 NATIVE_S3_TLS_DETACHED_RETRY closing SPI/IRQ before GPIO264 reset");
             gx_transport_close (self);
+            if (stage_qa)
+              fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=tls_detached_retry");
             gx_gpio_reset (self);
             if (!gx_transport_open (FP_DEVICE (self), &reopen_error))
               {
@@ -2181,6 +2210,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
           {
             /* normal in-process TLS retry remains byte-for-byte the
              * historical rel61 behavior, avoiding rel71.21 regression. */
+            if (stage_qa)
+              fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=tls_in_process_retry");
             gx_gpio_reset (self);
           }
 
@@ -4951,6 +4982,11 @@ static gboolean
 gx_cold_prepare (FpiDeviceGoodix51A0 *self)
 {
   gchar fw[64] = "";
+  gboolean stage_qa =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
+  gint64 qa_t0 = stage_qa ? g_get_monotonic_time () : 0;
+  gint64 qa_stage = qa_t0;
+  gboolean driverstate_ok;
 
   self->fdt_abs = GOODIX_FDT_ABS;
 
@@ -4963,18 +4999,29 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
   if (self->capture_gap_scale < GX_CAPTURE_SCALE_MIN)
     self->capture_gap_scale = GX_CAPTURE_SCALE_MIN;
 
-  if (!gx_driverstate_install_windows (self))
+  driverstate_ok = gx_driverstate_install_windows (self);
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=driverstate elapsed_ms=%ld "
+             "ack=%d sleep_boundary=%d",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000),
+             driverstate_ok ? 1 : 0, self->s3_first_tls_pending ? 1 : 0);
+  if (!driverstate_ok)
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=driverstate_silent");
       fp_info ("GXFP51A0: DriverState silent; applying reviewed Windows fallback reset");
       gx_gpio_reset (self);
       fp_warn ("GXFP51A0: continuing to init_MCU after DriverState fallback as Windows does");
     }
+  qa_stage = stage_qa ? g_get_monotonic_time () : 0;
 
   if (gx_read_fw_version (self, fw, sizeof fw))
     fp_info ("GXFP51A0 firmware: %s", fw);
   else
     {
       fp_info ("GXFP51A0: three A8 attempts silent; applying common-init reset fallback");
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=fw_version_silent");
       gx_gpio_reset (self);
       if (gx_read_fw_version_once (self, fw, sizeof fw))
         fp_info ("GXFP51A0 firmware after reset fallback: %s", fw);
@@ -4982,7 +5029,11 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
         fp_warn ("GXFP51A0: no A8 firmware response after final fallback");
     }
 
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=fw_version elapsed_ms=%ld",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000));
   fp_info ("GXFP51A0 opened; experimental PMK/TLS/capture path enabled");
+  qa_stage = stage_qa ? g_get_monotonic_time () : 0;
 
   if (g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") ||
       g_getenv ("GXFP_DIAGNOSTIC_ONESHOT") ||
@@ -4994,6 +5045,10 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
    * MCU boundary between attempts and the production PMK fallback. */
   if (!gx_prepare_capture_context (self, FALSE))
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=full_capture_context "
+                 "elapsed_ms=%ld success=0",
+                 (long) ((g_get_monotonic_time () - qa_stage) / 1000));
       fp_warn ("GXFP51A0 cold preparation failed after bounded recovery");
       gx_invalidate_capture_context (self);
       gx_tls_teardown (self);
@@ -5002,6 +5057,11 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
       return FALSE;
     }
 
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=full_capture_context "
+             "elapsed_ms=%ld total_cold_ms=%ld success=1",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000),
+             (long) ((g_get_monotonic_time () - qa_t0) / 1000));
   /* Protocol ACK/FDT misses measured during this cold preparation are useful
    * controller-speed evidence before the user ever touches the sensor.  Seed
    * the capture gap conservatively from that evidence so the first biometric
