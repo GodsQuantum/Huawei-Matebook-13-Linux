@@ -171,10 +171,9 @@ The manager installs a per-user systemd drop-in with:
 
 ```text
 KWIN_DRM_DEVICES=/dev/dri/huawei-matebook-intel
-KWIN_RENDER_NODES=
 ```
 
-The second setting is particularly relevant to Plasma 6.7+ GPU-manager behavior. The root helper also verifies the outcome at runtime and **fails closed** if a compositor grabs NVIDIA before the managed application starts.
+Empty KWIN_RENDER_NODES= can make KWin use software rendering and is intentionally not installed. On KWin 6.8.0 the symlink pin is disabled because of KDE issue 527309; KWin 6.8.1+ restores it. After a distribution/KWin update, run HUAWEI --gpu doctor, and if KWIN_ISOLATION shows missing or CONFIG_DRIFT=YES, run HUAWEI --gpu repair-kwin. This changes only the user-level KWin drop-in, never fingerprints, packages, NVIDIA modules, PCI or initramfs, and takes effect on next graphical login. The doctor also checks the live KWin renderer when accessible over D-Bus to identify software fallback without restarting the compositor. Do not apply cross-GPU NVIDIA tearing workarounds automatically to the Intel internal panel. The root helper also verifies the outcome at runtime and **fails closed** if a compositor grabs NVIDIA before the managed application starts.
 
 ## Other desktops
 
