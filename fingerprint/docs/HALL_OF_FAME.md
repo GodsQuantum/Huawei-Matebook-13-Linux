@@ -6,7 +6,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Discipline | Temps | Version | Essai |
 |---|---:|---|---|
-| LOCK : doigt → succès | **1.711 s** | rel71.55 | lock-20261024-1 |
+| LOCK : doigt → succès | **1.374 s** | rel71.69 | lock-20261027-7169-0204 |
 | LOCK : KDE → succès | **3.488 s** | rel71.55 | lock-20261024-1 |
 | S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
 | S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
@@ -38,6 +38,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.67 | LOCK | 2/2 | Nombre insuffisant |
 | rel71.68 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.68 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.69 | LOCK | 2/2 | Nombre insuffisant |
+| rel71.69 | S3 | 1/1 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -80,6 +82,9 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261027-7168-0019 | 2026-10-27T00:19:58.428781+01:00 | rel71.68 | LOCK | 2 | fail | — | 0.083 | 6.872 | — | — | 12/7 |
 | lock-20261027-7168-0020 | 2026-10-27T00:20:11.882466+01:00 | rel71.68 | LOCK | 1 | pass | — | 0.082 | 1.860 | — | — | 7/7 |
 | s3-20261027-7168-natural-0021 | 2026-10-27T00:21:36.860422+01:00 | rel71.68 | S3 | many | fail | — | — | — | — | — | —/7 |
+| lock-20261027-7169-0204 | 2026-10-27T02:04:33.795536+01:00 | rel71.69 | LOCK | 1 | pass | — | 0.051 | 1.374 | — | — | 7/7 |
+| lock-20261027-7169-s4resume-1457 | 2026-10-27T14:57:25.932538+01:00 | rel71.69 | LOCK | 1 | pass | — | 0.085 | 1.826 | — | — | 11/7 |
+| s3-20261027-7169-natural-1458 | 2026-10-27T14:58:45.886110+01:00 | rel71.69 | S3 | 1 | pass | 5.153 | 0.083 | 2.054 | — | 8.218 | 15/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

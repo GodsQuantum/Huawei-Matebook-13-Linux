@@ -10,7 +10,7 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20reference-2D8542)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
@@ -67,7 +67,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **rel71.30 推荐预览版 · rel71.24 S3 验证回退** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
+| **指纹** | **rel71.69 推荐参考版 · 参考设备已验证 S3 和 S4** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |
@@ -76,7 +76,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-**默认指纹安装版本：rel71.30**。在 MateBook 13 参考机通过 KDE 原生界面重新录入后，8/8 次校验捕获达到固定阈值 7。rel71.24 仍是最近通过冷启动/deep-S3 全面验证的回退版本；已在参考机上完成未录入手指的初步拒绝测试，但其他设备、冷启动与 deep-S3 仍需验证。
+**默认指纹安装版本：rel71.69**。在参考 MateBook 13 上，2026 年 10 月 27 日的普通锁屏、S4 休眠恢复及真实 S3 深度睡眠恢复均一次按指成功。S3 恢复后 5.153 秒完成传感器预热、8.218 秒完成认证，得分 15/7。通过 Linux 内核 SPI 跟踪确认 50 微秒 Chip Select 准备时间；保留密码登录、TLS 和固定阈值 7。其他设备、冷启动、多次 S3 和非录入手指测试仍需进一步验证。参见 [rel71.69 硬件记录](fingerprint/docs/rel71.69-hardware-final-20261027.md)。
 
 - 参考机 warm FAST_READY 约 **82–83 ms**
 - GPIO264 active-HIGH 短脉冲 recovery
@@ -86,7 +86,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 - 不融合分数
 - 保留与 v4 版指纹模板的兼容性
 
-技术记录：[已验证 rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [推荐预览版 rel71.30](fingerprint/docs/candidate-71.30.md)
+技术记录：[rel71.69 参考版](fingerprint/docs/rel71.69-hardware-final-20261027.md) · [rel71.30 历史版](fingerprint/docs/candidate-71.30.md)
 
 在参考 MateBook 13 上又完成了负面测试：未录入手指的 2/3/4 分均被拒绝，已录入右手食指获得 16 分并成功解锁（阈值保持 7）。Ubuntu 可选择仅安装指纹驱动 `./fingerprint/install.sh`，或完整 HUAWEI/GPU 安装 `./install.sh`；必须匹配 `GXFP51A0` 与显卡 `10de:1d13`，Ubuntu 24.04/26.04 LTS 的源码编译 CI 全部通过（7/7 发行版矩阵），但 Ubuntu 真实指纹硬件、GPU 和 GUI/PAM 运行仍未验证。
 

@@ -10,7 +10,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20reference-2D8542)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
@@ -67,7 +67,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 | Area | Status | Policy |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.30 recommended preview · rel71.24 S3-validated rollback** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
+| **Fingerprint** | **rel71.69 recommended reference · one verified S3 + S4 on reference unit** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
 | **MX250 power** | **GPU Manager v3.2** | Intel-first session; MX250 PCI-off while idle; R580 + PRIME only for managed dGPU apps |
 | **Huawei hotkeys / Fn-lock / battery interfaces** | **Mainline Linux** | Use `huawei_wmi`; do not duplicate it |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **Native Linux** | Verify only |
@@ -76,7 +76,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 ## Fingerprint
 
-**Default fingerprint install: rel71.30.** After KDE-native re-enrollment, eight post-enrollment verification captures passed on the Huawei MateBook 13 reference machine at threshold 7 (scores 7, 10, 7, 13, 9, 11, 11, 19). rel71.24 remains the last fully cold-boot/deep-S3 validated rollback. An initial wrong-finger check on the reference unit also rejected three unenrolled-finger placements (scores 2, 3, 4) and then accepted the enrolled finger at score 16. Broader cross-finger and other-machine evidence is still required.
+**Default fingerprint install: rel71.69.** Actual reference MateBook 13 with GXFP51A0 passed three operator-attested first-touch authentications (LOCK, S4 hibernation return, genuine deep S3 on 27 October 2026). Native S3 became ready after 5.153 s, positive after 8.218 s from wake; measured finger-to-positive 2.054 s and score 15/7. rel71.69 adds native 50 µs SPI CS-to-clock setup validated using kernel SPI tracepoints, plus proven clean S3 reference and strict FDT acknowledgement gates. **More S3 cycles, cold boots, reboots and wrong-finger testing are still required for broader certification.** Prior rel71.30 and rel71.24 data are preserved as historical references. See [rel71.69 measured hardware evidence](fingerprint/docs/rel71.69-hardware-final-20261027.md) and the [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 
 - warm readiness around **82–83 ms** on the validated reference unit;
 - short active-HIGH GPIO264 recovery;
@@ -86,7 +86,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 - no score fusion;
 - existing template-v4 enrollments remain compatible.
 
-Technical records: [validated rel71.24](fingerprint/docs/validated-checkpoint-71.24.md) · [recommended preview rel71.30](fingerprint/docs/candidate-71.30.md)
+Technical records: [rel71.69 reference](fingerprint/docs/rel71.69-hardware-final-20261027.md) · [historical rel71.30](fingerprint/docs/candidate-71.30.md)
 
 Driver-only install (no Huawei/GPU Manager). See [standalone guide](fingerprint/DRIVER_ONLY.md):
 

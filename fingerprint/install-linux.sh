@@ -16,7 +16,7 @@ if [[ -f "$ROOT/EXPERIMENTAL_BUILD_ONLY" ]]; then
 fi
 
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.64-qa1"
+PORTABLE_RELEASE="rel71.69"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -422,6 +422,7 @@ if (( ! SYSTEMD_AVAILABLE )); then
   cat > "$TMP_STATE/fprintd-wrapper" <<EOF
 #!/bin/sh
 export LD_LIBRARY_PATH="$LIBDIR\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
+export GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1
 "$PRESTART_RECOVERY_FILE"
 exec "$FPRINTD_BIN" --no-timeout "\$@"
 EOF
@@ -462,6 +463,7 @@ ExecStart=
 ExecStart=$FPRINTD_BIN --no-timeout
 TimeoutStartSec=90s
 Environment=LD_LIBRARY_PATH=$LIBDIR
+Environment=GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1
 DeviceAllow=char-gpiochip rw
 LimitCORE=0
 EOF

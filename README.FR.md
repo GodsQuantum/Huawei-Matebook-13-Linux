@@ -10,7 +10,7 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.30%20preview-24C8DB)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.30)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20reference-2D8542)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
@@ -67,7 +67,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.30 préversion recommandée · rel71.24 rollback S3 validé** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
+| **Fingerprint** | **rel71.69 référence recommandée · S3 et S4 vérifiés sur le PC de référence** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -76,7 +76,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-**Installation par défaut : rel71.30.** Après réenrôlement par l'interface native KDE, 8/8 captures de vérification ont réussi sur le MateBook 13 de référence (seuil 7). rel71.24 reste le dernier rollback intégralement validé après démarrage à froid/deep-S3. Un premier essai avec le majeur non enregistré a été refusé trois fois (scores 2/3/4), puis l'index enregistré a été accepté directement (score 16, seuil 7). Il reste à vérifier d'autres appareils et configurations.
+**Installation par défaut : rel71.69.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;
@@ -86,7 +86,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 - aucune fusion de scores ;
 - empreintes au format v4 conservées.
 
-Documentation : [rel71.24 validée](fingerprint/docs/validated-checkpoint-71.24.md) · [rel71.30 recommandée en préversion](fingerprint/docs/candidate-71.30.md)
+Documentation : [rel71.69 référence](fingerprint/docs/rel71.69-hardware-final-20261027.md) · [rel71.30 historique](fingerprint/docs/candidate-71.30.md)
 
 **Ubuntu :** les installateurs prévoient le pilote seul (`./fingerprint/install.sh`) ou l'ensemble HUAWEI/GPU (`./install.sh` après `./install.sh --doctor-only`). Il faut le capteur exact `GXFP51A0` ; la gestion du GPU nécessite une MX250 `10de:1d13` et NVIDIA R580 adapté au noyau. La compilation du pilote en CI est désormais **validée sur Ubuntu 24.04 et 26.04 LTS** (matrice complète : 7/7). Les essais réels du capteur sous Ubuntu, Secure Boot/DKMS, GPU MX250 et l'intégration PAM graphique restent à vérifier.
 
