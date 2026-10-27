@@ -16,6 +16,8 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 </div>
 
+**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/HANDOFF_CURRENT.md). rel71.69 is the reference; older benchmarks are historical.
+
 ## Choose your install
 
 **Fingerprint driver only:** `./fingerprint/install.sh` ([standalone archive](fingerprint/DRIVER_ONLY.md)). **Full MateBook 13 setup (fingerprint + MX250):** `./install.sh`. **Read-only compatibility check:** `./install.sh --doctor-only`.
