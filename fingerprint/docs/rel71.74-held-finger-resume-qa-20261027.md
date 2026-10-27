@@ -15,3 +15,12 @@ A brand-new sensor with no prior independently validated no-finger baseline cann
 
 ## Software validation
 Dedicated test_held_finger_resume_qa.py initially RED then GREEN, 5 safety assertions. Full native libfprint make verify passes on CT700 without touching production sensor. Real LOCK, natural S3, real S4 are pending on this source, and it MUST remain experimental with rollback. No agent-triggered suspend/reboot.
+
+
+## Deployed QA state (28 October 2026 local, 00:15 CET)
+
+Arch package libfprint-goodix51a0 1.94.100.goodix51a0-71.74 from source commit c796136, SHA256 20c9ce0ee5548c033cba7619076a0ad16b8bf77e635b41a4fb1881407a27ab09. Built only in CT700 Arch container. Installed on Pegasus over existing rel71.73 via pacman -U, Snapper pre1958/post1959. ACTIVE fprintd PID627240, pacman -Qkk 32/32 files intact, enrolled right index preserved. Production service flags include BOTH independent QA repairs, other tested rel71.73 settings unchanged.
+
+Native automatic cold initialization logged PMK cache hit+TLS attempt1 good, verified clean ImageBase at 00:15:30 (NATIVE_S3_CLEAN_REFERENCE_SAVED age206ms RAM-only). This proves the new rolling-cache hook is exercised in cold fprintd startup, but NOT that first touch after a real S3 or S4 is fixed; physical operator tests are pending.
+
+Previous SHA-pinned Pegasus rollback rel71.71-B speed package SHA 6a34c70bc6001b7c6d7f2213ae56b239cd8371d9e811c584edb4bb54b59a8314, and rel71.72 SHA 0018d1fba0d13f12c8c078f870dff29b7ed0d610dcd6d872beea2a85ad38cd67 preserved. No forced power cycle or re-enrollment. To undo QA: sudo pacman -U --noconfirm /var/lib/gxfp51a0-qa-rollback/rel71.71-B-speed.pkg.tar.zst
