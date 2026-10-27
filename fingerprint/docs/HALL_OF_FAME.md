@@ -38,12 +38,13 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.67 | LOCK | 2/2 | Nombre insuffisant |
 | rel71.68 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.68 | S3 | 0/1 | ÉCHEC de première pose |
-| rel71.69 | LOCK | 2/2 | Nombre insuffisant |
+| rel71.69 | LOCK | 1/1 | Nombre insuffisant |
 | rel71.69 | S3 | 1/1 | Nombre insuffisant |
+| rel71.69 | S4 | 1/2 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
-| Essai | Heure (Europe/Paris) | Version | Mode | Poses | Première | Préwarm S3 | FDT | Doigt→succès | KDE→succès | Réveil→succès | Score |
+| Essai | Heure (Europe/Paris) | Version | Mode | Poses | Première | Préchauffage S3/S4 | FDT | Doigt→succès | KDE→succès | Réveil→succès | Score |
 |---|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|
 | reboot-20261023-1 | 2026-10-23T13:12:03+02:00 | rel71.55 | REBOOT | 1 | pass | — | — | — | — | — | 10/7 |
 | lock-20261023-1 | 2026-10-23T13:17:00+02:00 | rel71.55 | LOCK | 1 | pass | — | 0.083 | — | — | — | 15/7 |
@@ -83,8 +84,10 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261027-7168-0020 | 2026-10-27T00:20:11.882466+01:00 | rel71.68 | LOCK | 1 | pass | — | 0.082 | 1.860 | — | — | 7/7 |
 | s3-20261027-7168-natural-0021 | 2026-10-27T00:21:36.860422+01:00 | rel71.68 | S3 | many | fail | — | — | — | — | — | —/7 |
 | lock-20261027-7169-0204 | 2026-10-27T02:04:33.795536+01:00 | rel71.69 | LOCK | 1 | pass | — | 0.051 | 1.374 | — | — | 7/7 |
-| lock-20261027-7169-s4resume-1457 | 2026-10-27T14:57:25.932538+01:00 | rel71.69 | LOCK | 1 | pass | — | 0.085 | 1.826 | — | — | 11/7 |
+| lock-20261027-7169-s4resume-1457 | 2026-10-27T14:57:25.932538+01:00 | rel71.69 | S4 | 1 | pass | — | 0.085 | 1.826 | — | — | 11/7 |
 | s3-20261027-7169-natural-1458 | 2026-10-27T14:58:45.886110+01:00 | rel71.69 | S3 | 1 | pass | 5.153 | 0.083 | 2.054 | — | 8.218 | 15/7 |
+| s4-20261027-7169-1719-unknown | 2026-10-27T17:19:09.649000+01:00 | rel71.69 | S4 | unknown | unknown | — | 0.083 | — | — | — | 20/7 |
+| s4-20261027-7169-1754-fail | 2026-10-27T17:54:03.206357+01:00 | rel71.69 | S4 | unknown | fail | 38.689 | 0.083 | — | — | — | —/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

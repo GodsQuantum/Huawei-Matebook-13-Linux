@@ -1,3 +1,5 @@
+**Avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
+
 # Goodix GXFP51A0 / GF3658 ST411 sous Linux
 
 > **Note historique QA (rel71.55, 23 octobre 2026) :** les corrections natives S3 et la connexion biométrique parallèle de Plasma Login Manager 6.8.1 ont réussi leurs tests logiciels. **La veille S3, le redémarrage et le démarrage à froid ne sont PAS encore certifiés sur le matériel.** Pegasus teste actuellement rel71.55 sans certification matérielle ; le retour arrière vers rel71.49 et KDE 6.8.1 d'origine est conservé. [Critères de certification](docs/real-hardware-certification.md).
@@ -7,7 +9,7 @@ famille Huawei MateBook 13 2021.
 
 > English: [README.md](README.md) · 简体中文: [README.ZH-CN.md](README.ZH-CN.md)
 
-## Version recommandée — rel71.69 (27 octobre 2026)
+## Version expérimentale — fiabilité S4 non établie — rel71.69 (27 octobre 2026)
 
 Pilote libfprint natif avec temporisation SPI CS de 50 µs vérifiée par traçage noyau. Trois succès matériels à la première pose sur le MateBook 13 (LOCK, hibernation S4, veille profonde S3). S3 : réveil→succès 8,218 s, doigt→succès 2,054 s, score 15/7. L'intégration KDE/Polkit utilise fprintd et préserve le mot de passe. Le seuil 7 et TLS-GCM sont intacts. Voir [preuve rel71.69](docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](docs/HALL_OF_FAME.md). Certification multi-appareils et démarrages froids non réalisée. Les notes rel71.30/71.24 ci-dessous sont historiques.
 

@@ -1,3 +1,5 @@
+**REVISION 2026-10-27: REL71.69 IS EXPERIMENTAL / NOT S4-STABLE.** The documented successes below were genuine but did not predict the later 17:54 S4 resume failure with 38.69s calibration and zero images. [Confirmed evidence](rel71.69-s4-hibernate-failure-20261027.md), [issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32).
+
 # rel71.69 — matériel réel, référence recommandée pour GXFP51A0/ST411 (27 octobre 2026)
 
 **Décision utilisateur:** « LOCK 1 pose, bien ; retour après hibernation / batterie et empreinte première pose rapide ; puis veille S3 : première pose longue ; je pense qu'on entérine cette version ». Trois authentifications utilisateur sur capteur réel après installation QA rel71.69 avec CS→SCLK 50us et FDT proof/FRESH BG conservés.

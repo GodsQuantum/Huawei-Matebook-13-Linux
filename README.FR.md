@@ -10,13 +10,15 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20reference-2D8542)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20EXPERIMENTAL-critical)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
 </div>
 
-**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/HANDOFF_CURRENT.md). rel71.69 est la référence, les versions antérieures sont historiques.
+**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/HANDOFF_CURRENT.md). rel71.69 est expérimentale (S4 non fiable) ; les versions antérieures sont historiques.
+
+**Avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
 
 ## Choisir son installation
 
@@ -69,7 +71,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.69 référence recommandée · S3 et S4 vérifiés sur le PC de référence** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
+| **Fingerprint** | **rel71.69 EXPÉRIMENTALE · échec intermittent au retour S4** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |

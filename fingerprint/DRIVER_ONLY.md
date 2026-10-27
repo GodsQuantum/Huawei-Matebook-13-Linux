@@ -1,3 +1,5 @@
+**Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
+
 # GXFP51A0 / GF3658 ST411 — standalone fingerprint driver
 
 This is the **driver-only** distribution. It does not install Huawei GPU Manager, a custom GUI, or the HUAWEI control center.

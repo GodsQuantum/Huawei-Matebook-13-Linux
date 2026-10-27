@@ -10,13 +10,15 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20reference-2D8542)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20EXPERIMENTAL-critical)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
 </div>
 
-**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/HANDOFF_CURRENT.md)。rel71.69 是参考版本，旧版本资料仅供历史查阅。
+**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/HANDOFF_CURRENT.md)。rel71.69 为实验版（S4 不可靠），旧版本资料仅供历史查阅。
+
+**指纹可靠性警告（2026-10-27）：** rel71.69 现在标记为**实验性预览版本**。一次真实 S4 休眠恢复需要 38.69 秒才能完成传感器准备，且指纹登录未成功。之前个别 LOCK、S3、S4 成功案例不能证明可靠性。参见 [问题 #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32)，务必保留密码登录。
 
 ## 选择安装方式
 
@@ -69,7 +71,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **rel71.69 推荐参考版 · 参考设备已验证 S3 和 S4** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
+| **指纹** | **rel71.69 实验性预览 · S4 恢复可能失败** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |

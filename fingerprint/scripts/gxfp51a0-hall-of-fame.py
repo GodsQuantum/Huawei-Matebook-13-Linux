@@ -26,7 +26,7 @@ def load():
         assert at.tzinfo is not None and at.utcoffset() is not None
         assert last is None or last <= at, rid
         last = at
-        assert r["kind"] in {"LOCK", "S3", "COLD", "REBOOT", "BOOT"}, rid
+        assert r["kind"] in {"LOCK", "S3", "S4", "COLD", "REBOOT", "BOOT"}, rid
         assert r["version"].startswith("rel71."), rid
         assert r["threshold"] == "7", rid
         assert r["first_touch"] in {"pass", "fail", "unknown"}, rid
@@ -38,7 +38,7 @@ def load():
         for k in METRICS:
             if r[k]:
                 assert int(r[k]) > 0, rid
-        if r["kind"] != "S3":
+        if r["kind"] not in ("S3", "S4"):
             assert not r["prewarm_ms"] and not r["wake_to_terminal_ms"], rid
     return rows
 
@@ -77,7 +77,7 @@ def render(rows):
               "| Version | Situation | 1ère pose | Certification de ce scénario |",
               "|---|---|---:|---|"]
     for version in dict.fromkeys(r["version"] for r in rows):
-        for kind in ("LOCK", "S3", "COLD", "REBOOT", "BOOT"):
+        for kind in ("LOCK", "S3", "S4", "COLD", "REBOOT", "BOOT"):
             group = [r for r in rows if r["version"] == version and
                      r["kind"] == kind and r["first_touch"] != "unknown"]
             if not group:
@@ -89,7 +89,7 @@ def render(rows):
                       "Scénario réussi ; autres gates ouverts")
             parts.append(f"| {version} | {kind} | {good}/{len(group)} | {status} |")
     parts += ["", "## Essais horodatés", "",
-              "| Essai | Heure (Europe/Paris) | Version | Mode | Poses | Première | Préwarm S3 | FDT | "
+              "| Essai | Heure (Europe/Paris) | Version | Mode | Poses | Première | Préchauffage S3/S4 | FDT | "
               "Doigt→succès | KDE→succès | Réveil→succès | Score |",
               "|---|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|"]
     for r in rows:
