@@ -138,7 +138,7 @@ fi
 if [[ -e /sys/bus/spi/devices/spi-GXFP51A0:00 ]]; then
   ok "GXFP51A0 SPI fingerprint device detected"
   command -v fprintd-list >/dev/null 2>&1 && ok "fprintd client installed" || note "fprintd client missing"
-  # Current rel71.69 handles reset, S3 and prewarm inside native libfprint /
+  # Current rel71.74 handles reset, S3 and prewarm inside native libfprint /
   # resident fprintd. The old external recovery helper was intentionally
   # removed, so its absence must not be reported as a failed requirement.
   if command -v systemctl >/dev/null 2>&1 &&
