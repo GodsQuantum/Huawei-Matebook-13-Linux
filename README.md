@@ -10,13 +10,13 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20EXPERIMENTAL-critical)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.74%20REFERENCE-informational)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.74)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
 </div>
 
-**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/HANDOFF_CURRENT.md). rel71.69 is experimental with an open S4 failure; older benchmarks are historical.
+**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/HANDOFF_CURRENT.md). rel71.74 is the reference-machine production release; repeated S4 remains unverified (issue #32). Older rel71.69 data are historical.
 
 **Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 
@@ -71,7 +71,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 | Area | Status | Policy |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.69 EXPERIMENTAL · intermittent S4 unavailable after 38.69s calibration** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
+| **Fingerprint** | **rel71.74 reference-machine production · repeated S4 not certified** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
 | **MX250 power** | **GPU Manager v3.2** | Intel-first session; MX250 PCI-off while idle; R580 + PRIME only for managed dGPU apps |
 | **Huawei hotkeys / Fn-lock / battery interfaces** | **Mainline Linux** | Use `huawei_wmi`; do not duplicate it |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **Native Linux** | Verify only |
@@ -80,7 +80,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 ## Fingerprint
 
-**Default fingerprint install: rel71.69.** Actual reference MateBook 13 with GXFP51A0 passed three operator-attested first-touch authentications (LOCK, S4 hibernation return, genuine deep S3 on 27 October 2026). Native S3 became ready after 5.153 s, positive after 8.218 s from wake; measured finger-to-positive 2.054 s and score 15/7. rel71.69 adds native 50 µs SPI CS-to-clock setup validated using kernel SPI tracepoints, plus proven clean S3 reference and strict FDT acknowledgement gates. **More S3 cycles, cold boots, reboots and wrong-finger testing are still required for broader certification.** Prior rel71.30 and rel71.24 data are preserved as historical references. See [rel71.69 measured hardware evidence](fingerprint/docs/rel71.69-hardware-final-20261027.md) and the [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
+**Historical rel71.69 hardware measurements (not current install):** Actual reference MateBook 13 with GXFP51A0 passed three operator-attested first-touch authentications (LOCK, S4 hibernation return, genuine deep S3 on 27 October 2026). Native S3 became ready after 5.153 s, positive after 8.218 s from wake; measured finger-to-positive 2.054 s and score 15/7. rel71.69 adds native 50 µs SPI CS-to-clock setup validated using kernel SPI tracepoints, plus proven clean S3 reference and strict FDT acknowledgement gates. **More S3 cycles, cold boots, reboots and wrong-finger testing are still required for broader certification.** Prior rel71.30 and rel71.24 data are preserved as historical references. See [rel71.69 measured hardware evidence](fingerprint/docs/rel71.69-hardware-final-20261027.md) and the [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 
 - warm readiness around **82–83 ms** on the validated reference unit;
 - short active-HIGH GPIO264 recovery;
