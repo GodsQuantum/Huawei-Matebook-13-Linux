@@ -1,3 +1,5 @@
+**当前参考机版本：rel71.74（2026-10-28）。** 锁屏指纹一次触摸成功，S3 一次触摸为用户报告。最近 S3/S4 因 KDE 与 Cloud9 NFS 自动挂载冲突未真正睡眠。重复 S4 和其他机型未认证；保留密码登录。详见 [证据与限制](docs/rel71.74-production-20261028.md)。
+
 # Goodix GXFP51A0 / GF3658 ST411 Linux 驱动
 
 > **仅供 QA 测试的分支（rel71.55，2026 年 10 月 23 日）：** 原生 S3 取消修复和 Plasma Login Manager 6.8.1 并行指纹/PAM 实现已通过软件构建测试，**但 S3、重新启动和冷启动尚未通过真机认证。** Pegasus 已安装 rel71.55 QA 测试版，尚未通过硬件认证；保留 rel71.49 与原版 KDE 6.8.1 回滚方案。参见 [硬件认证条件](docs/real-hardware-certification.md)。

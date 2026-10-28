@@ -1,10 +1,12 @@
-**Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
+**Current rel71.74 (2026-10-28)** supersedes rel71.69. Normal installation enables the same reference-machine wake and post-auth recovery settings. Repeatable S4 is not yet certified; retain passwords and rollback packages. [Release evidence](docs/rel71.74-production-20261028.md).
+
+**Historical rel71.69 fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 
 # GXFP51A0 / GF3658 ST411 — standalone fingerprint driver
 
 This is the **driver-only** distribution. It does not install Huawei GPU Manager, a custom GUI, or the HUAWEI control center.
 
-**Default: rel71.69 recommended reference (2026-10-27).** The reference MateBook 13/GXFP51A0 has demonstrated three operator-attested first-touch authentications across LOCK, S4 hibernation resume and genuine S3. Real S3 wake-to-positive was 8.218 s with score 15/7. The Linux SPI CS→first-clock timing fix is confirmed by kernel SPI tracepoints. The native fprintd/PAM integration preserves password access, biometric threshold 7, encrypted TLS records and existing enrollment. More cycles and multi-machine validation remain open. See [hardware evidence](docs/rel71.69-hardware-final-20261027.md) and [Hall of Fame](docs/HALL_OF_FAME.md).
+**Historical default rel71.69 (2026-10-27), now superseded.** The reference MateBook 13/GXFP51A0 has demonstrated three operator-attested first-touch authentications across LOCK, S4 hibernation resume and genuine S3. Real S3 wake-to-positive was 8.218 s with score 15/7. The Linux SPI CS→first-clock timing fix is confirmed by kernel SPI tracepoints. The native fprintd/PAM integration preserves password access, biometric threshold 7, encrypted TLS records and existing enrollment. More cycles and multi-machine validation remain open. See [hardware evidence](docs/rel71.69-hardware-final-20261027.md) and [Hall of Fame](docs/HALL_OF_FAME.md).
 
 ## Supported hardware and limitations
 
@@ -19,7 +21,7 @@ This is the **driver-only** distribution. It does not install Huawei GPU Manager
 
 ## Option A — GitHub driver-only source archive (all supported distros)
 
-Download the **`gxfp51a0-driver-only-rel71.69.tar.gz`** attachment from the rel71.69 GitHub release, then extract it. Its top-level directory contains **only** `fingerprint/` and no MateBook-specific GPU/application manager.
+Download the **`gxfp51a0-driver-only-rel71.74.tar.gz`** attachment from the rel71.69 GitHub release, then extract it. Its top-level directory contains **only** `fingerprint/` and no MateBook-specific GPU/application manager.
 
 From the extracted archive root:
 
@@ -33,7 +35,7 @@ You can alternatively clone the full repo and execute `./fingerprint/install.sh`
 
 ## Option B — Arch/CachyOS precompiled driver
 
-Download the prebuilt `libfprint-goodix51a0-1.94.100.goodix51a0-71.69-x86_64.pkg.tar.zst` release asset. Compare its SHA-256 with the release notes and install via `sudo pacman -U` after reviewing package contents and conflicts. This replaces the distro `libfprint` package with the reviewed driver package; do not force package conflicts. The package contains the bounded pre-enumeration helper and boot prime in addition to libfprint; it is **not** just a bare .so.
+Download the prebuilt `libfprint-goodix51a0-1.94.100.goodix51a0-71.74-x86_64.pkg.tar.zst` release asset. Compare its SHA-256 with the release notes and install via `sudo pacman -U` after reviewing package contents and conflicts. This replaces the distro `libfprint` package with the reviewed driver package; do not force package conflicts. The package includes native libfprint/fprintd resident configuration; no extra prewarm helper or sleep service.
 
 ## Fingerprints — native GUI only
 

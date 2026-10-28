@@ -962,11 +962,23 @@ gx_factory_acquire_staging_pmk (FpiDeviceGoodix51A0 *self, gboolean allow_cache)
 {
   int attempt;
 
+  gboolean stage_qa =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
   if (allow_cache && gx_pmk_cache_load (self))
-    return TRUE;
+    {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cache hit=1");
+      return TRUE;
+    }
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cache hit=0 "
+             "cache_allowed=%d", allow_cache ? 1 : 0);
 
   for (attempt = 1; attempt <= GXFP_PMK_ACQUIRE_ATTEMPTS; attempt++)
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_staging "
+                 "attempt=%d", attempt);
       gx_gpio_reset (self);
       fp_info ("GXFP51A0 PMK staging attempt %d/%d after hardware reset",
                attempt, GXFP_PMK_ACQUIRE_ATTEMPTS);
@@ -1214,20 +1226,44 @@ gx_upload_config_and_reqtls (FpiDeviceGoodix51A0 *self, gboolean allow_cache)
       if (!gx_factory_acquire_staging_pmk (self, allow_cache))
         return FALSE;
 
-      /* Rejected F2 staging reads are intentionally outside the normal 14115
-       * command flow. Keep the recovered PMK host-side, but return the MCU to a
-       * pristine boot state before target init. The exact reference MateBook config probe
-       * that passed starts a fresh hardware reset with A8 -> A2 -> chip-id ->
-       * OTP, so reproduce that boundary here instead of continuing after F2/E4. */
-      fp_info ("GXFP51A0 PMK retained; performing post-PMK reset before target init");
-      gx_gpio_reset (self);
-      if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
-          g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
+      /* The reviewed full MCU reset is essential AFTER actual F2/E4
+       * factory boot-staging extraction: its RAM state is transient and
+       * must not reach target initialization.
+       *
+       * By contrast, an already validated 48-byte PMK read from the secure,
+       * owner-only local CACHE did NOT send any staging command to the MCU.
+       * In that case the current native S3/S4 initial reset, DriverState,
+       * FW A8 and bounded TLS preparation have already established the
+       * fresh boundary. Resetting the MCU a SECOND time solely because the
+       * host loaded a file added ~900ms and another A8 cycle on real S4.
+       *
+       * The cache-only optimization stays explicitly QA opt-in until repeated
+       * hardware tests. Failed TLS/config still runs the original bounded
+       * GPIO recovery; TLS-GCM and the real matcher cannot be bypassed. */
+      gboolean cached_pmk_fast =
+        self->psk_from_cache &&
+        g_strcmp0 (g_getenv ("GXFP_PMK_CACHE_SKIP_RESET_QA"), "1") == 0;
+      if (cached_pmk_fast)
         {
-          fp_warn ("GXFP51A0 target init failed: post-PMK reset/A8");
-          return FALSE;
+          fp_warn ("GXFP51A0 cached PMK QA: skipping unnecessary post-stage "
+                   "reset after secure cache load; full TLS validation next");
+          if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
+            fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=pmk_cached_skip_post_reset");
         }
-      fp_info ("GXFP51A0 post-PMK reset/A8 confirmed: %s", fw);
+      if (!cached_pmk_fast)
+        {
+          fp_info ("GXFP51A0 PMK retained; performing reviewed post-PMK reset");
+          if (g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0)
+            fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=pmk_post_stage");
+          gx_gpio_reset (self);
+          if (!gx_read_fw_version_stage2e (self, fw, sizeof fw) ||
+              g_strcmp0 (fw, "GF_ST411SEC_APP_14115") != 0)
+            {
+              fp_warn ("GXFP51A0 target init failed: post-PMK reset/A8");
+              return FALSE;
+            }
+          fp_info ("GXFP51A0 post-PMK reset/A8 confirmed: %s", fw);
+        }
     }
 
   if (!gx_target_configure (self))
@@ -1451,6 +1487,8 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   g_autofree guint8 *rec = g_malloc0 (GOODIX_RX_MAX);
   g_autofree guint8 *plain = g_malloc0 (GOODIX_RX_MAX);
   gboolean ok = FALSE;
+  gboolean perf_qa =
+    g_strcmp0 (g_getenv ("GXFP_CAPTURE_PERF_QA"), "1") == 0;
   gsize i;
 
   if (!gxfp_build_capture_cleanup_recipe (&recipe))
@@ -1459,6 +1497,7 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
   for (i = 0; i < recipe.count; i++)
     {
       const struct gxfp_target_packet *packet = &recipe.steps[i];
+      gint64 t_step = perf_qa ? g_get_monotonic_time () : 0;
       if (self->s3_presleep_deadline_us > 0 &&
           g_get_monotonic_time () >= self->s3_presleep_deadline_us)
         goto out;
@@ -1488,6 +1527,11 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
             }
         }
 
+      if (perf_qa)
+        fp_warn ("GXFP51A0 CAPTURE_PERF_QA cleanup_step=%lu cmd=0x%02x "
+                 "processing_ms=%ld",
+                 (unsigned long) i, packet->inner[0],
+                 (long) ((g_get_monotonic_time () - t_step) / 1000));
       g_usleep (gx_capture_gap_us (self));
     }
 
@@ -2108,8 +2152,21 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
           break;
         }
 
-      if (gx_upload_config_and_reqtls (self, TRUE) &&
-          gx_tls_handshake (self))
+      gboolean stage_qa =
+        g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
+      gint64 qa_start = stage_qa ? g_get_monotonic_time () : 0;
+      gboolean config_ok = gx_upload_config_and_reqtls (self, TRUE);
+      gint64 qa_config = stage_qa ? g_get_monotonic_time () : 0;
+      gboolean handshake_ok = config_ok && gx_tls_handshake (self);
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=tls_attempt attempt=%d "
+                 "config_ok=%d handshake_ok=%d pmk_cache=%d "
+                 "config_ms=%ld handshake_ms=%ld",
+                 att, config_ok ? 1 : 0, handshake_ok ? 1 : 0,
+                 self->psk_from_cache ? 1 : 0,
+                 (long) ((qa_config - qa_start) / 1000),
+                 (long) ((g_get_monotonic_time () - qa_config) / 1000));
+      if (handshake_ok)
         break;
 
       gx_tls_teardown (self);
@@ -2161,6 +2218,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
 
             fp_warn ("GXFP51A0 NATIVE_S3_TLS_DETACHED_RETRY closing SPI/IRQ before GPIO264 reset");
             gx_transport_close (self);
+            if (stage_qa)
+              fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=tls_detached_retry");
             gx_gpio_reset (self);
             if (!gx_transport_open (FP_DEVICE (self), &reopen_error))
               {
@@ -2173,6 +2232,8 @@ gx_tls_session (FpiDeviceGoodix51A0 *self)
           {
             /* normal in-process TLS retry remains byte-for-byte the
              * historical rel61 behavior, avoiding rel71.21 regression. */
+            if (stage_qa)
+              fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=tls_in_process_retry");
             gx_gpio_reset (self);
           }
 
@@ -2450,15 +2511,28 @@ gx_s3_snapshot_clean_bg (FpiDeviceGoodix51A0 *self)
   gint64 age = self->bg_last_refresh_us > 0 ?
                now - self->bg_last_refresh_us : G_MAXINT64;
 
-  gx_s3_discard_clean_bg (self);
+  gboolean rolling =
+    g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0;
+
+  /* A clean backup is separate from transport/TLS reliability. If a previous
+   * image cleanup broke the TLS stream, keep the last independently proven
+   * clean background: later S3/S4 cannot create one with the finger already
+   * on the glass. Non-QA behavior still discards as before. */
   /* The only accepted backgrounds were captured with a fully clear sensor
    * AND a valid subsequent FDT baseline. Never retain pending, dirty,
    * missing or old references from an unfinished biometric operation. */
-  if (!self->warm_valid || !self->bg_frame || !self->have_fdt ||
+  if ((!self->warm_valid && !rolling) ||
+      !self->bg_frame || !self->have_fdt ||
       self->bg_dirty || !self->tls_up || age < 0 ||
-      age > GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US || boot <= 0)
-    return;
+      age > GX_S3_CLEAN_REFERENCE_PRE_AGE_MAX_US || boot <= 0 ||
+      gx_fdt_mean (self->fdt_base) < GOODIX_FDT_ABS)
+    {
+      if (!rolling || !self->s3_saved_bg)
+        gx_s3_discard_clean_bg (self);
+      return;
+    }
 
+  gx_s3_discard_clean_bg (self);
   self->s3_saved_bg =
     g_memdup2 (self->bg_frame, sizeof (guint16) * GOODIX_IMG_PIXELS);
   memcpy (self->s3_saved_fdt, self->fdt_base,
@@ -2581,7 +2655,12 @@ gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self)
            "normal strict image/matcher gates still required",
            touchflag, mean, self->fdt_abs,
            (int) ((saved_age + elapsed) / 1000));
-  gx_s3_discard_clean_bg (self);
+  /* Normally this is a single-use S3 snapshot. QA-only rolling cache keeps
+   * a known clean ImageBase RAM-only across successive wake/transport errors
+   * until the next independently clean background replaces it or 12h expire.
+   * The next encrypted finger frame STILL has to pass full quality + 7 score. */
+  if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") != 0)
+    gx_s3_discard_clean_bg (self);
   return TRUE;
 }
 
@@ -2628,6 +2707,26 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
    * real finger. Longer sleep or partial contact retains cold calibration. */
   if (!capture_diagnostic && gx_s3_try_early_finger_reference (self))
     return TRUE;
+
+  /* The first post-S4 FDT request can be lost once (ACK retry observed).
+   * Without another chance we enter a long finger-OFF calibration loop,
+   * even though a clean RAM-only background exists. In QA mode retry only
+   * the read-only FDT proof; do not acquire/accept a touched ImageBase. */
+  if (!capture_diagnostic &&
+      g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0 &&
+      self->s3_saved_bg)
+    {
+      for (guint proof_attempt = 0; proof_attempt < 2; proof_attempt++)
+        {
+          g_usleep (35 * 1000);
+          if (gx_s3_try_early_finger_reference (self))
+            {
+              fp_warn ("GXFP51A0 HELD_FINGER_QA early contact "
+                       "proved on retry=%u without lift", proof_attempt + 1);
+              return TRUE;
+            }
+        }
+    }
 
   /* Both the background and the detection baseline are only meaningful with
    * the finger LIFTED. A finger left resting on the sensor when the operation
@@ -2692,6 +2791,30 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 
         fp_warn ("GXFP51A0 background contaminated by touch: mean=%d anchor=%d touch=0x%02x; discarding",
                  mean, off_anchor_mean, touchflag);
+
+        /* LAB ONLY, default off: the validated pre-S4 clean RAM background
+         * may have been available before this image capture, but the sensor
+         * was clear on our first early-reference check and the user placed
+         * a finger DURING the background capture.  The original sequence
+         * then spent repeated 15s cycles waiting for an empty sensor.
+         *
+         * Re-evaluate the existing age-bounded, independently validated
+         * clean S3/S4 snapshot only on explicit opt-in.  This helper
+         * rejects absent/partial finger and stale saved calibration, then
+         * restores the old verified finger-OFF ImageBase, never the frame
+         * contaminated above.  The next real TLS image, full image-quality
+         * tests and unchanged matcher threshold 7 remain mandatory.
+         *
+         * If no trusted snapshot/full-contact proof exists, preserve the
+         * old strict finger-off wait and rejection. No GPIO or PAM change. */
+        if (g_strcmp0 (g_getenv ("GXFP_S4_MIDCAPTURE_REUSE_QA"), "1") == 0 &&
+            gx_s3_try_early_finger_reference (self))
+          {
+            fp_warn ("GXFP51A0 S4_MIDCAPTURE_SAVED_REFERENCE strict prior "
+                     "background restored after rejecting touched image");
+            return TRUE;
+          }
+
         /* Wait for a genuinely STABLE lift before spending another whole
          * image cycle; a quick release/re-press was the S3 failure pattern. */
         if (!gx_wait_sensor_clear_stable (self, off_anchor_mean, NULL,
@@ -2770,7 +2893,17 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
     return FALSE;
 
   if (self->have_fdt)
-    gx_s3_discard_clean_bg (self);
+    {
+      if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0)
+        {
+          /* The background was captured with no finger, and the following
+           * four FDT baselines individually proved no-contact. Copy it
+           * BEFORE any later biometric/TLS cleanup can fail. */
+          gx_s3_snapshot_clean_bg (self);
+        }
+      else
+        gx_s3_discard_clean_bg (self);
+    }
   return self->have_fdt;
 }
 
@@ -3440,6 +3573,8 @@ typedef struct
   GPtrArray      *identify_gallery; /* worker-owned FpPrint refs for 1:N */
   GxSiftFeatures *feat;            /* best capture result, NULL on failure */
   guint           same_press_images;
+  int             worker_score;
+  guint           worker_candidate, worker_base, worker_adapt;
   gboolean        ok;
 } GxWork;
 
@@ -3447,7 +3582,11 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images);
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_candidate,
+                            guint                *out_base,
+                            guint                *out_adapt);
 
 static void
 gx_work_free (GxWork *w)
@@ -3528,10 +3667,15 @@ gx_capture_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
   GxWork *w = data;
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (w->dev);
 
+  w->worker_score = -1;
   if (w->verify_print || w->identify_gallery)
     w->feat = gx_capture_auth_same_press (self, w->verify_print,
                                           w->identify_gallery,
-                                          &w->same_press_images);
+                                          &w->same_press_images,
+                                          &w->worker_score,
+                                          &w->worker_candidate,
+                                          &w->worker_base,
+                                          &w->worker_adapt);
   else
     w->feat = gx_capture_features (self);
   w->ok = (w->feat != NULL);
@@ -4067,13 +4211,22 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images)
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_candidate,
+                            guint                *out_base,
+                            guint                *out_adapt)
 {
   GxSiftFeatures *best_probe = NULL;
   int best_score = -1;
+  guint best_candidate = 0, best_base = 0, best_adapt = 0;
   guint images = 0;
   gboolean cleanup_needed = FALSE;
   const gchar *mode = gallery ? "identify" : "verify";
+  /* Stage timings, no pixels, fingerprints or templates in observability.
+   * Opt-in so normal hot capture avoids even one extra logfile write. */
+  gboolean perf_qa =
+    g_strcmp0 (g_getenv ("GXFP_CAPTURE_PERF_QA"), "1") == 0;
 
   for (guint attempt = 1; attempt <= GX_SAME_PRESS_CAPTURE_ATTEMPTS; attempt++)
     {
@@ -4082,6 +4235,10 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       gboolean ok;
       int score;
       guint candidate = 0;
+      guint base_views = 0, adapt_views = 0;
+      gint64 t_start = perf_qa ? g_get_monotonic_time () : 0;
+      gint64 t_frame = 0;
+      gint64 t_features = 0;
 
       if (attempt == 1)
         {
@@ -4117,7 +4274,11 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
         }
 
       images++;
+      if (perf_qa)
+        t_frame = g_get_monotonic_time ();
       probe = gx_features_from_pixels (self, px);
+      if (perf_qa)
+        t_features = g_get_monotonic_time ();
       if (!probe)
         {
           fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
@@ -4143,7 +4304,20 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe, NULL, NULL);
+        score = gx_score_probe_against_print (tmpl, probe,
+                                              &base_views, &adapt_views);
+
+      if (perf_qa)
+        {
+          gint64 t_score = g_get_monotonic_time ();
+          fp_warn ("GXFP51A0 CAPTURE_PERF_QA mode=%s image=%u "
+                   "frame_ms=%ld sift_ms=%ld match_ms=%ld total_ms=%ld",
+                   mode, attempt,
+                   (long) ((t_frame - t_start) / 1000),
+                   (long) ((t_features - t_frame) / 1000),
+                   (long) ((t_score - t_features) / 1000),
+                   (long) ((t_score - t_start) / 1000));
+        }
 
       fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
                "score=%d threshold=%d candidate=%u decision=final-for-pose",
@@ -4154,6 +4328,9 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       best_probe = probe;
       probe = NULL;
       best_score = score;
+      best_candidate = candidate;
+      best_base = base_views;
+      best_adapt = adapt_views;
 
       /*
        * Security boundary: the first usable image is the only scored draw for
@@ -4166,10 +4343,32 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
 
   if (cleanup_needed && !self->capture_recovery_pending)
     {
-      if (!gx_send_capture_cleanup (self))
+      gint64 t_cleanup = perf_qa ? g_get_monotonic_time () : 0;
+      gboolean cleanup_ok = gx_send_capture_cleanup (self);
+      if (perf_qa)
+        fp_warn ("GXFP51A0 CAPTURE_PERF_QA cleanup_ms=%ld ok=%d",
+                 (long) ((g_get_monotonic_time () - t_cleanup) / 1000),
+                 cleanup_ok ? 1 : 0);
+      if (!cleanup_ok)
         {
           fp_warn ("GXFP51A0 same-press final cleanup failed");
-          g_clear_pointer (&best_probe, gx_sift_free);
+          /* Authenticated TLS image + completed biometric match came BEFORE
+           * the protocol cleanup. A missing post-capture FDT response must
+           * retire this TLS session, but not retroactively erase valid
+           * positive biometric evidence. Never apply to enroll, a negative
+           * score, missing/partial image or a cancelled operation. */
+          if (g_strcmp0 (g_getenv ("GXFP_POSTAUTH_CLEANUP_DEFER_QA"), "1") == 0 &&
+              (tmpl || gallery) && best_probe &&
+              best_score >= GX_MATCH_THRESHOLD &&
+              self->capture_recovery_pending)
+            {
+              self->force_cold_reset = TRUE;
+              fp_warn ("GXFP51A0 POSTAUTH_CLEANUP_DEFER_QA "
+                       "authenticated score=%d; retiring failed TLS context "
+                       "at Close; positive first press preserved", best_score);
+            }
+          else
+            g_clear_pointer (&best_probe, gx_sift_free);
         }
       else
         {
@@ -4182,6 +4381,14 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
 
   if (out_images)
     *out_images = images;
+  if (out_score)
+    *out_score = best_probe ? best_score : -1;
+  if (out_candidate)
+    *out_candidate = best_probe ? best_candidate : 0;
+  if (out_base)
+    *out_base = best_probe ? best_base : 0;
+  if (out_adapt)
+    *out_adapt = best_probe ? best_adapt : 0;
 
   fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press completed "
            "images=%u best=%d threshold=%d",
@@ -4318,23 +4525,31 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
               int best = 0;
 
               fpi_device_get_identify_data (dev, &gallery);
-              for (guint i = 0; gallery && i < gallery->len; i++)
+              if (gallery && gallery->len > 0)
                 {
-                  FpPrint *candidate = g_ptr_array_index (gallery, i);
-                  guint base_views = 0, adapt_views = 0;
-                  int score = gx_score_probe_against_print (candidate, t->probe,
-                                                            &base_views,
-                                                            &adapt_views);
-
-                  fp_info ("identify: candidate=%u score=%d threshold=%d views=%u+%u",
-                           i, score, GX_MATCH_THRESHOLD,
-                           base_views, adapt_views);
-                  if (!best_print || score > best)
+                  if (!w->identify_gallery ||
+                      w->identify_gallery->len != gallery->len ||
+                      w->worker_candidate >= gallery->len ||
+                      w->worker_score < 0)
                     {
-                      best = score;
-                      best_print = candidate;
+                      fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                        FP_DEVICE_ERROR_PROTO, "identify gallery changed"));
+                      return;
                     }
+                  for (guint i = 0; i < gallery->len; i++)
+                    if (g_ptr_array_index (gallery, i) !=
+                        g_ptr_array_index (w->identify_gallery, i))
+                      {
+                        fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                          FP_DEVICE_ERROR_PROTO, "identify gallery reordered"));
+                        return;
+                      }
+                  best = w->worker_score;
+                  best_print = g_ptr_array_index (gallery,
+                                                  w->worker_candidate);
                 }
+              fp_info ("identify: cached score=%d candidate=%u threshold=%d",
+                       best, w->worker_candidate, GX_MATCH_THRESHOLD);
 
               t->best = MAX (t->best, best);
               if (best_print && best >= GX_MATCH_THRESHOLD)
@@ -4372,13 +4587,20 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
             }
           else
             {
-              FpPrint *tmpl = NULL;
-              guint base_views = 0, adapt_views = 0;
+              /* The authenticated capture worker already scored the
+               * exact first usable frame against the held verify template.
+               * Repeating the same comparison in this callback added
+               * measured CPU latency without changing the decision. */
+              int attempt_score = w->worker_score;
+              guint base_views = w->worker_base;
+              guint adapt_views = w->worker_adapt;
 
-              fpi_device_get_verify_data (dev, &tmpl);
-              int attempt_score = gx_score_probe_against_print (tmpl, t->probe,
-                                                                  &base_views,
-                                                                  &adapt_views);
+              if (attempt_score < 0)
+                {
+                  fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                    FP_DEVICE_ERROR_PROTO, "worker score unavailable"));
+                  return;
+                }
               t->best = MAX (t->best, attempt_score);
 
               fp_info ("verify: attempt %d/%d -> %d matches (best=%d threshold=%d, %u views + %u acquired)",
@@ -4846,6 +5068,11 @@ static gboolean
 gx_cold_prepare (FpiDeviceGoodix51A0 *self)
 {
   gchar fw[64] = "";
+  gboolean stage_qa =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_STAGE_QA"), "1") == 0;
+  gint64 qa_t0 = stage_qa ? g_get_monotonic_time () : 0;
+  gint64 qa_stage = qa_t0;
+  gboolean driverstate_ok;
 
   self->fdt_abs = GOODIX_FDT_ABS;
 
@@ -4858,18 +5085,29 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
   if (self->capture_gap_scale < GX_CAPTURE_SCALE_MIN)
     self->capture_gap_scale = GX_CAPTURE_SCALE_MIN;
 
-  if (!gx_driverstate_install_windows (self))
+  driverstate_ok = gx_driverstate_install_windows (self);
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=driverstate elapsed_ms=%ld "
+             "ack=%d sleep_boundary=%d",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000),
+             driverstate_ok ? 1 : 0, self->s3_first_tls_pending ? 1 : 0);
+  if (!driverstate_ok)
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=driverstate_silent");
       fp_info ("GXFP51A0: DriverState silent; applying reviewed Windows fallback reset");
       gx_gpio_reset (self);
       fp_warn ("GXFP51A0: continuing to init_MCU after DriverState fallback as Windows does");
     }
+  qa_stage = stage_qa ? g_get_monotonic_time () : 0;
 
   if (gx_read_fw_version (self, fw, sizeof fw))
     fp_info ("GXFP51A0 firmware: %s", fw);
   else
     {
       fp_info ("GXFP51A0: three A8 attempts silent; applying common-init reset fallback");
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA reset_reason=fw_version_silent");
       gx_gpio_reset (self);
       if (gx_read_fw_version_once (self, fw, sizeof fw))
         fp_info ("GXFP51A0 firmware after reset fallback: %s", fw);
@@ -4877,7 +5115,11 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
         fp_warn ("GXFP51A0: no A8 firmware response after final fallback");
     }
 
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=fw_version elapsed_ms=%ld",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000));
   fp_info ("GXFP51A0 opened; experimental PMK/TLS/capture path enabled");
+  qa_stage = stage_qa ? g_get_monotonic_time () : 0;
 
   if (g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") ||
       g_getenv ("GXFP_DIAGNOSTIC_ONESHOT") ||
@@ -4889,6 +5131,10 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
    * MCU boundary between attempts and the production PMK fallback. */
   if (!gx_prepare_capture_context (self, FALSE))
     {
+      if (stage_qa)
+        fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=full_capture_context "
+                 "elapsed_ms=%ld success=0",
+                 (long) ((g_get_monotonic_time () - qa_stage) / 1000));
       fp_warn ("GXFP51A0 cold preparation failed after bounded recovery");
       gx_invalidate_capture_context (self);
       gx_tls_teardown (self);
@@ -4897,6 +5143,11 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
       return FALSE;
     }
 
+  if (stage_qa)
+    fp_warn ("GXFP51A0 RESUME_STAGE_QA stage=full_capture_context "
+             "elapsed_ms=%ld total_cold_ms=%ld success=1",
+             (long) ((g_get_monotonic_time () - qa_stage) / 1000),
+             (long) ((g_get_monotonic_time () - qa_t0) / 1000));
   /* Protocol ACK/FDT misses measured during this cold preparation are useful
    * controller-speed evidence before the user ever touches the sensor.  Seed
    * the capture gap conservatively from that evidence so the first biometric
@@ -5274,7 +5525,17 @@ gx_dev_suspend (FpDevice *dev)
     gx_s3_snapshot_clean_bg (self);
   else
     {
-      gx_s3_discard_clean_bg (self);
+      /* If a cleanup/desync made warm=0 just before suspend, preserve the
+       * last independently verified no-finger RAM baseline. It remains
+       * age-bounded, only becomes active on a live 6/6 finger FDT proof,
+       * and is never reused as a TLS session or a biometric image. */
+      if (g_strcmp0 (g_getenv ("GXFP_HELD_FINGER_ROLLING_BG_QA"), "1") == 0 &&
+          self->s3_saved_bg)
+        fp_warn ("GXFP51A0 HELD_FINGER_QA retaining proven clean RAM "
+                 "reference despite warm=%d parked=%d",
+                 warm ? 1 : 0, parked ? 1 : 0);
+      else
+        gx_s3_discard_clean_bg (self);
       if (warm && idle && parked)
         fp_warn ("GXFP51A0 NATIVE_S3_CLEAN_REFERENCE_NOT_SAVED "
                  "pre_sleep_clear=%d recent_reference=%d",
@@ -5330,15 +5591,28 @@ gx_resume_preflight_thread (GTask *task,
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
   g_autoptr(GError) err = NULL;
   gboolean ok = FALSE;
+  gboolean fast_settle =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_FAST_SETTLE_QA"), "1") == 0;
+  gboolean profile =
+    g_strcmp0 (g_getenv ("GXFP_RESUME_PERF_QA"), "1") == 0;
+  gint64 t_start = g_get_monotonic_time ();
+  gint64 t_prepare;
 
   gx_warm_abandon (self);
   gx_transport_close (self);
 
   /* The sensor has just resumed from deep sleep. The old host-side TLS
-   * context is never reused, and no GPIO pulse may run with live SPI/IRQ. */
-  g_usleep (G_USEC_PER_SEC);
+   * context is never reused, and no GPIO pulse may run with live SPI/IRQ.
+   *
+   * QA-only timing A/B, independently opt-in. Rel71.69 waited 1000ms on
+   * either side of the native detached reset (2000ms artificial latency).
+   * An unproven faster variant uses 250ms before and 500ms after and retains
+   * the already-hardware-validated HIGH10/LOW150 reset. No change to the
+   * default or device semantics before a real hardware A/B. */
+  g_usleep (fast_settle ? (250 * 1000) : G_USEC_PER_SEC);
   gx_reset_detached_s3_boundary (self);
-  g_usleep (G_USEC_PER_SEC);
+  g_usleep (fast_settle ? (500 * 1000) : G_USEC_PER_SEC);
+  t_prepare = g_get_monotonic_time ();
 
   if (gx_transport_open (dev, &err))
     {
@@ -5356,6 +5630,15 @@ gx_resume_preflight_thread (GTask *task,
       gx_warm_abandon (self);
       gx_transport_close (self);
     }
+
+  if (profile)
+    fp_warn ("GXFP51A0 RESUME_PERF_QA fast_settle=%d stage_reset_ms=%ld "
+             "cold_tls_background_ms=%ld total_ms=%ld success=%d",
+             fast_settle ? 1 : 0,
+             (long) ((t_prepare - t_start) / 1000),
+             (long) ((g_get_monotonic_time () - t_prepare) / 1000),
+             (long) ((g_get_monotonic_time () - t_start) / 1000),
+             ok ? 1 : 0);
 
   g_task_return_boolean (task, ok);
 }
