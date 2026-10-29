@@ -329,6 +329,11 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
 #define GX_FDT_DOWN_SECOND_REPLY_POLLS   (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
 G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
 G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_POLLS == 10);
+/* 2020 hardware compatibility experiment ONLY: longer wait for the second
+ * proven FDT report, never a weaker proof or a replay of FDT-down. */
+#define GX_FDT_DOWN_LATE_REPLY_QA_TIMEOUT_MS 250
+#define GX_FDT_DOWN_LATE_REPLY_QA_POLLS   (GX_FDT_DOWN_LATE_REPLY_QA_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
+G_STATIC_ASSERT (GX_FDT_DOWN_LATE_REPLY_QA_POLLS == 25);
 #ifndef GX_GET_IMAGE_ATTEMPTS
 #define GX_GET_IMAGE_ATTEMPTS 2
 #endif
@@ -350,6 +355,10 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
   static guint8 scratch[GOODIX_RX_MAX];
   int expected_plain_replies = 0;
   int attempts = body[0] == 0x20u ? GX_GET_IMAGE_ATTEMPTS : 1;
+  /* Off unless explicitly requested for a controlled 2020-model trial. */
+  gboolean fdt_late_reply_qa =
+    body[0] == 0x32u &&
+    g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_LATE_REPLY_QA"), "1") == 0;
   int attempt;
 
   /* Reply counts observed stable across the GXFP51A0 capture path and matching
@@ -388,8 +397,12 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
         body[0] == 0x20u ? GX_GET_IMAGE_NO_REPLY_POLLS :
         body[0] == 0xaeu ? 12 : 25;
       int r, got = 0, i, misses = 0;
+      gboolean fdt_data_seen = FALSE;
+      gint64 fdt_first_reply_us = 0, fdt_second_reply_us = 0;
       int post_reply_miss_limit =
         body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
+      if (fdt_late_reply_qa)
+        post_reply_miss_limit = GX_FDT_DOWN_LATE_REPLY_QA_POLLS;
 
       /* Capture commands are sent directly. The recipe carries explicit NOPs
        * at the positions observed on GXFP51A0; do not prepend one here. */
@@ -431,11 +444,44 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
           if (r > 0 && ty == GOODIX_PKT_PLAIN)
             {
               guint8 ack_status = 0;
+              gboolean valid_ack =
+                gxfp_parse_ack (scratch, r, body[0], &ack_status) &&
+                gxfp_ack_status_success (ack_status);
+
+              if (fdt_late_reply_qa)
+                {
+                  /* The proof on this branch requires exactly one accepted
+                   * command ACK and one checksum-validated 20-byte FDT report;
+                   * a duplicated ACK or unrelated pending plain frame is
+                   * NOT evidence of the second response. */
+                  guint8 touchflag;
+                  guint16 zones[GXFP_FDT_ZONE_COUNT];
+                  gboolean valid_data =
+                    gxfp_parse_fdt_response (scratch, (gsize) r,
+                                             &touchflag, zones);
+
+                  if ((!valid_ack && !valid_data) ||
+                      (valid_ack && ack_seen) ||
+                      (valid_data && fdt_data_seen))
+                    {
+                      fp_dbg ("FDT_DOWN_LATE_REPLY_QA ignored unrelated/duplicate "
+                              "plain response");
+                      continue;
+                    }
+                  if (valid_data)
+                    fdt_data_seen = TRUE;
+                }
 
               got++;
               misses = 0;
-              if (gxfp_parse_ack (scratch, r, body[0], &ack_status) &&
-                  gxfp_ack_status_success (ack_status))
+              if (body[0] == 0x32u)
+                {
+                  if (got == 1)
+                    fdt_first_reply_us = g_get_monotonic_time ();
+                  else if (got == 2)
+                    fdt_second_reply_us = g_get_monotonic_time ();
+                }
+              if (valid_ack)
                 ack_seen = TRUE;
               if (expected_plain_replies > 0 && got >= expected_plain_replies)
                 {
@@ -467,8 +513,20 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       fp_dbg ("drain cmd=%02x: %d cleartext reply/replies ack=%d tls=%d attempt=%d/%d",
               body[0], got, ack_seen, tls_seen, attempt, attempts);
       if (body[0] == 0x32u)
-        fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
-                 got, expected_plain_replies, ack_seen);
+        {
+          fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
+                   got, expected_plain_replies, ack_seen);
+          if (fdt_late_reply_qa)
+            fp_info ("GXFP51A0 FDT_DOWN_LATE_REPLY_QA replies=%d ack=%d "
+                     "valid_data=%d second_reply_delta_ms=%ld "
+                     "window_ms=%d",
+                     got, ack_seen, fdt_data_seen,
+                     fdt_second_reply_us > fdt_first_reply_us &&
+                     fdt_first_reply_us > 0
+                       ? (long) ((fdt_second_reply_us -
+                                  fdt_first_reply_us) / 1000) : -1L,
+                     GX_FDT_DOWN_LATE_REPLY_QA_TIMEOUT_MS);
+        }
 
       if (out_ack_seen && ack_seen)
         *out_ack_seen = TRUE;
@@ -484,8 +542,10 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
        * NEVER replay it or the next image request; recover the whole
        * transport with the existing bounded strict TLS path. */
       if (body[0] == 0x32u &&
-          g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0 &&
-          (got < expected_plain_replies || !ack_seen))
+          (fdt_late_reply_qa ||
+           g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0) &&
+          (got < expected_plain_replies || !ack_seen ||
+           (fdt_late_reply_qa && !fdt_data_seen)))
         {
           fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
                    "replies=%d expected=%d ack=%d; bounded session recovery",
