@@ -487,10 +487,19 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
           g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0 &&
           (got < expected_plain_replies || !ack_seen))
         {
+          /* A missing FDT command/data reply is control-plane evidence,
+           * not a failed image transfer. A longer capture SPI gap cannot
+           * repair it; keep full MCU/TLS recovery but do not ratchet the
+           * session-local capture pacing for this specific FDT failure.
+           * Preserve any suppression requested by the lifecycle caller. */
+          gboolean was_pacing_suppressed = self->capture_pacing_suppressed;
+
           fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
                    "replies=%d expected=%d ack=%d; bounded session recovery",
                    got, expected_plain_replies, ack_seen ? 1 : 0);
+          self->capture_pacing_suppressed = TRUE;
           gx_capture_transport_desync (self);
+          self->capture_pacing_suppressed = was_pacing_suppressed;
           return FALSE;
         }
 
