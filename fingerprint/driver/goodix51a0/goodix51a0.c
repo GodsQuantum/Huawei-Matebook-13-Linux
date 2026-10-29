@@ -294,6 +294,32 @@ gx_send_plain_raw (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n)
   return gx_write_frame (self, GOODIX_PKT_PLAIN, body, n);
 }
 
+/* 2020 MateBook 13 QA only: distinguish delayed FDT-down data from a
+ * genuinely missing second reply. The tested production default remains
+ * 100ms; allow only exact 200/300ms values to avoid unbounded waits.
+ * This never bypasses the mandatory ACK + second FDT report and never
+ * permits GET_IMAGE to run with an incomplete transport response. */
+#ifndef GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS
+#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100
+#endif
+#ifndef GX_DRAIN_IRQ_POLL_MS
+#define GX_DRAIN_IRQ_POLL_MS 10
+#endif
+#define GX_FDT_DOWN_SECOND_REPLY_POLLS (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
+G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
+G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_POLLS == 10);
+
+static int
+gx_fdt_down_second_reply_poll_limit (void)
+{
+  const gchar *qa_ms = g_getenv ("GXFP_FDT_DOWN_SECOND_REPLY_WINDOW_QA_MS");
+  if (g_strcmp0 (qa_ms, "200") == 0)
+    return 200 / GX_DRAIN_IRQ_POLL_MS;
+  if (g_strcmp0 (qa_ms, "300") == 0)
+    return 300 / GX_DRAIN_IRQ_POLL_MS;
+  return GX_FDT_DOWN_SECOND_REPLY_POLLS;
+}
+
 /* Sends a cleartext command and drains every plain response. A TLS record
  * arriving instead is stashed for the BIO layer to pick up. */
 static gboolean
@@ -323,12 +349,6 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
  * 40 ms, while the already-validated explicit FDT probe allows 100 ms for its
  * second response.  Give FDT-down the same second-response window before
  * advancing to GET_IMAGE. */
-#ifndef GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS
-#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100
-#endif
-#define GX_FDT_DOWN_SECOND_REPLY_POLLS   (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
-G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
-G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_POLLS == 10);
 #ifndef GX_GET_IMAGE_ATTEMPTS
 #define GX_GET_IMAGE_ATTEMPTS 2
 #endif
@@ -389,7 +409,9 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
         body[0] == 0xaeu ? 12 : 25;
       int r, got = 0, i, misses = 0;
       int post_reply_miss_limit =
-        body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
+        body[0] == 0x32u ? gx_fdt_down_second_reply_poll_limit () : GX_DRAIN_SILENCE;
+      gint64 first_reply_us = 0;
+      gint64 second_reply_us = 0;
 
       /* Capture commands are sent directly. The recipe carries explicit NOPs
        * at the positions observed on GXFP51A0; do not prepend one here. */
@@ -433,6 +455,10 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
               guint8 ack_status = 0;
 
               got++;
+              if (body[0] == 0x32u && got == 1)
+                first_reply_us = g_get_monotonic_time ();
+              if (body[0] == 0x32u && got == 2)
+                second_reply_us = g_get_monotonic_time ();
               misses = 0;
               if (gxfp_parse_ack (scratch, r, body[0], &ack_status) &&
                   gxfp_ack_status_success (ack_status))
@@ -467,8 +493,14 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       fp_dbg ("drain cmd=%02x: %d cleartext reply/replies ack=%d tls=%d attempt=%d/%d",
               body[0], got, ack_seen, tls_seen, attempt, attempts);
       if (body[0] == 0x32u)
-        fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
-                 got, expected_plain_replies, ack_seen);
+        fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d "
+                 "second_window_ms=%d second_reply_delta_ms=%ld",
+                 got, expected_plain_replies, ack_seen,
+                 post_reply_miss_limit * GX_DRAIN_IRQ_POLL_MS,
+                 first_reply_us > 0
+                 ? (long) (((second_reply_us > 0 ? second_reply_us :
+                               g_get_monotonic_time ()) - first_reply_us) / 1000)
+                 : -1L);
 
       if (out_ack_seen && ack_seen)
         *out_ack_seen = TRUE;

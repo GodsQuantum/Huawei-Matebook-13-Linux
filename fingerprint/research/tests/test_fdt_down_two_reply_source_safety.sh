@@ -22,10 +22,10 @@ else:
 
 assert "case 0x32u: expected_plain_replies = 2" in f
 assert "FDT-down ACK + data" in f
-assert "#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100" in f
-assert "GX_FDT_DOWN_SECOND_REPLY_POLLS == 10" in f
-assert "body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE" in f
-assert "GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d" in f
+assert "#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100" in s
+assert "GX_FDT_DOWN_SECOND_REPLY_POLLS == 10" in s
+assert "body[0] == 0x32u ? gx_fdt_down_second_reply_poll_limit () : GX_DRAIN_SILENCE" in f
+assert "GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d " in f
 assert "case 0x36u: expected_plain_replies = 2" in f
 assert "case 0x50u: expected_plain_replies = 2" in f
 assert "#define GX_GET_IMAGE_ACK_TIMEOUT_MS 1000" in f

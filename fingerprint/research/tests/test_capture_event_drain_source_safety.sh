@@ -12,4 +12,4 @@ grep -Fq 'expected %d replies received; finish' "$d"
 echo 'test_capture_event_drain_source_safety: OK'
 
 grep -Fq '#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100' "$d"
-grep -Fq 'body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE' "$d"
+grep -Fq 'body[0] == 0x32u ? gx_fdt_down_second_reply_poll_limit () : GX_DRAIN_SILENCE' "$d"
