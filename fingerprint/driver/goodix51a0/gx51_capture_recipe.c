@@ -77,6 +77,22 @@ bool gxfp_build_warm_background_capture_recipe(
            push(r, gxfp_build_get_image(&p), &p);
 }
 
+bool gxfp_build_post_background_fdt_arm_recipe(
+    struct gxfp_capture_recipe *r)
+{
+    struct gxfp_target_packet p;
+
+    if (r == NULL)
+        return false;
+    memset(r, 0, sizeof(*r));
+
+    /* After a new clear-sensor ImageBase, restore the same FDT mode -> down
+     * pair used before a finger image in the independently validated recipe.
+     * An FDT manual probe by itself does not arm the down-detection mode. */
+    return push(r, gxfp_build_fdt_command(0x0du, FDT_FINGER_MODE, &p), &p) &&
+           push(r, gxfp_build_fdt_command(0x0cu, FDT_FINGER_MODE, &p), &p);
+}
+
 bool gxfp_build_fdt_probe(struct gxfp_target_packet *packet)
 {
     return packet != NULL &&

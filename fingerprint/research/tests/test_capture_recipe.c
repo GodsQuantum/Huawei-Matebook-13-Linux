@@ -39,6 +39,15 @@ int main(void)
     for (size_t i = 0; i < r.count; i++)
         assert(r.steps[i].inner[0] != 0x80u); /* no register/DAC writes warm */
 
+    {
+        static const uint8_t arm[] = {0x36,0x32};
+        assert(gxfp_build_post_background_fdt_arm_recipe(&r));
+        expect_commands(&r, arm, sizeof arm);
+        assert(r.steps[0].inner[3] == 0x0du);
+        assert(r.steps[1].inner[3] == 0x0cu);
+        assert(memcmp(r.steps[0].inner + 5u, r.steps[1].inner + 5u, 12u) == 0);
+    }
+
     assert(gxfp_build_finger_capture_recipe(&r));
     expect_commands(&r, finger, sizeof finger);
     assert(r.steps[0].inner[3] == 0x0du);
