@@ -3123,11 +3123,39 @@ out:
   return ok;
 }
 
+/* QA45: only arm finger-down AFTER a fresh, finger-OFF ImageBase has
+ * passed both FDT proofs, never during capture nor under the finger.
+ * The same mode/down bytes are used by the normal capture recipe;
+ * gx_send_plain_drain validates the existing ACK + typed reply policy.
+ * Any failure aborts Verify before a potentially poisoned session is used. */
+static gboolean
+gx_post_background_fdt_arm_qa (FpiDeviceGoodix51A0 *self)
+{
+  struct gxfp_capture_recipe recipe;
+
+  if (!gxfp_build_post_background_fdt_arm_recipe (&recipe))
+    return FALSE;
+
+  for (gsize i = 0; i < recipe.count; i++)
+    if (!gx_send_plain_drain (self, recipe.steps[i].inner,
+                              recipe.steps[i].inner_len, NULL, NULL))
+      {
+        fp_warn ("GXFP51A0 FDT_REARM_QA failed stage=%lu; aborting verify",
+                 (unsigned long) i);
+        self->capture_recovery_pending = TRUE;
+        return FALSE;
+      }
+
+  fp_warn ("GXFP51A0 FDT_REARM_QA armed finger-down after proven fresh ImageBase");
+  return TRUE;
+}
+
 static gboolean
 gx_session_start (FpiDeviceGoodix51A0 *self)
 {
   gboolean capture_diagnostic =
     g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") != NULL;
+  gboolean warm_bg_refreshed = FALSE;
 
   /* A Verify/Identify operation may already be open when the machine enters
    * deep S3. In that case fprintd does not necessarily close/reopen the device,
@@ -3209,14 +3237,27 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
                 return FALSE;
             }
           else if (self->bg_last_refresh_us > previous_refresh)
-            fp_warn ("GXFP51A0 AUTH_TRACE fresh ImageBase ready before biometric READY");
+            {
+              warm_bg_refreshed = TRUE;
+              fp_warn ("GXFP51A0 AUTH_TRACE fresh ImageBase ready before biometric READY");
+            }
           else
             fp_warn ("GXFP51A0 AUTH_TRACE ImageBase refresh deferred by touch; "
                      "using retained reference for this pose");
         }
 
       fp_info ("GXFP51A0 reusing capture context prepared during device open");
-      return gx_wakeup_mcu (self);
+      if (!gx_wakeup_mcu (self))
+        return FALSE;
+
+      /* Normal path (flag OFF) is exactly QA42. Only a just-accepted,
+       * double-finger-off-proven background can trigger this opt-in rearm.
+       * Deferred finger-on ImageBase must NOT be rearmed here. */
+      if (warm_bg_refreshed &&
+          g_strcmp0 (g_getenv ("GXFP_FDT_REARM_AFTER_BG_QA"), "1") == 0 &&
+          !gx_post_background_fdt_arm_qa (self))
+        return FALSE;
+      return TRUE;
     }
 
   /* Defensive fallback for non-fprintd clients that may reach an operation

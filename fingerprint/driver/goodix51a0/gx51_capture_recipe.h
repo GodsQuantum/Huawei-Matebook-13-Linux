@@ -17,6 +17,7 @@ bool gxfp_build_background_capture_recipe(
 bool gxfp_build_warm_background_capture_recipe(
     struct gxfp_capture_recipe *recipe);
 bool gxfp_build_finger_capture_recipe(struct gxfp_capture_recipe *recipe);
+bool gxfp_build_post_background_fdt_arm_recipe(struct gxfp_capture_recipe *recipe);
 bool gxfp_build_fdt_probe(struct gxfp_target_packet *packet);
 bool gxfp_build_capture_cleanup_recipe(struct gxfp_capture_recipe *recipe);
 
