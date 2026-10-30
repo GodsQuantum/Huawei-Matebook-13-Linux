@@ -5049,6 +5049,11 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
   int before_mean;
   int after_mean;
   gint64 t0 = g_get_monotonic_time ();
+  /* Stage-only QA telemetry: no extra sensor command, no biometric values. */
+  gboolean trace_stages =
+    g_strcmp0 (g_getenv ("GXFP_WARM_REBASE_STAGE_QA"), "1") == 0;
+  gint64 before_done_us = 0, image_done_us = 0, after_done_us = 0;
+  const gchar *outcome = "before_fdt_fail";
 
   /* Failure while validating a retained lifecycle context is evidence that the
    * session went stale, not that steady-state capture pacing is too fast. */
@@ -5056,6 +5061,8 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
 
   if (gx_fdt_probe_ex (self, cur, &before_touchflag) != 0)
     goto out;
+  if (trace_stages)
+    before_done_us = g_get_monotonic_time ();
 
   before_mean = gx_fdt_mean (cur);
 
@@ -5068,6 +5075,7 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
       before_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();
+      outcome = "finger_before";
       fp_warn ("GXFP51A0 WARM_REBASE deferred: finger already present "
                "(FDT mean=%d floor=%d); retaining previous background",
                before_mean, GOODIX_FDT_ABS);
@@ -5081,20 +5089,27 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
    * conflates calibration with baseline refresh and can reset useful sensor
    * state. Reuse the warm T0 validation image as the new background, then
    * prove the sensor stayed clear before adopting it. */
+  outcome = "warm_image_fail";
   if (!gx_capture_warm_background_frame (self, fresh_bg))
     {
       fp_warn ("GXFP51A0 warm FDT answered but GET_IMAGE/TLS validation failed");
       goto out;
     }
+  if (trace_stages)
+    image_done_us = g_get_monotonic_time ();
 
+  outcome = "after_fdt_fail";
   if (gx_fdt_probe_ex (self, after, &after_touchflag) != 0)
     goto out;
+  if (trace_stages)
+    after_done_us = g_get_monotonic_time ();
 
   after_mean = gx_fdt_mean (after);
   if (gx_fdt_touch_is_finger (after_touchflag) ||
       after_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();
+      outcome = "finger_during";
       fp_warn ("GXFP51A0 WARM_REBASE discarded: finger landed during "
                "background capture (FDT mean=%d floor=%d)",
                after_mean, GOODIX_FDT_ABS);
@@ -5110,6 +5125,7 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
   self->have_fdt = TRUE;
   self->warm_last_activity_us = g_get_monotonic_time ();
 
+  outcome = "updated";
   fp_warn ("GXFP51A0 WARM_REBASE refreshed background+FDT in %d ms "
            "(idle=%d floor=%d)",
            (int) ((self->warm_last_activity_us - t0) / 1000),
@@ -5117,6 +5133,17 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
   ok = TRUE;
 
 out:
+  if (trace_stages)
+    fp_info ("GXFP51A0 WARM_REBASE_STAGE_QA outcome=%s total_ms=%ld "
+             "fdt_before_ms=%ld warm_image_ms=%ld fdt_after_ms=%ld "
+             "refresh_accepted=%d",
+             outcome, (long) ((g_get_monotonic_time () - t0) / 1000),
+             before_done_us ? (long) ((before_done_us - t0) / 1000) : -1L,
+             image_done_us
+               ? (long) ((image_done_us - before_done_us) / 1000) : -1L,
+             after_done_us
+               ? (long) ((after_done_us - image_done_us) / 1000) : -1L,
+             g_strcmp0 (outcome, "updated") == 0 ? 1 : 0);
   self->capture_pacing_suppressed = previous_pacing_suppression;
   return ok;
 }
