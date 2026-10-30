@@ -337,6 +337,22 @@ bool gxfp_parse_config_response(const uint8_t *body, size_t len, uint8_t *status
     return true;
 }
 
+bool gxfp_parse_fdt_down_reply(const uint8_t *body, size_t len)
+{
+    uint16_t wire_len;
+
+    /* The 2020 ST411 reports the FDT-down data with command echo 0x32,
+     * whereas the generic/manual FDT parser uses 0x36. Keep this exception
+     * strictly within the 0x32 drain, and fail closed on malformed frames. */
+    if (body == NULL || len != 20u ||
+        (body[0] != 0x32u && body[0] != 0x36u))
+        return false;
+
+    wire_len = (uint16_t)body[1] | ((uint16_t)body[2] << 8);
+    return wire_len == 17u &&
+           body[len - 1u] == gxfp_body_checksum(body, len - 1u);
+}
+
 bool gxfp_parse_fdt_response(const uint8_t *body, size_t len, uint8_t *touchflag,
                              uint16_t out[GXFP_FDT_ZONE_COUNT])
 {
