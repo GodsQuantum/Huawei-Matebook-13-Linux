@@ -69,6 +69,9 @@ bool gxfp_parse_config_response(const uint8_t *body, size_t len, uint8_t *status
 /* Only for a 0x32 FDT-down command: checksum-valid 20-byte response,
  * with firmware-specific inner tag 0x32 OR 0x36. No ACK accepted here. */
 bool gxfp_parse_fdt_down_reply(const uint8_t *body, size_t len);
+bool gxfp_parse_fdt_down_event(const uint8_t *body, size_t len,
+                               uint8_t *touchflag,
+                               uint16_t out[GXFP_FDT_ZONE_COUNT]);
 bool gxfp_parse_fdt_response(const uint8_t *body, size_t len, uint8_t *touchflag,
                              uint16_t out[GXFP_FDT_ZONE_COUNT]);
 enum gxfp_mem_read_result {
