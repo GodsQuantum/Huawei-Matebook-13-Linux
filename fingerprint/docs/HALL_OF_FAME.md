@@ -6,7 +6,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Discipline | Temps | Version | Essai |
 |---|---:|---|---|
-| LOCK : doigt → succès | **1.254 s** | rel71.71 | lock-20261027-7171-2235 |
+| LOCK : doigt → succès | **1.181 s** | rel71.74-qa42 | lock-20261030-qa42-0144 |
 | LOCK : KDE → succès | **3.488 s** | rel71.55 | lock-20261024-1 |
 | S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
 | S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
@@ -48,6 +48,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.71 | S4 | 1/1 | Nombre insuffisant |
 | rel71.73 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.73 | S4 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa42 | LOCK | 1/1 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -102,6 +103,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s4-20261027-7171-2302 | 2026-10-27T23:02:21.003027+01:00 | rel71.71 | S4 | 1 | pass | 4.826 | 0.083 | 1.748 | — | 8.308 | 8/7 |
 | s3-20261027-7173-2354-regression | 2026-10-27T23:53:59+01:00 | rel71.73 | S3 | 5+ (operator) | fail | 4.740 | 0.071 | — | — | — | 17/7 |
 | s4-20261027-7173-2357-regression | 2026-10-27T23:57:04+01:00 | rel71.73 | S4 | 5-6 (operator) | fail | 18.379 | 0.083 | — | — | — | 12/7 |
+| lock-20261030-qa42-0144 | 2026-10-30T01:44:28.208327+01:00 | rel71.74-qa42 | LOCK | 1 | pass | — | 0.052 | 1.181 | — | — | 13/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
