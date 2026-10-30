@@ -83,6 +83,12 @@ bool gxfp_build_fdt_probe(struct gxfp_target_packet *packet)
            gxfp_build_fdt_command(0x0du, FDT_FINGER_MODE, packet);
 }
 
+bool gxfp_build_fdt_async_arm(struct gxfp_target_packet *packet)
+{
+    return packet != NULL &&
+           gxfp_build_fdt_command(0x0cu, FDT_FINGER_MODE, packet);
+}
+
 bool gxfp_build_finger_capture_recipe(struct gxfp_capture_recipe *r)
 {
     struct gxfp_target_packet p;

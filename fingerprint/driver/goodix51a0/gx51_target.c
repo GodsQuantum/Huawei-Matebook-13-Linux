@@ -353,6 +353,23 @@ bool gxfp_parse_fdt_down_reply(const uint8_t *body, size_t len)
            body[len - 1u] == gxfp_body_checksum(body, len - 1u);
 }
 
+/* A finger-down event is separate from the earlier ACK and may arrive
+ * much later.  Reuse strict target checksum and framing validation. */
+bool gxfp_parse_fdt_down_event(const uint8_t *body, size_t len,
+                               uint8_t *touchflag,
+                               uint16_t out[GXFP_FDT_ZONE_COUNT])
+{
+    size_t i;
+    if (touchflag == NULL || out == NULL ||
+        !gxfp_parse_fdt_down_reply(body, len))
+        return false;
+    *touchflag = body[5];
+    for (i = 0; i < GXFP_FDT_ZONE_COUNT; i++)
+        out[i] = (uint16_t)body[7u + 2u * i] |
+                 ((uint16_t)body[8u + 2u * i] << 8);
+    return true;
+}
+
 bool gxfp_parse_fdt_response(const uint8_t *body, size_t len, uint8_t *touchflag,
                              uint16_t out[GXFP_FDT_ZONE_COUNT])
 {

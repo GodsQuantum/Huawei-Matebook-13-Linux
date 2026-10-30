@@ -107,6 +107,7 @@ struct _FpiDeviceGoodix51A0
   gint64        s3_saved_bg_age_us;
 
   guint         poll_id;     /* finger-detection timeout source */
+  gboolean      fdt_async_armed; /* QA46: 0x32 ACK received, later IRQ pending */
   int           poll_count;  /* poll iterations, bounded to avoid hanging */
   GPtrArray    *enroll_feats;/* descriptor sets accumulated during enrolment */
   int           fdt_base[GXFP_FDT_ZONE_COUNT]; /* FDT baseline (finger absent) */
@@ -3123,11 +3124,55 @@ out:
   return ok;
 }
 
+/* An 0x32 FDT-down ACK only confirms arming. Its contact report is
+ * asynchronous: do not demand a second response during a finger-off period.
+ * Never issue 0x36 manual probes while the future 0x32 report is pending. */
+static gboolean
+gx_fdt_async_arm_qa (FpiDeviceGoodix51A0 *self)
+{
+  struct gxfp_target_packet packet;
+  guint8 rx[256], ty = 0, ack_status = 0;
+  guint8 touchflag = 0;
+  int zones[GXFP_FDT_ZONE_COUNT], n;
+
+  self->fdt_async_armed = FALSE;
+  /* Verify live finger-off just before arming. If finger already arrived,
+   * keep QA42 manual path rather than arm 0x32 under it. */
+  if (gx_fdt_probe_ex (self, zones, &touchflag) != 0)
+    return FALSE;
+  if (gx_fdt_touch_is_finger (touchflag) ||
+      gx_fdt_drop (self->fdt_base, zones) > GOODIX_FDT_DROP ||
+      gx_fdt_mean (zones) < self->fdt_abs)
+    return TRUE;
+
+  /* The existing finger capture recipe uses a 30ms minimum inter-command
+   * settle; do not fire a down trigger immediately after the final
+   * sensor-manual report. This is NOT a polling timer or background work. */
+  g_usleep (gx_capture_gap_us (self));
+  if (!gxfp_build_fdt_async_arm (&packet) ||
+      !gx_write_frame (self, GOODIX_PKT_PLAIN,
+                       packet.inner, packet.inner_len))
+    return FALSE;
+
+  if (gx51_wait_irq_gpio48 (self->irq_fd, GX_FDT_IRQ_TIMEOUT_MS) < 0)
+    return FALSE;
+  n = gx_read_frame (self, &ty, rx, sizeof rx);
+  if (n <= 0 || ty != GOODIX_PKT_PLAIN ||
+      !gxfp_parse_ack (rx, (gsize) n, 0x32u, &ack_status) ||
+      !gxfp_ack_status_success (ack_status))
+    return FALSE;
+
+  self->fdt_async_armed = TRUE;
+  fp_warn ("GXFP51A0 FDT_ASYNC_QA ARMED; awaiting finger IRQ, not 100ms reply");
+  return TRUE;
+}
+
 static gboolean
 gx_session_start (FpiDeviceGoodix51A0 *self)
 {
   gboolean capture_diagnostic =
     g_getenv ("GXFP_DIAGNOSTIC_CAPTURE_ONCE") != NULL;
+  gboolean fresh_bg_committed = FALSE;
 
   /* A Verify/Identify operation may already be open when the machine enters
    * deep S3. In that case fprintd does not necessarily close/reopen the device,
@@ -3209,14 +3254,26 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
                 return FALSE;
             }
           else if (self->bg_last_refresh_us > previous_refresh)
-            fp_warn ("GXFP51A0 AUTH_TRACE fresh ImageBase ready before biometric READY");
+            {
+              fresh_bg_committed = TRUE;
+              fp_warn ("GXFP51A0 AUTH_TRACE fresh ImageBase ready before biometric READY");
+            }
           else
             fp_warn ("GXFP51A0 AUTH_TRACE ImageBase refresh deferred by touch; "
                      "using retained reference for this pose");
         }
 
       fp_info ("GXFP51A0 reusing capture context prepared during device open");
-      return gx_wakeup_mcu (self);
+      if (!gx_wakeup_mcu (self))
+        return FALSE;
+      if (fresh_bg_committed &&
+          g_strcmp0 (g_getenv ("GXFP_FDT_ASYNC_EVENT_QA"), "1") == 0 &&
+          !gx_fdt_async_arm_qa (self))
+        {
+          self->capture_recovery_pending = TRUE;
+          return FALSE;
+        }
+      return TRUE;
     }
 
   /* Defensive fallback for non-fprintd clients that may reach an operation
@@ -3902,14 +3959,58 @@ gx_poll_on (gpointer user_data)
   GxTask *t = fpi_ssm_get_data (ssm);
   int cur[GXFP_FDT_ZONE_COUNT];
   guint8 touchflag = 0;
+  gboolean async_event_consumed = FALSE;
 
   if (gx_cancelled (dev, ssm))
-    { self->poll_id = 0; return G_SOURCE_REMOVE; }
+    {
+      if (self->fdt_async_armed)
+        {
+          self->fdt_async_armed = FALSE;
+          self->capture_recovery_pending = TRUE;
+        }
+      self->poll_id = 0;
+      return G_SOURCE_REMOVE;
+    }
 
   if (gx_active_sleep_recovery (dev, ssm))
-    return G_SOURCE_REMOVE;
+    {
+      self->fdt_async_armed = FALSE;
+      return G_SOURCE_REMOVE;
+    }
 
-  if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
+  if (self->fdt_async_armed)
+    {
+      guint8 rx[256], ty = 0;
+      guint16 report_zones[GXFP_FDT_ZONE_COUNT];
+      int n;
+
+      /* Strict event mode: NO manual 0x36 polling until event/abort.
+       * A 0x32 data report may arrive seconds after the arm ACK. */
+      errno = 0;
+      if (gx51_wait_irq_gpio48 (self->irq_fd, GX_DRAIN_IRQ_POLL_MS) < 0)
+        {
+          if (errno == ETIMEDOUT)
+            goto again;
+          fp_warn ("GXFP51A0 FDT_ASYNC_QA IRQ failure");
+          goto async_fail;
+        }
+      n = gx_read_frame (self, &ty, rx, sizeof rx);
+      if (n <= 0 || ty != GOODIX_PKT_PLAIN ||
+          !gxfp_parse_fdt_down_event (rx, (gsize) n,
+                                      &touchflag, report_zones))
+        {
+          fp_warn ("GXFP51A0 FDT_ASYNC_QA malformed/unexpected IRQ packet");
+          goto async_fail;
+        }
+      for (gsize i = 0; i < GXFP_FDT_ZONE_COUNT; i++)
+        cur[i] = (int) report_zones[i];
+      fp_warn ("GXFP51A0 FDT_ASYNC_QA EVENT zones=%u mean=%d drop=%d",
+               gx_fdt_touch_count (touchflag), gx_fdt_mean (cur),
+               gx_fdt_drop (self->fdt_base, cur));
+      self->fdt_async_armed = FALSE;
+      async_event_consumed = TRUE;
+    }
+  else if (gx_fdt_probe_ex (self, cur, &touchflag) != 0)
     {
       fp_dbg ("wait-on: detection probe failed");
       goto again;
@@ -3953,14 +4054,34 @@ gx_poll_on (gpointer user_data)
       fpi_ssm_jump_to_state (ssm, GX_ST_CAPTURE);
       return G_SOURCE_REMOVE;
     }
+  /* A one-shot 0x32 event has completed; its absence of valid contact
+   * is a transport/sensor discrepancy, not a biometric mismatch. */
+  if (async_event_consumed)
+    {
+      fp_warn ("GXFP51A0 FDT_ASYNC_QA event lacked proven finger");
+      goto async_fail;
+    }
 again:
   if (++t->polls > GX_POLL_MAX)
     {
+      if (self->fdt_async_armed)
+        {
+          self->fdt_async_armed = FALSE;
+          self->capture_recovery_pending = TRUE;
+        }
       self->poll_id = 0;
       fpi_ssm_mark_failed (ssm, fpi_device_retry_new (FP_DEVICE_RETRY_GENERAL));
       return G_SOURCE_REMOVE;
     }
   return G_SOURCE_CONTINUE;
+
+async_fail:
+  self->fdt_async_armed = FALSE;
+  self->capture_recovery_pending = TRUE;
+  self->poll_id = 0;
+  fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+      FP_DEVICE_ERROR_GENERAL, "Invalid FDT-down event; recovery required"));
+  return G_SOURCE_REMOVE;
 }
 
 static gboolean
@@ -4969,6 +5090,7 @@ gx_warm_idle_expired (FpiDeviceGoodix51A0 *self)
 static void
 gx_warm_abandon (FpiDeviceGoodix51A0 *self)
 {
+  self->fdt_async_armed = FALSE;
   /* Host-only invalidation.  Use this after suspend or another lifecycle
    * boundary where sensor-side TLS state cannot be trusted: never send a
    * close_notify over a session that may no longer exist. */
@@ -5420,6 +5542,13 @@ gx_dev_close (FpDevice *dev)
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
 
   g_clear_handle_id (&self->poll_id, g_source_remove);
+  /* Closing an armed, unconsumed event must not preserve it across a
+   * future Claim: there may be an IRQ waiting in the SPI response queue. */
+  if (self->fdt_async_armed)
+    {
+      self->fdt_async_armed = FALSE;
+      self->capture_recovery_pending = TRUE;
+    }
 
   /* Close may be requested more than once around a short-lived fprintd Claim:
    * the first close marks production_ready=FALSE, while later cleanup can call
@@ -5431,6 +5560,13 @@ gx_dev_close (FpDevice *dev)
    * real cold boundary was requested, keep it regardless of the UI/action
    * readiness flag. Host SPI/GPIO FDs are still closed, so this adds no polling
    * or periodic I/O while idle. */
+  /* An unconsumed 0x32 IRQ or invalid event makes retained TLS/FDT
+   * untrustworthy. Invalidate host state BEFORE the original warm-close
+   * criterion, so future Claim takes the existing detached cold reset. */
+  if (self->capture_recovery_pending &&
+      g_strcmp0 (g_getenv ("GXFP_FDT_ASYNC_EVENT_QA"), "1") == 0)
+    gx_warm_abandon (self);
+
   if (!self->force_cold_reset && gx_warm_available (self))
     {
       gboolean was_ready = self->production_ready;
