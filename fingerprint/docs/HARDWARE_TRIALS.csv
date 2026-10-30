@@ -49,3 +49,4 @@ s4-20261027-7171-2302,2026-10-27T23:02:21.003027+01:00,rel71.71,S4,pass,1,4826,8
 s3-20261027-7173-2354-regression,2026-10-27T23:53:59+01:00,rel71.73,S3,fail,5+ (operator),4740,71,,,,17,7,rel71.74-held-finger-resume-qa-20261027.md
 s4-20261027-7173-2357-regression,2026-10-27T23:57:04+01:00,rel71.73,S4,fail,5-6 (operator),18379,83,,,,12,7,rel71.74-held-finger-resume-qa-20261027.md
 lock-20261030-qa42-0144,2026-10-30T01:44:28.208327+01:00,rel71.74-qa42,LOCK,pass,1,,52,1181,,,13,7,rel71.74-qa42-fdt-typed32-20261030-lock.md
+lock-20261030-qa44-0944-fail,2026-10-30T09:44:48.313426+01:00,rel71.74-qa44,LOCK,fail,multiple (operator),,51,,,,,7,rel71.74-qa44-lock-no-detect-20261030.md
