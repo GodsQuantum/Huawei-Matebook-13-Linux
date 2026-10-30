@@ -2985,6 +2985,36 @@ gx_background_is_fresh (FpiDeviceGoodix51A0 *self)
   return gx_background_age_us (self) <= GX_BG_FRESH_MAX_US;
 }
 
+/* Fast-first-capture QA is intentionally narrow: a recent successful
+ * open/Claim FDT liveness probe, already-established TLS, and a clean,
+ * bounded-age reference. The first image still goes through the unchanged
+ * encrypted capture, quality and matcher gates. A failed usable pose takes
+ * the original stale-background refresh path before retry.
+ *
+ * Do NOT make this the default or extend the age bound without repeated
+ * first-touch hardware trials: ST411 ImageBase can drift in tens of seconds.
+ * A merely present bg_frame is NOT proof that it is safe to reuse. */
+#define GX_BG_FAST_FIRST_MAX_US (G_GINT64_CONSTANT(5) * 60 * G_USEC_PER_SEC)
+#define GX_BG_FAST_FDT_MAX_US (G_GINT64_CONSTANT(2) * G_USEC_PER_SEC)
+
+static gboolean
+gx_fast_first_capture_qa_eligible (FpiDeviceGoodix51A0 *self)
+{
+  gint64 now = g_get_monotonic_time ();
+  gint64 age = gx_background_age_us (self);
+
+  return g_strcmp0 (g_getenv ("GXFP_FIRST_CAPTURE_FAST_QA"), "1") == 0 &&
+         self->production_ready && self->warm_valid && self->tls_up &&
+         self->tls && self->bg_frame && self->have_fdt &&
+         !self->bg_dirty && !self->force_cold_reset &&
+         !self->capture_recovery_pending &&
+         age > GX_BG_FRESH_MAX_US && age <= GX_BG_FAST_FIRST_MAX_US &&
+         self->warm_last_activity_us > 0 &&
+         now >= self->warm_last_activity_us &&
+         now - self->warm_last_activity_us <= GX_BG_FAST_FDT_MAX_US;
+}
+
+
 static void
 gx_invalidate_capture_context (FpiDeviceGoodix51A0 *self)
 {
@@ -3189,7 +3219,13 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
        * biometric READY. If the user is already touching the sensor,
        * gx_warm_validate() safely defers the refresh and the bounded reposition
        * path remains available. */
-      if (!gx_background_is_fresh (self))
+      if (!gx_background_is_fresh (self) &&
+          gx_fast_first_capture_qa_eligible (self))
+        fp_warn ("GXFP51A0 FIRST_CAPTURE_FAST_QA retaining clean ImageBase "
+                 "age=%ld ms for one strict first capture; "
+                 "stale-background refresh remains on failed-pose retry",
+                 (long) (gx_background_age_us (self) / 1000));
+      else if (!gx_background_is_fresh (self))
         {
           gint64 age_us = gx_background_age_us (self);
           gint64 previous_refresh = self->bg_last_refresh_us;
