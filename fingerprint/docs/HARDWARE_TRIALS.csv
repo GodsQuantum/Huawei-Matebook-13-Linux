@@ -54,3 +54,4 @@ lock-20261030-qa42-1026-fail,2026-10-30T10:26:25.669543+01:00,rel71.74-qa42,LOCK
 boot-20261031-qa42-2138,2026-10-31T21:38:22.075314+01:00,rel71.74-qa42,BOOT,pass,1,,84,1227,,,12,7,rel71.74-qa42-postreboot-hardware-20261031.md
 s3-20261031-qa42-2312,2026-10-31T23:12:13.855733+01:00,rel71.74-qa42,S3,pass,1,5498,85,1828,,9881,7,7,rel71.74-qa42-postreboot-hardware-20261031.md
 lock-20261031-qa42-2317,2026-10-31T23:17:51.805924+01:00,rel71.74-qa42,LOCK,fail,4 (operator),,84,1790,,,14,7,rel71.74-qa42-postreboot-hardware-20261031.md
+lock-20261031-qa42-2343-hidden-ui-fail,2026-10-31T23:43:39.438447+01:00,rel71.74-qa42,LOCK,fail,multiple (operator; exact unknown),,83,1758,,,16,7,rel71.74-qa42-kscreenlocker-hidden-ui-failure-20261031.md
