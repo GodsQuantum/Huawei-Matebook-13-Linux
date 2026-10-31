@@ -5217,6 +5217,26 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
              GX_CAPTURE_SCALE_MIN, 250);
     int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
 
+    /* QA48, default OFF. A benign, successful second-attempt FDT manual
+     * reply during background setup only measures FDT ACK pacing; it is
+     * not evidence that the sensor needs longer *image capture* gaps.
+     * Upstream 2020 traces and the 2021 reference both show this retry
+     * without a GET_IMAGE/TLS failure. Keep the capture state independent
+     * until an actual image retry/desync provides direct evidence.
+     *
+     * The existing retry-assisted calibration in
+     * gx_capture_pacing_success() stays fully enabled. Do not lower
+     * any already-raised capture gap or change TLS/FDT/matcher rules. */
+    if (protocol_floor > previous &&
+        g_strcmp0 (g_getenv ("GXFP_CAPTURE_GAP_FDT_INDEPENDENT_QA"), "1") == 0)
+      {
+        fp_warn ("GXFP51A0 CAPTURE_GAP_FDT_INDEPENDENT_QA: "
+                 "ignore FDT-only cold seed protocol=%d%%; "
+                 "retain direct-capture pacing=%d%% (%u us)",
+                 self->timing_scale, previous, gx_capture_gap_us (self));
+        protocol_floor = GX_CAPTURE_SCALE_MIN;
+      }
+
     if (protocol_floor > previous)
       {
         self->capture_gap_scale = protocol_floor;
