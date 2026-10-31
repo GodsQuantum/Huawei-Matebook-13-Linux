@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Apply a small, reversible KDE 6.8 fingerprint-on-lock QML integration.
+
+No new PAM method, daemon or timer: this uses stock KScreenLocker authenticator
+and its existing heartbeat, with logind suspend/resume lifecycle gating.
+"""
+from __future__ import annotations
+import sys
+import hashlib
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import tempfile
+
+TARGET = Path(os.environ.get("GXFP_KDE_QML", "/usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen/LockScreenUi.qml"))
+ROLLBACK = Path(os.environ.get("GXFP_KDE_ROLLBACK", "/var/lib/gxfp51a0-qa-rollback/kde-lockscreen"))
+LINTER = os.environ.get("GXFP_QMLLINT", "/usr/lib/qt6/bin/qmllint")
+MARK = "GXFP51A0 prompt-free fingerprint v1 vendor-sha256="
+ORIGINAL = "        Component.onCompleted: launchAnimation.start();"
+PATCHES = (
+    (
+        "    property bool expectingPrompt: false // this is set for real when an authenticator is selected\n",
+        "    property bool expectingPrompt: false // this is set for real when an authenticator is selected\n"
+        "    property bool biometricSuspendPending: false // pause fingerprint across S3/S4\n",
+    ),
+    (
+        "        function onAboutToSuspend() {\n"
+        "            root.clearPassword();\n"
+        "        }\n",
+        "        function onAboutToSuspend() {\n"
+        "            lockScreenUi.biometricSuspendPending = true;\n"
+        "            authenticator.stopAuthenticating();\n"
+        "            root.clearPassword();\n"
+        "        }\n"
+        "        function onResumingFromSuspend() {\n"
+        "            lockScreenUi.biometricSuspendPending = false;\n"
+        "            authenticator.startAuthenticating();\n"
+        "        }\n",
+    ),
+    (
+        "            authenticator.startAuthenticating();\n"
+        "        }\n\n"
+        "        Timer { // heart beat keeping the backend active for as long as we are in visible state",
+        "            if (!lockScreenUi.biometricSuspendPending) {\n"
+        "                authenticator.startAuthenticating();\n"
+        "            }\n"
+        "        }\n\n"
+        "        Timer { // stock KDE heartbeat, also active while prompt remains hidden",
+    ),
+    (
+        "            running: !authenticator.unlocked && parent.uiVisible\n",
+        "            running: !authenticator.unlocked && !lockScreenUi.biometricSuspendPending\n",
+    ),
+)
+
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+def build(original: str) -> str:
+    if MARK in original or "GXFP51A0 cpp-lifecycle-auth" in original:
+        raise ValueError("existing unrelated KDE integration; stop without changes")
+    if original.count(ORIGINAL) != 1:
+        raise ValueError("unrecognized KScreenLocker Component.onCompleted structure")
+    for old, _ in PATCHES:
+        if original.count(old) != 1:
+            raise ValueError("unrecognized KDE 6.8 QML structure; preserving vendor file")
+    # Never change the password/PAM/selected authenticator or S3 timeout behavior.
+    patched = original
+    for old, new in PATCHES:
+        patched = patched.replace(old, new, 1)
+    marker = MARK + digest(original.encode("utf-8"))
+    patched = patched.replace(ORIGINAL,
+        "        Component.onCompleted: {\n"
+        "            launchAnimation.start();\n"
+        "            // " + marker + "\n"
+        "            authenticator.startAuthenticating();\n"
+        "        }", 1)
+    assert patched.count(marker) == 1
+    return patched
+
+def verify(patched: str) -> str:
+    m = re.search(r"GXFP51A0 prompt-free fingerprint v1 vendor-sha256=([a-f0-9]{64})", patched)
+    if not m:
+        raise ValueError("prompt-free marker not found")
+    for needle in (
+        "property bool biometricSuspendPending: false",
+        "authenticator.stopAuthenticating();",
+        "function onResumingFromSuspend()",
+        "running: !authenticator.unlocked && !lockScreenUi.biometricSuspendPending",
+        "authenticator.startAuthenticating();",
+    ):
+        if needle not in patched:
+            raise ValueError("missing lifecycle gate: " + needle)
+    return m.group(1)
+
+def lint(candidate: Path) -> None:
+    result = subprocess.run([LINTER, "--only-explicit-categories", "--syntax=error", str(candidate)],
+                            capture_output=True, text=True, timeout=25)
+    if result.returncode:
+        raise RuntimeError("QML syntax rejected: " + (result.stderr or result.stdout)[:800])
+
+def atomic_write(path: Path, data: bytes) -> None:
+    fd, temp_name = tempfile.mkstemp(prefix=".gxfp-kde.", suffix=".qml", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(temp_name, stat.S_IMODE(path.stat().st_mode))
+        lint(Path(temp_name))
+        os.replace(temp_name, path)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+def main() -> int:
+    if len(sys.argv) != 2 or sys.argv[1] not in ("--apply", "--check", "--remove", "--dry-run"):
+        raise SystemExit("usage: gxfp51a0-kde-lock-reapply --apply|--check|--remove|--dry-run")
+    mode = sys.argv[1]
+    if not TARGET.is_file():
+        print("GXFP_KDE: missing QML; refusing patch")
+        return 0 if mode == "--apply" else 2
+    raw = TARGET.read_bytes()
+    existing = raw.decode("utf-8")
+    if mode == "--check":
+        verify(existing)
+        lint(TARGET)
+        print("GXFP_KDE: prompt-free KScreenLocker QML verified")
+        return 0
+    if MARK in existing:
+        sha = verify(existing)
+        if mode in ("--apply", "--dry-run"):
+            lint(TARGET)
+            print("GXFP_KDE: already applied, vendor=" + sha[:12])
+            return 0
+        backup = ROLLBACK / ("LockScreenUi.vendor." + sha + ".qml")
+        if not backup.is_file() or digest(backup.read_bytes()) != sha:
+            raise RuntimeError("rollback original missing/invalid; not modifying QML")
+        if os.geteuid() != 0:
+            raise PermissionError("root required to restore packaged QML")
+        atomic_write(TARGET, backup.read_bytes())
+        print("GXFP_KDE: original QML restored from verified backup")
+        return 0
+    if mode == "--remove":
+        print("GXFP_KDE: no active patch")
+        return 0
+    patched = build(existing)
+    if mode == "--dry-run":
+        with tempfile.TemporaryDirectory(prefix="gxfp-kde-qml-preflight-") as tmp:
+            candidate = Path(tmp) / "LockScreenUi.qml"
+            candidate.write_text(patched, encoding="utf-8")
+            lint(candidate)
+        print("GXFP_KDE: supported vendor QML and QML syntax; ready sha256=" + digest(raw))
+        return 0
+    if os.geteuid() != 0:
+        raise PermissionError("root required to patch packaged QML")
+    # Retain one immutable copy per vendor hash to allow complete rollback.
+    ROLLBACK.mkdir(parents=True, exist_ok=True)
+    os.chmod(ROLLBACK, 0o700)
+    sha = digest(raw)
+    backup = ROLLBACK / ("LockScreenUi.vendor." + sha + ".qml")
+    if not backup.exists():
+        fd = os.open(backup, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+            f.flush()
+            os.fsync(f.fileno())
+    if digest(backup.read_bytes()) != sha:
+        raise RuntimeError("vendor backup hash mismatch")
+    atomic_write(TARGET, patched.encode("utf-8"))
+    print("GXFP_KDE: enabled hidden-prompt authentication with suspend-safe lifecycle")
+    print("GXFP_KDE: vendor=" + sha + " patched=" + digest(patched.encode("utf-8")))
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
