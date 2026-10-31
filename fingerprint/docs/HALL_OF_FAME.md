@@ -48,7 +48,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.71 | S4 | 1/1 | Nombre insuffisant |
 | rel71.73 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.73 | S4 | 0/1 | ÉCHEC de première pose |
-| rel71.74-qa42 | LOCK | 1/2 | ÉCHEC de première pose |
+| rel71.74-qa42 | LOCK | 1/4 | ÉCHEC de première pose |
 | rel71.74-qa42 | S3 | 1/1 | Nombre insuffisant |
 | rel71.74-qa42 | BOOT | 1/1 | Nombre insuffisant |
 
@@ -106,6 +106,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261027-7173-2354-regression | 2026-10-27T23:53:59+01:00 | rel71.73 | S3 | 5+ (operator) | fail | 4.740 | 0.071 | — | — | — | 17/7 |
 | s4-20261027-7173-2357-regression | 2026-10-27T23:57:04+01:00 | rel71.73 | S4 | 5-6 (operator) | fail | 18.379 | 0.083 | — | — | — | 12/7 |
 | lock-20261030-qa42-0144 | 2026-10-30T01:44:28.208327+01:00 | rel71.74-qa42 | LOCK | 1 | pass | — | 0.052 | 1.181 | — | — | 13/7 |
+| lock-20261030-qa42-1018-fail | 2026-10-30T10:18:03.371885+01:00 | rel71.74-qa42 | LOCK | multiple (operator) | fail | — | 0.051 | — | — | — | —/7 |
+| lock-20261030-qa42-1026-fail | 2026-10-30T10:26:25.669543+01:00 | rel71.74-qa42 | LOCK | unknown (no success) | fail | — | 0.051 | — | — | — | —/7 |
 | boot-20261031-qa42-2138 | 2026-10-31T21:38:22.075314+01:00 | rel71.74-qa42 | BOOT | 1 | pass | — | 0.084 | 1.227 | — | — | 12/7 |
 | s3-20261031-qa42-2312 | 2026-10-31T23:12:13.855733+01:00 | rel71.74-qa42 | S3 | 1 | pass | 5.498 | 0.085 | 1.828 | — | 9.881 | 7/7 |
 | lock-20261031-qa42-2317 | 2026-10-31T23:17:51.805924+01:00 | rel71.74-qa42 | LOCK | 4 (operator) | fail | — | 0.084 | 1.790 | — | — | 14/7 |
