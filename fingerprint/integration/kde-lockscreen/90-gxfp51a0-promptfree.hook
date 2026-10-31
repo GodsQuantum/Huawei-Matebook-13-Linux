@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = plasma-desktop
+
+[Action]
+Description = Reapplying verified GXFP51A0 KScreenLocker prompt-free fingerprint integration...
+When = PostTransaction
+Exec = /usr/local/libexec/gxfp51a0-kde-lock-reapply --apply
+Depends = python
