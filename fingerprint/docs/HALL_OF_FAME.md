@@ -51,6 +51,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa42 | LOCK | 1/5 | ÉCHEC de première pose |
 | rel71.74-qa42 | S3 | 1/1 | Nombre insuffisant |
 | rel71.74-qa42 | BOOT | 1/1 | Nombre insuffisant |
+| rel71.74-qa42+kde47 | LOCK | 1/1 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -112,6 +113,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261031-qa42-2312 | 2026-10-31T23:12:13.855733+01:00 | rel71.74-qa42 | S3 | 1 | pass | 5.498 | 0.085 | 1.828 | — | 9.881 | 7/7 |
 | lock-20261031-qa42-2317 | 2026-10-31T23:17:51.805924+01:00 | rel71.74-qa42 | LOCK | 4 (operator) | fail | — | 0.084 | 1.790 | — | — | 14/7 |
 | lock-20261031-qa42-2343-hidden-ui-fail | 2026-10-31T23:43:39.438447+01:00 | rel71.74-qa42 | LOCK | multiple (operator; exact unknown) | fail | — | 0.083 | 1.758 | — | — | 16/7 |
+| lock-20261101-qa42-kde47-hidden-ui-first-pose | 2026-11-01T00:00:14.998207+01:00 | rel71.74-qa42+kde47 | LOCK | 1 | pass | — | 0.083 | 1.800 | — | — | 14/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
