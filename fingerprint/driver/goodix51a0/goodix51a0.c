@@ -2600,7 +2600,7 @@ gx_diag_press_countdown (FpiDeviceGoodix51A0 *self, int off_anchor_mean)
                 {
                   fp_warn ("GXFP51A0 CAPTURE_DIAGNOSTIC_COUNTDOWN_RESTART: REMOVE_FINGER mean=%d anchor=%d",
                            mean, off_anchor_mean);
-                  if (!gx_wait_sensor_clear (self, off_anchor_mean, NULL))
+                  if (!gx_wait_sensor_clear (self, off_anchor_mean, NULL, NULL))
                     return FALSE;
                   restart = TRUE;
                   break;
