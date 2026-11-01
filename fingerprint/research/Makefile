@@ -589,3 +589,8 @@ test_qa53_quality_diagnostics:
 test: test_qa54_rotation_qa
 test_qa54_rotation_qa:
 	python3 ./tests/test_qa54_rotation_qa.py
+
+.PHONY: test_qa55_active_cancel
+test: test_qa55_active_cancel
+test_qa55_active_cancel:
+	python3 ./tests/test_qa55_active_cancel.py

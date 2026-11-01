@@ -80,7 +80,7 @@ struct _FpiDeviceGoodix51A0
 
   int           spi_fd;
   int           irq_fd;
-  FpiSsm       *task_ssm;
+  FpiSsm       *task_ssm; /* QA55: main-thread-only borrowed pointer; cleared by every SSM completion */
 
   /* TLS stack. Note the sensor is the client and we are the server. */
   GxTls        *tls;
@@ -3865,6 +3865,42 @@ gx_cancelled (FpDevice *dev, FpiSsm *ssm)
   return TRUE;
 }
 
+/* QA55: libfprint 1.94.100 exposes a native device cancel vfunc.
+ * Its GCancellable is cancelled on an unsupported active suspend and the
+ * vfunc is delivered via GLib's main context. A waiting FDT timer must
+ * complete its SSM *before* libfprint can release the suspend inhibitor.
+ *
+ * Only interrupt the idle WAIT_ON/WAIT_OFF source. NEVER mark an SSM done
+ * while its blocking TLS / GET_IMAGE worker still owns the SPI/IRQ FDs.
+ * This also handles normal PAM cancel without a new daemon/timer. */
+static void
+gx_dev_cancel (FpDevice *dev)
+{
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+  FpiSsm *ssm = self->task_ssm;
+  guint pending_poll = self->poll_id;
+  int state;
+
+  if (g_strcmp0 (g_getenv ("GXFP_CANCEL_PENDING_POLL_QA"), "1") != 0 ||
+      !ssm || pending_poll == 0)
+    return;
+
+  state = fpi_ssm_get_cur_state (ssm);
+  if (state != GX_ST_WAIT_ON && state != GX_ST_WAIT_OFF)
+    return;
+
+  /* No capture worker is running in a WAIT state. Clear the GLib source
+   * before failing the SSM, whose completion callback frees it immediately. */
+  self->poll_id = 0;
+  g_source_remove (pending_poll);
+  fp_warn ("GXFP51A0 CANCEL_PENDING_POLL_QA state=%d "
+           "removed_fdt_source=1; completing cancelled SSM", state);
+  fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NONE);
+  fpi_ssm_mark_failed (ssm,
+                       g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                                            "fingerprint wait cancelled"));
+}
+
 /* Handle the real desktop failure mode: the lockscreen may Claim/Open the
  * reader before suspend and keep that same operation alive across S3.  Compare
  * CLOCK_BOOTTIME with CLOCK_MONOTONIC on every lightweight finger poll; the
@@ -4867,6 +4903,7 @@ gx_run_state (FpiSsm *ssm, FpDevice *dev)
 static void
 gx_enroll_done (FpiSsm *ssm, FpDevice *dev, GError *error)
 {
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = NULL;
   GxTask *t = fpi_ssm_get_data (ssm);
   FpPrint *print = NULL;
 
@@ -5839,6 +5876,7 @@ gx_dev_resume (FpDevice *dev)
 static void
 gx_verify_done (FpiSsm *ssm, FpDevice *dev, GError *error)
 {
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = NULL;
   GxTask *t = fpi_ssm_get_data (ssm);
   FpPrint *template = NULL;
   g_autoptr(GPtrArray) views = NULL;
@@ -5889,6 +5927,7 @@ gx_verify_done (FpiSsm *ssm, FpDevice *dev, GError *error)
 static void
 gx_identify_done (FpiSsm *ssm, FpDevice *dev, GError *error)
 {
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = NULL;
   GxTask *t = fpi_ssm_get_data (ssm);
 
   if (error)
@@ -5959,6 +5998,7 @@ gx_dev_enroll (FpDevice *dev)
         fp_info ("enroll: kept %u existing views", t->views->len);
     }
   fpi_ssm_set_data (ssm, t, (GDestroyNotify) gx_task_free);
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = ssm;
   fpi_ssm_start (ssm, gx_enroll_done);
 }
 
@@ -5973,6 +6013,7 @@ gx_dev_verify (FpDevice *dev)
   if (t->cold_contact_gate)
     FPI_DEVICE_GOODIX51A0 (dev)->cold_verify_placement_budget--;
   fpi_ssm_set_data (ssm, t, (GDestroyNotify) gx_task_free);
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = ssm;
   fpi_ssm_start (ssm, gx_verify_done);
 }
 
@@ -5988,6 +6029,7 @@ gx_dev_identify (FpDevice *dev)
   if (t->cold_contact_gate)
     FPI_DEVICE_GOODIX51A0 (dev)->cold_verify_placement_budget--;
   fpi_ssm_set_data (ssm, t, (GDestroyNotify) gx_task_free);
+  FPI_DEVICE_GOODIX51A0 (dev)->task_ssm = ssm;
   fpi_ssm_start (ssm, gx_identify_done);
 }
 
@@ -6060,6 +6102,7 @@ fpi_device_goodix51a0_class_init (FpiDeviceGoodix51A0Class *klass)
   dev_class->probe = gx_dev_probe;
   dev_class->open = gx_dev_open;
   dev_class->close = gx_dev_close;
+  dev_class->cancel = gx_dev_cancel;
   dev_class->suspend = gx_dev_suspend;
   dev_class->resume = gx_dev_resume;
   dev_class->enroll = gx_dev_enroll;
