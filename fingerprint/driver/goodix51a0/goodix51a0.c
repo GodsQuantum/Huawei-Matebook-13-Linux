@@ -146,6 +146,7 @@ static gboolean gx_warm_crossed_sleep (FpiDeviceGoodix51A0 *self);
 static gboolean gx_warm_validate (FpiDeviceGoodix51A0 *self);
 static void gx_warm_abandon (FpiDeviceGoodix51A0 *self);
 static gboolean gx_cold_prepare (FpiDeviceGoodix51A0 *self);
+static gboolean gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self);
 static void gx_transport_close (FpiDeviceGoodix51A0 *self);
 static gboolean gx_transport_open (FpDevice *dev, GError **error);
 
@@ -2438,19 +2439,38 @@ gx_fdt_clear_stable_sample (guint8 touchflag,
   return now_us - *clean_since_us >= dwell_us;
 }
 
+/* QA59 never attempts to reuse a stored ImageBase without FULL live contact,
+ * a previously independently verified clear RAM reference and explicit opt-in.
+ * The original age limit, second FDT proof, real image and biometric matcher
+ * gates are implemented by gx_s3_try_early_finger_reference(). */
+static gboolean
+gx_s3_calibration_early_reuse_eligible (FpiDeviceGoodix51A0 *self,
+                                        guint8 touchflag, int mean)
+{
+  return self->s3_saved_bg &&
+    g_strcmp0 (g_getenv ("GXFP_S3_CALIBRATION_EARLY_REUSE_QA"), "1") == 0 &&
+    (touchflag & 0x3fu) == 0x3fu &&
+    mean < GOODIX_FDT_ABS - 30 &&
+    mean < self->s3_saved_abs;
+}
+
 /* Only called inside a genuine libfprint OPEN/VERIFY action with a valid
  * cancellable. Unlike rejected rel71.39, never invoke this from idle resume. */
 static gboolean
 gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
                              int anchor_mean,
                              int *out_mean,
-                             gint64 dwell_us)
+                             gint64 dwell_us,
+                             gboolean *out_s3_reference_restored)
 {
   gint64 deadline_us = g_get_monotonic_time () +
                        (gint64) GX_CLEAR_WAIT_MS * 1000;
   gint64 clean_since_us = 0;
   int cur[GXFP_FDT_ZONE_COUNT];
   gboolean warned = FALSE;
+
+  if (out_s3_reference_restored)
+    *out_s3_reference_restored = FALSE;
 
   while (g_get_monotonic_time () <= deadline_us)
     {
@@ -2466,6 +2486,25 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
         {
           mean = gx_fdt_mean (cur);
           now_us = g_get_monotonic_time ();
+
+          /* QA59: if the user puts a full finger onto the sensor BETWEEN
+           * the initial clean anchor and the first ImageBase acquisition,
+           * do not wait 15 seconds for a lift. Use the existing prior
+           * independently verified, age-limited RAM-only clean reference
+           * only after a second live strict 6/6 FDT probe confirms contact.
+           * A new TLS image and normal biometric score remain mandatory.
+           * Fail closed if the saved reference is missing or FDT disagrees. */
+          if (out_s3_reference_restored &&
+              gx_s3_calibration_early_reuse_eligible (self, touchflag, mean) &&
+              gx_s3_try_early_finger_reference (self))
+            {
+              *out_s3_reference_restored = TRUE;
+              fp_warn ("GXFP51A0 S3_CALIBRATION_EARLY_REUSE_QA "
+                       "full_contact=1 stable_clean_reference_restored=1 "
+                       "next=TLS_image_and_strict_match");
+              return TRUE;
+            }
+
           if (gx_fdt_clear_stable_sample (touchflag, mean, anchor_mean,
                                           now_us, dwell_us,
                                           &clean_since_us))
@@ -2502,11 +2541,13 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
 }
 
 static gboolean
-gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean)
+gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean,
+                      gboolean *out_s3_reference_restored)
 {
   gboolean ok = gx_wait_stable_sensor_clear (self, -1, out_mean,
-                                              GX_CALIB_CLEAN_DWELL_US);
-  if (ok)
+                                              GX_CALIB_CLEAN_DWELL_US,
+                                              out_s3_reference_restored);
+  if (ok && (!out_s3_reference_restored || !*out_s3_reference_restored))
     fp_info ("GXFP51A0 clean calibration anchor: mean=%d", *out_mean);
   return ok;
 }
@@ -2518,16 +2559,18 @@ gx_wait_sensor_clear_stable (FpiDeviceGoodix51A0 *self,
                              gint64 dwell_us)
 {
   return gx_wait_stable_sensor_clear (self, off_anchor_mean, out_mean,
-                                      dwell_us);
+                                      dwell_us, NULL);
 }
 
 static gboolean
 gx_wait_sensor_clear (FpiDeviceGoodix51A0 *self,
                       int off_anchor_mean,
-                      int *out_mean)
+                      int *out_mean,
+                      gboolean *out_s3_reference_restored)
 {
-  return gx_wait_sensor_clear_stable (self, off_anchor_mean, out_mean,
-                                     GX_CALIB_PREIMAGE_DWELL_US);
+  return gx_wait_stable_sensor_clear (self, off_anchor_mean, out_mean,
+                                     GX_CALIB_PREIMAGE_DWELL_US,
+                                     out_s3_reference_restored);
 }
 
 static gboolean
@@ -2768,6 +2811,7 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 {
   int q, k;
   int off_anchor_mean = -1;
+  gboolean s3_reference_restored = FALSE;
 
   if (!gx_tls_session (self))
     return FALSE;
@@ -2850,8 +2894,12 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
      * a 2 s timeout and then accepted a contaminated background anyway; on
      * reference MateBook that learned idle≈211 while the true finger-off level is≈353,
      * making every subsequent press invisible. Never do that. */
-    if (!gx_wait_clean_anchor (self, &off_anchor_mean))
+    if (!gx_wait_clean_anchor (self, &off_anchor_mean,
+                               capture_diagnostic ? NULL :
+                               &s3_reference_restored))
       return FALSE;
+    if (s3_reference_restored)
+      return TRUE;
 
     if (capture_diagnostic)
       fp_info ("GXFP51A0 CAPTURE_DIAGNOSTIC_CLEAR_SENSOR_ANCHOR: mean=%d",
@@ -2862,8 +2910,12 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
         int clear_mean = off_anchor_mean;
         int mean;
 
-        if (!gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean))
+        if (!gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean,
+                                   capture_diagnostic ? NULL :
+                                   &s3_reference_restored))
           return FALSE;
+        if (s3_reference_restored)
+          return TRUE;
         if (clear_mean > off_anchor_mean)
           off_anchor_mean = clear_mean;
 

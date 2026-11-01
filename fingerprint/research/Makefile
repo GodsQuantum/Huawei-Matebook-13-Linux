@@ -599,3 +599,8 @@ test_qa57_capture_protocol_pacing:
 test: test_qa58_post_nav_settle
 test_qa58_post_nav_settle:
 	python3 ./tests/test_qa58_post_nav_settle.py
+
+.PHONY: test_qa59_s3_calibration_early_reuse
+test: test_qa59_s3_calibration_early_reuse
+test_qa59_s3_calibration_early_reuse:
+	python3 ./tests/test_qa59_s3_calibration_early_reuse.py
