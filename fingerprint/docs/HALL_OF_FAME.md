@@ -6,14 +6,14 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Discipline | Temps | Version | Essai |
 |---|---:|---|---|
-| LOCK : doigt → succès | **1.158 s** | rel71.74-qa54+kde47 | lock-20261101-qa54-1212 |
+| LOCK : doigt → succès | **1.157 s** | rel71.74-qa57+kde47 | lock-20261101-qa57-194519 |
 | LOCK : KDE → succès | **3.488 s** | rel71.55 | lock-20261024-1 |
 | S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
 | S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
 
 ## Champion de vitesse : référence pour les futures QA
 
-- Record matériel **1.158 s** en première pose : **rel71.74-qa54+kde47** (lock-20261101-qa54-1212).
+- Record matériel **1.157 s** en première pose : **rel71.74-qa57+kde47** (lock-20261101-qa57-194519).
 - Examiner d'abord le code du champion, jamais uniquement la dernière branche QA ; comparer aussi à la version en production.
 - Ne pas confondre un gain de READY→DETECT avec une authentification plus rapide ou plus fiable. Les échecs du matcher disqualifient un candidat même si la détection est accélérée.
 - Conserver les correctifs indépendants validés (dont KDE sans souris), TLS, FDT strict et seuil biométrique 7.
@@ -71,6 +71,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa55+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa57+kde47 | LOCK | 1/1 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -150,6 +151,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261101-qa56-165039 | 2026-11-01T16:50:39.274858+01:00 | rel71.74-qa56+kde47 | LOCK | 1 detected; physical unconfirmed | unknown | — | 0.084 | 1.725 | — | — | 7/7 |
 | s3-20261101-qa56-165120 | 2026-11-01T16:51:20.881670+01:00 | rel71.74-qa56+kde47 | S3 | 1 detected; physical unconfirmed | unknown | 4.147 | 0.084 | 1.794 | — | 6.852 | 7/7 |
 | s3-20261101-qa56-165147 | 2026-11-01T16:51:47.548953+01:00 | rel71.74-qa56+kde47 | S3 | 2 detected; physical unconfirmed | unknown | 4.155 | 0.083 | 1.732 | — | 11.317 | 7/7 |
+| lock-20261101-qa57-194519 | 2026-11-01T19:45:19.316071+01:00 | rel71.74-qa57+kde47 | LOCK | 1 | pass | — | 0.060 | 1.157 | — | — | 9/7 |
+| s3-20261101-qa57-195500 | 2026-11-01T19:55:00.285666+01:00 | rel71.74-qa57+kde47 | S3 | 2 detected; physical count unconfirmed | unknown | 3.781 | 0.084 | 1.227 | — | — | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

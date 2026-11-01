@@ -36,7 +36,10 @@ class HallOfFameTests(unittest.TestCase):
                  and r["first_touch"] == "pass"
                  and r["press_to_terminal_ms"]]
         champion = min(locks, key=lambda r: int(r["press_to_terminal_ms"]))
-        self.assertEqual(champion["trial_id"], latest["trial_id"])
+        # QA54's hardware observation remains immutable even after a later
+        # candidate records a slightly faster independent first-touch LOCK.
+        self.assertEqual(champion["trial_id"],
+                         "lock-20261101-qa57-194519")
         qa49 = by_id["lock-20261101-qa49-held-poll-0310"]
         qa50 = by_id["lock-20261101-qa50-failed-0357"]
         self.assertEqual((qa49["first_touch"], qa49["press_to_terminal_ms"]),
@@ -47,6 +50,26 @@ class HallOfFameTests(unittest.TestCase):
         self.assertIn("QA42", page)
         self.assertIn("1/5 LOCK", page)
         self.assertIn("rel71.74-qa54+kde47", page)
+
+    def test_qa57_hardware_speed_and_s3_fdt_failure_both_recorded(self):
+        by_id = {r["trial_id"]: r for r in self.rows}
+        lock = by_id["lock-20261101-qa57-194519"]
+        s3 = by_id["s3-20261101-qa57-195500"]
+        self.assertEqual((lock["first_touch"], lock["poses"],
+                          lock["press_to_terminal_ms"], lock["score"],
+                          lock["fast_ready_ms"]),
+                         ("pass", "1", "1157", "9", "60"))
+        self.assertEqual((s3["first_touch"], s3["prewarm_ms"],
+                          s3["fast_ready_ms"], s3["press_to_terminal_ms"],
+                          s3["wake_to_terminal_ms"], s3["score"]),
+                         ("unknown", "3781", "84", "1227", "", "7"))
+        self.assertIn("2 detected", s3["poses"])
+        self.assertLess(int(lock["press_to_terminal_ms"]),
+                        int(by_id["lock-20261101-qa54-1212"]["press_to_terminal_ms"]))
+        eligible_s3 = [r for r in self.rows if r["kind"] == "S3" and
+                       r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
+        self.assertNotIn(s3, eligible_s3)
+        self.assertIn("rel71.74-qa57+kde47", hof.render(self.rows))
 
     def test_qa56_first_lock_and_second_touch_s3_preserve_record(self):
         ids = {r["trial_id"]: r for r in self.rows}
