@@ -48,6 +48,24 @@ class HallOfFameTests(unittest.TestCase):
         self.assertIn("1/5 LOCK", page)
         self.assertIn("rel71.74-qa54+kde47", page)
 
+    def test_qa56_first_lock_and_second_touch_s3_preserve_record(self):
+        ids = {r["trial_id"]: r for r in self.rows}
+        lock = ids["lock-20261101-qa56-1633"]
+        s3 = ids["s3-20261101-qa56-1634"]
+        self.assertEqual(
+            (lock["kind"], lock["first_touch"], lock["poses"],
+             lock["press_to_terminal_ms"], lock["fast_ready_ms"], lock["score"]),
+            ("LOCK", "pass", "1", "1193", "51", "7"))
+        self.assertEqual(
+            (s3["kind"], s3["first_touch"], s3["poses"],
+             s3["prewarm_ms"], s3["fast_ready_ms"],
+             s3["press_to_terminal_ms"], s3["wake_to_terminal_ms"], s3["score"]),
+            ("S3", "fail", "2", "3542", "84", "1679", "11780", "7"))
+        # A second-touch S3 success is NOT a first-touch speed record.
+        self.assertGreater(int(lock["press_to_terminal_ms"]),
+                           int(ids["lock-20261101-qa54-1212"]["press_to_terminal_ms"]))
+        self.assertIn("s3-20261101-qa56-1634", hof.render(self.rows))
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
