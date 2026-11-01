@@ -330,6 +330,10 @@ gx_send_plain_drain (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n,
 #define GX_FDT_DOWN_SECOND_REPLY_POLLS   (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
 G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
 G_STATIC_ASSERT (GX_FDT_DOWN_SECOND_REPLY_POLLS == 10);
+#define GX_FDT_DOWN_LATE_REPLY_TIMEOUT_MS 200
+#define GX_FDT_DOWN_LATE_REPLY_POLLS (GX_FDT_DOWN_LATE_REPLY_TIMEOUT_MS / GX_DRAIN_IRQ_POLL_MS)
+G_STATIC_ASSERT (GX_FDT_DOWN_LATE_REPLY_TIMEOUT_MS % GX_DRAIN_IRQ_POLL_MS == 0);
+G_STATIC_ASSERT (GX_FDT_DOWN_LATE_REPLY_POLLS == 20);
 #ifndef GX_GET_IMAGE_ATTEMPTS
 #define GX_GET_IMAGE_ATTEMPTS 2
 #endif
@@ -354,6 +358,11 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
   /* Optional 2020/2021 interoperability trial; rel71.74 default unchanged. */
   gboolean fdt_typed_qa = body[0] == 0x32u &&
     g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_TYPED_REPLY_QA"), "1") == 0;
+  /* QA56: 200ms is only an extra wait for the separate, checksum-validated
+   * FDT-down report AFTER an ACK. Never re-send 0x32 or skip strict proof.
+   * Normal capture and healthy 60ms reports pay zero extra latency. */
+  gboolean fdt_late_report_qa = fdt_typed_qa &&
+    g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_LATE_REPORT_QA"), "1") == 0;
   int attempt;
 
   /* Reply counts observed stable across the GXFP51A0 capture path and matching
@@ -396,7 +405,10 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       guint8 fdt_data_tag = 0;
       gint64 fdt_ack_us = 0, fdt_report_us = 0;
       int post_reply_miss_limit =
-        body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
+        body[0] == 0x32u
+          ? (fdt_late_report_qa ? GX_FDT_DOWN_LATE_REPLY_POLLS
+                                : GX_FDT_DOWN_SECOND_REPLY_POLLS)
+          : GX_DRAIN_SILENCE;
 
       /* Capture commands are sent directly. The recipe carries explicit NOPs
        * at the positions observed on GXFP51A0; do not prepend one here. */
@@ -514,7 +526,8 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
                      fdt_ack_us && fdt_report_us > fdt_ack_us
                        ? (long) ((fdt_report_us - fdt_ack_us) / 1000)
                        : -1L,
-                     GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS);
+                     fdt_late_report_qa ? GX_FDT_DOWN_LATE_REPLY_TIMEOUT_MS
+                                        : GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS);
         }
 
       if (out_ack_seen && ack_seen)
@@ -552,6 +565,13 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
           return FALSE;
         }
 
+      /* A late, validated 0x32 report is useful evidence for an
+       * intermittent ACK->data delay. Keep telemetry non-biometric. */
+      if (body[0] == 0x32u && fdt_late_report_qa && fdt_data_seen &&
+          fdt_ack_us && fdt_report_us - fdt_ack_us > 100000)
+        fp_warn ("GXFP51A0 FDT_LATE_REPORT_QA accepted=1 ack_to_data_ms=%ld "
+                 "window_ms=200",
+                 (long) ((fdt_report_us - fdt_ack_us) / 1000));
       if (body[0] != 0x20u)
         return TRUE;
 
