@@ -73,6 +73,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa57+kde47 | LOCK | 1/1 | Nombre insuffisant |
 | rel71.74-qa57+kde47 | S3 | 1/1 | Nombre insuffisant |
+| rel71.74-qa57+fprintd-mr259 | S3 | 0/1 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -155,6 +156,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261101-qa57-194519 | 2026-11-01T19:45:19.316071+01:00 | rel71.74-qa57+kde47 | LOCK | 1 | pass | — | 0.060 | 1.157 | — | — | 9/7 |
 | s3-20261101-qa57-195500 | 2026-11-01T19:55:00.285666+01:00 | rel71.74-qa57+kde47 | S3 | 2 detected; physical count unconfirmed | unknown | 3.781 | 0.084 | 1.227 | — | — | 7/7 |
 | s3-20261101-qa57-214932 | 2026-11-01T21:49:32.205312+01:00 | rel71.74-qa57+kde47 | S3 | 1 | pass | 3.538 | 0.083 | 1.173 | — | 6.609 | 21/7 |
+| s3-20261101-qa57-fprintd259-222809 | 2026-11-01T22:28:09.499958+01:00 | rel71.74-qa57+fprintd-mr259 | S3 | 5 | fail | 3.530 | 0.083 | 16.356 | — | 23.045 | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
