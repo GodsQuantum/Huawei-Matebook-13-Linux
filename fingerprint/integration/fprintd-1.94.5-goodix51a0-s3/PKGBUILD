@@ -1,10 +1,12 @@
-# rel73 candidate: fprintd 1.94.5 + Goodix GXFP51A0 S3-open boundary.
-# This is intentionally separate from install-arch.sh until the human S3 gate passes.
+# QA upstream MR !259 backport for fprintd 1.94.5 (2026-11-01).
+# Regression fix only: close an unclaimed device after resume.
+# Legacy Goodix open-before-suspend patch retained as reference, NOT applied.
+# Unmerged upstream MR; keep this package experimental until hardware QA.
 
 pkgname=fprintd
 pkgver=1.94.5
-pkgrel=73
-pkgdesc="D-Bus service to access fingerprint readers (GXFP51A0 rel73 S3 lifecycle)"
+pkgrel=2.2
+pkgdesc="D-Bus fingerprint service (upstream MR259 deferred release backport)"
 url="https://fprint.freedesktop.org/"
 arch=(x86_64)
 license=(GPL-2.0-or-later)
@@ -13,11 +15,11 @@ makedepends=(git glib2-devel gtk-doc meson pam_wrapper python-cairo python-dbus 
 groups=(fprint)
 source=(
   "git+https://gitlab.freedesktop.org/libfprint/fprintd.git?signed#tag=v$pkgver"
-  "0001-goodix51a0-open-before-suspend.patch"
+  "0002-upstream-mr259-deferred-close.patch"
 )
 b2sums=(
   'e9fec866da871cdae2f3312b8428209237f94312c6baa622cb1d71960d2de422c7aab339b75c05607cb915da28ad0135c9cf3538fbde9df1700a36d5f9547ba8'
-  'SKIP'
+  '5e1fb10cda35c2c1ecc18bff03b5820406d31db0530182eb47aa831acbda21e321296f70a6490c6680b88209206fdf4bdcc165b7da0263003ced30c71a1b8dec'
 )
 validpgpkeys=(
   D4C501DA48EB797A081750939449C2F50996635F
@@ -25,13 +27,13 @@ validpgpkeys=(
 
 prepare() {
   cd fprintd
-  git cherry-pick -n ec2a995c36f0757e1f5c695a80d89f41d2fa03bb
-  patch -p1 < "$srcdir/0001-goodix51a0-open-before-suspend.patch"
+  patch -p1 < "$srcdir/0002-upstream-mr259-deferred-close.patch"
 }
 
 build() {
   local meson_options=(
-    -D gtk_doc=true
+    -D gtk_doc=false
+    -D man=false
     -D pam_modules_dir=/usr/lib/security
   )
   arch-meson fprintd build "${meson_options[@]}"
