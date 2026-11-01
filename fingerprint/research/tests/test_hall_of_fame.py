@@ -19,6 +19,24 @@ class HallOfFameTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(hof.PAGE.read_text(encoding="utf-8"), hof.render(self.rows))
 
+    def test_qa42_record_and_rejected_qa50_are_preserved(self):
+        locks = [r for r in self.rows if r["kind"] == "LOCK"
+                 and r["first_touch"] == "pass"
+                 and r["press_to_terminal_ms"]]
+        champion = min(locks, key=lambda r: int(r["press_to_terminal_ms"]))
+        self.assertEqual((champion["version"], champion["press_to_terminal_ms"]),
+                         ("rel71.74-qa42", "1181"))
+        by_id = {r["trial_id"]: r for r in self.rows}
+        qa49 = by_id["lock-20261101-qa49-held-poll-0310"]
+        qa50 = by_id["lock-20261101-qa50-failed-0357"]
+        self.assertEqual((qa49["first_touch"], qa49["press_to_terminal_ms"]),
+                         ("pass", "1328"))
+        self.assertEqual((qa50["first_touch"], qa50["press_to_terminal_ms"]),
+                         ("fail", ""))
+        page = hof.render(self.rows)
+        self.assertIn("qa/gxfp71.74-fdt-typed32-20261030", page)
+        self.assertIn("1/5 LOCK", page)
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]

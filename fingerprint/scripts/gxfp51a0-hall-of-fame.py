@@ -73,6 +73,41 @@ def render(rows):
             best = min(possible, key=lambda r: int(r[metric]))
             parts.append(f'| {label} | **{seconds(best[metric])} s** | '
                          f'{best["version"]} | {best["trial_id"]} |')
+    lock_successes = [r for r in rows if r["kind"] == "LOCK"
+                      and r["first_touch"] == "pass"
+                      and r["press_to_terminal_ms"]]
+    if lock_successes:
+        champion = min(lock_successes,
+                       key=lambda r: int(r["press_to_terminal_ms"]))
+        parts += [
+            "",
+            "## Champion de vitesse : référence pour les futures QA",
+            "",
+            f"- Record matériel **{seconds(champion['press_to_terminal_ms'])} s** "
+            f"en première pose : **{champion['version']}** "
+            f"({champion['trial_id']}).",
+            "- Examiner d'abord le code du champion, jamais uniquement la "
+            "dernière branche QA ; comparer aussi à la version en production.",
+            "- Ne pas confondre un gain de READY→DETECT avec une authentification "
+            "plus rapide ou plus fiable. Les échecs du matcher disqualifient "
+            "un candidat même si la détection est accélérée.",
+            "- Conserver les correctifs indépendants validés (dont KDE sans "
+            "souris), TLS, FDT strict et seuil biométrique 7.",
+            "- Promotion uniquement après comparaisons mesurées : première pose, "
+            "READY→DETECT, DETECT→succès, capture, matching, nettoyage, KDE "
+            "bout-en-bout et validation LOCK/S3/S4 avec doigt inconnu rejeté.",
+        ]
+        if champion["version"] == "rel71.74-qa42":
+            parts += [
+                "- Source du champion QA42 : branche "
+                "`qa/gxfp71.74-fdt-typed32-20261030`, commit moteur "
+                "`b98b437` (incluant le correctif `dcdb043`), "
+                "avec KDE #47 séparé. Les QA43, QA48 et QA50 ont régressé ; "
+                "QA49 n'a pas amélioré la latence observée.",
+                "- Fiabilité du champion QA42 : seulement **1/5 LOCK** "
+                "à la première pose dans le registre. Ce chrono n'est "
+                "**pas** une certification de production.",
+            ]
     parts += ["", "## Fiabilité par version", "",
               "| Version | Situation | 1ère pose | Certification de ce scénario |",
               "|---|---|---:|---|"]
