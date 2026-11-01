@@ -12,6 +12,7 @@ typedef SigfmImgInfo GxSiftFeatures;
 
 GxSiftFeatures *gx_sift_extract (const double *img, int w, int h);
 void            gx_sift_free (GxSiftFeatures *features);
+GxSiftFeatures *gx_sift_rotate_extract (const GxSiftFeatures *features, double degrees);
 guint           gx_sift_keypoints (const GxSiftFeatures *features);
 int             gx_sift_match (const GxSiftFeatures *a,
                                const GxSiftFeatures *b);
@@ -27,3 +28,5 @@ int             gx_sift_pixel_overlap_metrics (const GxSiftFeatures *probe,
                                                     int *out_overlap,
                                                     int *out_zncc_milli,
                                                     int *out_agree_permille);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (GxSiftFeatures, gx_sift_free)

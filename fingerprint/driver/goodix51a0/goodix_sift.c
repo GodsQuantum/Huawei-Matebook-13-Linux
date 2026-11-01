@@ -110,6 +110,12 @@ gx_sift_extract (const double *img, int w, int h)
   return features;
 }
 
+GxSiftFeatures *
+gx_sift_rotate_extract (const GxSiftFeatures *features, double degrees)
+{
+  return sigfm_rotate_extract (features, degrees);
+}
+
 void
 gx_sift_free (GxSiftFeatures *features)
 {

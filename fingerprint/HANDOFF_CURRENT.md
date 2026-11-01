@@ -1,3 +1,13 @@
+## QA54 — base canonique de développement (2026-11-01)
+
+- Base choisie: QA54 testée sur Pegasus, libfprint-goodix51a0 1.94.100.goodix51a0.qa54-1. Paquet SHA256 d3fe51eb826b009e80612a88e48642c0ef3d47c80fe37a29ef15e3fa88e1b174. Fichiers du pilote et des tests identiques aux sources QA54 du commit 8ec86a6.
+- LOCK première pose: DETECT→terminal 1157,858 ms, score 12/7 sans rotation. S3: DETECT→terminal 1711,333 ms, score initial 3/7 récupéré par +12 degrés sur une unique capture (score brut15, recouvrement4391, ZNCC812, accord873). Nombre total de poses de l'utilisateur S3 incertain. Voir docs/qa54-lock-and-s3-first-physical-20261101.md et docs/HARDWARE_TRIALS.csv.
+- QA54 devient la base de travail des futures branches. Flag GXFP_ROTATION_RESCUE_QA=1 active seulement sur Pegasus; désactivé par défaut sur toute nouvelle installation. Maintenir le seuil SIGFM7, TLS et FDT stricts. Une observation ne certifie ni fiabilité ni FAR; tests répétés et mauvaise empreinte manquants.
+- Rollback paquet QA49 préservé sur Cloud9 (private/candidates/pr49-held-first-poll-20261101); image enrolment root-only sur Pegasus. Aucune suppression ou recréation d'empreinte automatique.
+- Nouvelle issue #6, commentaire du 2026-11-01: https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/6#issuecomment-6557944671 : identify actif interrompu par sleep (2020 s2idle) laisse fprintd busy et empêche native resume. L'API libfprint exige une annulation complète d'opération pour un suspend non pris en charge. Chercher fix natif en branche expérimentale séparée; ne pas ajouter de hook system-sleep.
+- Source opérationnelle de vérité: Cloud9 Workstations/Pegasus/Fingerprint-GXFP51A0/HANDOFF_CURRENT.md. Ce préambule et le HOF supplantent les vieilles sections historiques gardées ci-dessous pour provenance.
+
+---
 ## CURRENT (2026-10-28): rel71.74 on reference Pegasus, S4 still unverified
 - Source of truth: GitHub main and release tag matebook13-rel71.74; normal HUAWEI and fingerprint installers use pkgrel71.74, all 11 tested native fprintd flags. Earlier rel71.69, rel71.55 and below are historical evidence only.
 - Hardware: operator reported LOCK one physical pose and S3 one physical pose under rel71.74. The later attempt to enter S3/S4 was aborted by the systemd freezer BEFORE sleep (KDE kded6 and kioworker waiting in autofs_wait on /mnt/Cloud9 after Wi-Fi stopped). Unlock after aborted S4 is NOT S4 certification. Issue #32 remains open.
