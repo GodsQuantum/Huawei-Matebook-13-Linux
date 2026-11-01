@@ -1,5 +1,16 @@
 # Maintainer instructions — Huawei MateBook 13 Linux
 
+Before changing, building or installing any GXFP51A0 candidate, **read**
+`fingerprint/docs/HALL_OF_FAME.md`, `fingerprint/docs/HARDWARE_TRIALS.csv`,
+`fingerprint/HANDOFF_CURRENT.md` and the active Cloud9 workspace handoff.
+Use the measured winner's *code* as a new experimental base, with separately
+validated KDE/desktop corrections; also benchmark the currently installed
+version. Never promote an acceleration in READY→DETECT when first-touch
+matching regresses. Keep both failed trials and the rollback package.
+A record is not a reliability certification; compare the same end-to-end
+metric under real user-attested LOCK, S3 and S4 trials.
+
+
 This is the public source repository. Read README.md, docs/PROJECT_MAP.md, and fingerprint/HANDOFF_CURRENT.md before modifying driver or installers. The current reference-machine release is rel71.74 (matebook13-rel71.74); repeated S4 is NOT certified. Historical rel71.69 and older branches, trial documents and old README sections are NOT current installation instructions.
 
 ## Changes
