@@ -4076,7 +4076,8 @@ static int
 gx_score_probe_against_print (FpPrint *tmpl,
                               const GxSiftFeatures *probe,
                               guint *out_base_views,
-                              guint *out_adapt_views)
+                              guint *out_adapt_views,
+                              gboolean first_accept_qa)
 {
   g_autoptr(GPtrArray) views = gx_views_from_print (tmpl);
   g_autofree int *view_scores = NULL;
@@ -4138,6 +4139,21 @@ gx_score_probe_against_print (FpPrint *tmpl,
             top_idx[rank] = i;
             break;
           }
+
+      /* QA52: Verify is a one-template yes/no decision. If the unchanged
+       * SIGFM scorer already finds a >=7 match in a single enrolled view,
+       * later views can only alter diagnostic score magnitude, never whether
+       * the finger is accepted. Identify must retain full gallery ranking.
+       * Keep diagnostics full-scan as well. A negative/near-miss ALWAYS
+       * runs all views and the existing strict pixel rescue gates. */
+      if (first_accept_qa && score >= GX_MATCH_THRESHOLD &&
+          !g_getenv ("GXFP_MATCH_DIAGNOSTICS"))
+        {
+          fp_info ("GXFP51A0 VERIFY_FIRST_ACCEPT_QA view=%u score=%d "
+                   "threshold=%d other_views_skipped=%u",
+                   i, score, GX_MATCH_THRESHOLD, views->len - i - 1);
+          return score;
+        }
     }
 
   if (best >= GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN &&
@@ -4238,7 +4254,7 @@ gx_score_probe_against_gallery (GPtrArray            *gallery,
   for (guint i = 0; gallery && i < gallery->len; i++)
     {
       FpPrint *candidate = g_ptr_array_index (gallery, i);
-      int score = gx_score_probe_against_print (candidate, probe, NULL, NULL);
+      int score = gx_score_probe_against_print (candidate, probe, NULL, NULL, FALSE);
 
       if (score > best)
         {
@@ -4361,8 +4377,9 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe,
-                                              &base_views, &adapt_views);
+        score = gx_score_probe_against_print (
+          tmpl, probe, &base_views, &adapt_views,
+          g_strcmp0 (g_getenv ("GXFP_VERIFY_FIRST_ACCEPT_QA"), "1") == 0);
 
       if (perf_qa)
         {
