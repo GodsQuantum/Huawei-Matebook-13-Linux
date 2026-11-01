@@ -19,14 +19,24 @@ class HallOfFameTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(hof.PAGE.read_text(encoding="utf-8"), hof.render(self.rows))
 
-    def test_qa42_record_and_rejected_qa50_are_preserved(self):
+    def test_qa54_new_record_qa42_preserved_and_qa50_rejected(self):
+        by_id = {r["trial_id"]: r for r in self.rows}
+        old = by_id["lock-20261030-qa42-0144"]
+        latest = by_id["lock-20261101-qa54-1212"]
+        s3 = by_id["s3-20261101-qa54-1213"]
+        self.assertEqual((old["version"], old["press_to_terminal_ms"],
+                          old["first_touch"]), ("rel71.74-qa42", "1181", "pass"))
+        self.assertEqual((latest["first_touch"], latest["poses"],
+                          latest["press_to_terminal_ms"],
+                          latest["score"]), ("pass", "1", "1158", "12"))
+        self.assertEqual((s3["first_touch"], s3["press_to_terminal_ms"],
+                          s3["wake_to_terminal_ms"], s3["prewarm_ms"]),
+                         ("unknown", "1711", "7384", "3787"))
         locks = [r for r in self.rows if r["kind"] == "LOCK"
                  and r["first_touch"] == "pass"
                  and r["press_to_terminal_ms"]]
         champion = min(locks, key=lambda r: int(r["press_to_terminal_ms"]))
-        self.assertEqual((champion["version"], champion["press_to_terminal_ms"]),
-                         ("rel71.74-qa42", "1181"))
-        by_id = {r["trial_id"]: r for r in self.rows}
+        self.assertEqual(champion["trial_id"], latest["trial_id"])
         qa49 = by_id["lock-20261101-qa49-held-poll-0310"]
         qa50 = by_id["lock-20261101-qa50-failed-0357"]
         self.assertEqual((qa49["first_touch"], qa49["press_to_terminal_ms"]),
@@ -34,8 +44,9 @@ class HallOfFameTests(unittest.TestCase):
         self.assertEqual((qa50["first_touch"], qa50["press_to_terminal_ms"]),
                          ("fail", ""))
         page = hof.render(self.rows)
-        self.assertIn("qa/gxfp71.74-fdt-typed32-20261030", page)
+        self.assertIn("QA42", page)
         self.assertIn("1/5 LOCK", page)
+        self.assertIn("rel71.74-qa54+kde47", page)
 
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and

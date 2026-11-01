@@ -6,20 +6,21 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Discipline | Temps | Version | Essai |
 |---|---:|---|---|
-| LOCK : doigt → succès | **1.181 s** | rel71.74-qa42 | lock-20261030-qa42-0144 |
+| LOCK : doigt → succès | **1.158 s** | rel71.74-qa54+kde47 | lock-20261101-qa54-1212 |
 | LOCK : KDE → succès | **3.488 s** | rel71.55 | lock-20261024-1 |
 | S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
 | S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
 
 ## Champion de vitesse : référence pour les futures QA
 
-- Record matériel **1.181 s** en première pose : **rel71.74-qa42** (lock-20261030-qa42-0144).
+- Record matériel **1.158 s** en première pose : **rel71.74-qa54+kde47** (lock-20261101-qa54-1212).
 - Examiner d'abord le code du champion, jamais uniquement la dernière branche QA ; comparer aussi à la version en production.
 - Ne pas confondre un gain de READY→DETECT avec une authentification plus rapide ou plus fiable. Les échecs du matcher disqualifient un candidat même si la détection est accélérée.
 - Conserver les correctifs indépendants validés (dont KDE sans souris), TLS, FDT strict et seuil biométrique 7.
+- Ce record est une observation matérielle unique : ne jamais le prendre pour une certification de fiabilité ou de sécurité biométrique.
 - Promotion uniquement après comparaisons mesurées : première pose, READY→DETECT, DETECT→succès, capture, matching, nettoyage, KDE bout-en-bout et validation LOCK/S3/S4 avec doigt inconnu rejeté.
-- Source du champion QA42 : branche `qa/gxfp71.74-fdt-typed32-20261030`, commit moteur `b98b437` (incluant le correctif `dcdb043`), avec KDE #47 séparé. Les QA43, QA48 et QA50 ont régressé ; QA49 n'a pas amélioré la latence observée.
-- Fiabilité du champion QA42 : seulement **1/5 LOCK** à la première pose dans le registre. Ce chrono n'est **pas** une certification de production.
+- Source du précédent champion QA42 : branche `qa/gxfp71.74-fdt-typed32-20261030`, commit moteur `b98b437` (incluant le correctif `dcdb043`), avec KDE #47 séparé. Les QA43, QA48 et QA50 ont régressé ; QA49 n'a pas amélioré la latence observée.
+- Fiabilité de l’ancien champion QA42 : seulement **1/5 LOCK** à la première pose dans le registre. Ce chrono n'est **pas** une certification de production.
 
 ## Fiabilité par version
 
@@ -65,6 +66,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa49+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa49+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa50+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa54+kde47 | LOCK | 1/1 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -132,6 +134,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261101-qa50-failed-0357 | 2026-11-01T03:57:04.139771+01:00 | rel71.74-qa50+kde47 | LOCK | 5+ | fail | — | 0.052 | — | — | — | 4/7 |
 | s3-20261101-qa49-overnight-0949 | 2026-11-01T09:49:28.625864+01:00 | rel71.74-qa49+kde47 | S3 | 5+ detected | fail | 3.597 | 0.074 | — | — | — | 3/7 |
 | lock-20261101-qa49-1017 | 2026-11-01T10:17:35.768375+01:00 | rel71.74-qa49+kde47 | LOCK | 3+ detected | fail | — | 0.084 | — | — | — | 3/7 |
+| lock-20261101-qa54-1212 | 2026-11-01T12:12:39.943902+01:00 | rel71.74-qa54+kde47 | LOCK | 1 | pass | — | 0.052 | 1.158 | — | — | 12/7 |
+| s3-20261101-qa54-1213 | 2026-11-01T12:13:59.438957+01:00 | rel71.74-qa54+kde47 | S3 | 1-2 uncertain operator; 1 detected | unknown | 3.787 | 0.083 | 1.711 | — | 7.384 | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
