@@ -128,6 +128,16 @@ class HallOfFameTests(unittest.TestCase):
                           "1173", "6609", "21", "7"))
         self.assertEqual(by_id["s3-20261101-qa57-195500"]["first_touch"], "unknown")
 
+    def test_qa57_s3_fprintd259_five_contacts_is_not_a_record(self):
+        by_id = {r["trial_id"]: r for r in self.rows}
+        bad = by_id["s3-20261101-qa57-fprintd259-222809"]
+        good = by_id["s3-20261101-qa57-214932"]
+        self.assertEqual((bad["kind"], bad["first_touch"], bad["poses"],
+                          bad["prewarm_ms"], bad["wake_to_terminal_ms"],
+                          bad["score"], bad["threshold"]),
+                         ("S3", "fail", "5", "3530", "23045", "7", "7"))
+        self.assertEqual((good["first_touch"], good["poses"]), ("pass", "1"))
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
