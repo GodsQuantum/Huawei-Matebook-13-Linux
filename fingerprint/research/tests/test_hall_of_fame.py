@@ -117,12 +117,26 @@ class HallOfFameTests(unittest.TestCase):
         qa54 = ids["lock-20261101-qa54-1212"]
         self.assertEqual(qa54["press_to_terminal_ms"], "1158")
 
+    def test_qa57_second_deep_s3_one_touch_score_and_timing(self):
+        by_id = {r["trial_id"]: r for r in self.rows}
+        row = by_id["s3-20261101-qa57-214932"]
+        self.assertEqual((row["kind"], row["first_touch"], row["poses"],
+                          row["prewarm_ms"], row["fast_ready_ms"],
+                          row["press_to_terminal_ms"], row["wake_to_terminal_ms"],
+                          row["score"], row["threshold"]),
+                         ("S3", "pass", "1", "3538", "83",
+                          "1173", "6609", "21", "7"))
+        self.assertEqual(by_id["s3-20261101-qa57-195500"]["first_touch"], "unknown")
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
         champion = min(s3, key=lambda r: int(r["wake_to_terminal_ms"]))
-        self.assertEqual(champion["version"], "rel71.55")
-        self.assertEqual(int(champion["wake_to_terminal_ms"]), 6951)
+        self.assertEqual(champion["version"], "rel71.74-qa57+kde47")
+        self.assertEqual(champion["trial_id"], "s3-20261101-qa57-214932")
+        self.assertEqual(int(champion["wake_to_terminal_ms"]), 6609)
+        old = next(x for x in self.rows if x["trial_id"] == "s3-20261023-1")
+        self.assertEqual(old["wake_to_terminal_ms"], "6951")
         self.assertFalse(any(r["version"] == "rel71.56" for r in s3))
 
     def test_version_gates_are_separated(self):
