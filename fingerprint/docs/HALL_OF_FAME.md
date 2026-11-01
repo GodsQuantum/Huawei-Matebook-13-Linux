@@ -69,7 +69,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa54+kde47 | LOCK | 1/1 | Nombre insuffisant |
 | rel71.74-qa55+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa55+kde47 | S3 | 0/1 | ÉCHEC de première pose |
-| rel71.74-qa56+kde47 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.74-qa56+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 
 ## Essais horodatés
@@ -144,6 +144,12 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261101-qa55-1558-fail | 2026-11-01T15:58:31.575078+01:00 | rel71.74-qa55+kde47 | S3 | 8+ detected, no success | fail | 3.555 | 0.083 | — | — | — | 3/7 |
 | lock-20261101-qa56-1633 | 2026-11-01T16:33:19.842273+01:00 | rel71.74-qa56+kde47 | LOCK | 1 | pass | — | 0.051 | 1.193 | — | — | 7/7 |
 | s3-20261101-qa56-1634 | 2026-11-01T16:34:11.890969+01:00 | rel71.74-qa56+kde47 | S3 | 2 | fail | 3.542 | 0.084 | 1.679 | — | 11.780 | 7/7 |
+| lock-20261101-qa56-165011 | 2026-11-01T16:50:11.532834+01:00 | rel71.74-qa56+kde47 | LOCK | 2 detected; second success | fail | — | 0.084 | 1.719 | — | — | 16/7 |
+| lock-20261101-qa56-165023 | 2026-11-01T16:50:23.993116+01:00 | rel71.74-qa56+kde47 | LOCK | 1 detected; physical unconfirmed | unknown | — | 0.083 | 1.696 | — | — | 10/7 |
+| lock-20261101-qa56-165032 | 2026-11-01T16:50:32.084544+01:00 | rel71.74-qa56+kde47 | LOCK | 1 detected; physical unconfirmed | unknown | — | 0.084 | 1.713 | — | — | 13/7 |
+| lock-20261101-qa56-165039 | 2026-11-01T16:50:39.274858+01:00 | rel71.74-qa56+kde47 | LOCK | 1 detected; physical unconfirmed | unknown | — | 0.084 | 1.725 | — | — | 7/7 |
+| s3-20261101-qa56-165120 | 2026-11-01T16:51:20.881670+01:00 | rel71.74-qa56+kde47 | S3 | 1 detected; physical unconfirmed | unknown | 4.147 | 0.084 | 1.794 | — | 6.852 | 7/7 |
+| s3-20261101-qa56-165147 | 2026-11-01T16:51:47.548953+01:00 | rel71.74-qa56+kde47 | S3 | 2 detected; physical unconfirmed | unknown | 4.155 | 0.083 | 1.732 | — | 11.317 | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
