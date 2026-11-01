@@ -107,6 +107,7 @@ struct _FpiDeviceGoodix51A0
   gint64        s3_saved_bg_age_us;
 
   guint         poll_id;     /* finger-detection timeout source */
+  gboolean      fast_first_poll_armed; /* proved full touch at warm Claim */
   int           poll_count;  /* poll iterations, bounded to avoid hanging */
   GPtrArray    *enroll_feats;/* descriptor sets accumulated during enrolment */
   int           fdt_base[GXFP_FDT_ZONE_COUNT]; /* FDT baseline (finger absent) */
@@ -350,6 +351,9 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
   static guint8 scratch[GOODIX_RX_MAX];
   int expected_plain_replies = 0;
   int attempts = body[0] == 0x20u ? GX_GET_IMAGE_ATTEMPTS : 1;
+  /* Optional 2020/2021 interoperability trial; rel71.74 default unchanged. */
+  gboolean fdt_typed_qa = body[0] == 0x32u &&
+    g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_TYPED_REPLY_QA"), "1") == 0;
   int attempt;
 
   /* Reply counts observed stable across the GXFP51A0 capture path and matching
@@ -388,6 +392,9 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
         body[0] == 0x20u ? GX_GET_IMAGE_NO_REPLY_POLLS :
         body[0] == 0xaeu ? 12 : 25;
       int r, got = 0, i, misses = 0;
+      gboolean fdt_data_seen = FALSE;
+      guint8 fdt_data_tag = 0;
+      gint64 fdt_ack_us = 0, fdt_report_us = 0;
       int post_reply_miss_limit =
         body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
 
@@ -431,12 +438,40 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
           if (r > 0 && ty == GOODIX_PKT_PLAIN)
             {
               guint8 ack_status = 0;
+              gboolean good_ack =
+                gxfp_parse_ack (scratch, r, body[0], &ack_status) &&
+                gxfp_ack_status_success (ack_status);
 
+              if (fdt_typed_qa)
+                {
+                  gboolean good_report =
+                    gxfp_parse_fdt_down_reply (scratch, (gsize) r);
+
+                  /* A duplicated ACK, duplicated report, or unrelated
+                   * message is not evidence of a second distinct packet.
+                   * Do not replay FDT-down or touch TLS/matcher state. */
+                  if ((!good_ack && !good_report) ||
+                      (good_ack && ack_seen) ||
+                      (good_report && fdt_data_seen))
+                    {
+                      fp_dbg ("GXFP51A0 FDT_TYPED_REPLY_QA ignored invalid/duplicate frame");
+                      continue;
+                    }
+                  if (good_report)
+                    {
+                      fdt_data_seen = TRUE;
+                      fdt_data_tag = scratch[0];
+                      fdt_report_us = g_get_monotonic_time ();
+                    }
+                }
               got++;
               misses = 0;
-              if (gxfp_parse_ack (scratch, r, body[0], &ack_status) &&
-                  gxfp_ack_status_success (ack_status))
-                ack_seen = TRUE;
+              if (good_ack)
+                {
+                  ack_seen = TRUE;
+                  if (fdt_typed_qa)
+                    fdt_ack_us = g_get_monotonic_time ();
+                }
               if (expected_plain_replies > 0 && got >= expected_plain_replies)
                 {
                   fp_dbg ("drain cmd=%02x: expected %d replies received; finish",
@@ -467,8 +502,20 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       fp_dbg ("drain cmd=%02x: %d cleartext reply/replies ack=%d tls=%d attempt=%d/%d",
               body[0], got, ack_seen, tls_seen, attempt, attempts);
       if (body[0] == 0x32u)
-        fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
-                 got, expected_plain_replies, ack_seen);
+        {
+          fp_info ("GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d",
+                   got, expected_plain_replies, ack_seen);
+          if (fdt_typed_qa)
+            fp_warn ("GXFP51A0 FDT_TYPED_REPLY_QA replies=%d ack=%d "
+                     "valid_data=%d data_tag=0x%02x ack_to_data_ms=%ld "
+                     "window_ms=%d",
+                     got, ack_seen ? 1 : 0, fdt_data_seen ? 1 : 0,
+                     fdt_data_tag,
+                     fdt_ack_us && fdt_report_us > fdt_ack_us
+                       ? (long) ((fdt_report_us - fdt_ack_us) / 1000)
+                       : -1L,
+                     GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS);
+        }
 
       if (out_ack_seen && ack_seen)
         *out_ack_seen = TRUE;
@@ -484,13 +531,24 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
        * NEVER replay it or the next image request; recover the whole
        * transport with the existing bounded strict TLS path. */
       if (body[0] == 0x32u &&
-          g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0 &&
-          (got < expected_plain_replies || !ack_seen))
+          (fdt_typed_qa ||
+           g_strcmp0 (g_getenv ("GXFP_FDT_DOWN_PROOF_QA"), "1") == 0) &&
+          (got < expected_plain_replies || !ack_seen ||
+           (fdt_typed_qa && !fdt_data_seen)))
         {
+          /* A missing FDT command/data reply is control-plane evidence,
+           * not a failed image transfer. A longer capture SPI gap cannot
+           * repair it; keep full MCU/TLS recovery but do not ratchet the
+           * session-local capture pacing for this specific FDT failure.
+           * Preserve any suppression requested by the lifecycle caller. */
+          gboolean was_pacing_suppressed = self->capture_pacing_suppressed;
+
           fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
                    "replies=%d expected=%d ack=%d; bounded session recovery",
                    got, expected_plain_replies, ack_seen ? 1 : 0);
+          self->capture_pacing_suppressed = TRUE;
           gx_capture_transport_desync (self);
+          self->capture_pacing_suppressed = was_pacing_suppressed;
           return FALSE;
         }
 
@@ -3906,6 +3964,22 @@ again:
   return G_SOURCE_CONTINUE;
 }
 
+/* QA49 one-shot: a 1ms repeating timeout would overload the sensor.
+ * The first held-finger probe runs once; if it sees no finger, rearm the
+ * original 100ms recurring poll. Cancellation and changed SSM states
+ * return REMOVE without installing a second source. */
+static gboolean
+gx_poll_first_held (gpointer user_data)
+{
+  FpiSsm *ssm = user_data;
+  FpDevice *dev = fpi_ssm_get_device (ssm);
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+
+  if (gx_poll_on (user_data) == G_SOURCE_CONTINUE)
+    self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
+  return G_SOURCE_REMOVE;
+}
+
 static gboolean
 gx_poll_off (gpointer user_data)
 {
@@ -4018,6 +4092,7 @@ gx_pixel_rescue_view_pass (const GxSiftFeatures *probe,
 static int
 gx_score_probe_against_print (FpPrint *tmpl,
                               const GxSiftFeatures *probe,
+                              gboolean rotation_verify,
                               guint *out_base_views,
                               guint *out_adapt_views)
 {
@@ -4083,6 +4158,41 @@ gx_score_probe_against_print (FpPrint *tmpl,
           }
     }
 
+  /* QA54: extra orientation coverage, same authenticated frame. Strict
+   * baseline>=3 and corroborating SAME-VIEW photometric agreement required
+   * before any rotated FAST/BRIEF score can authenticate. Identify disabled
+   * until cross-finger corpus and per-candidate calibration are available. */
+  if (rotation_verify &&
+      g_strcmp0 (g_getenv ("GXFP_ROTATION_RESCUE_QA"), "1") == 0 &&
+      best >= 3 && best < GX_MATCH_THRESHOLD && views)
+    {
+      static const double angles[] = { -12.0, 12.0, -6.0, 6.0 };
+      for (guint a = 0; a < G_N_ELEMENTS (angles); a++)
+        {
+          g_autoptr(GxSiftFeatures) rotated = NULL;
+          rotated = gx_sift_rotate_extract (probe, angles[a]);
+          if (!rotated || gx_sift_keypoints (rotated) < GX_MIN_CAPTURE_KEYPOINTS)
+            continue;
+          for (guint i = 0; i < views->len; i++)
+            {
+              GxSiftFeatures *view = g_ptr_array_index (views, i);
+              int score = gx_sift_match (rotated, view);
+              int inliers = 0, overlap = 0, zncc = 0, agree = 0;
+              if (score < GX_MATCH_THRESHOLD ||
+                  !gx_sift_pixel_overlap_metrics (rotated, view,
+                     &inliers, &overlap, &zncc, &agree) ||
+                  overlap < GX_PIXEL_RESCUE_MIN_OVERLAP ||
+                  zncc < GX_PIXEL_RESCUE_MIN_ZNCC_MILLI ||
+                  agree < GX_PIXEL_RESCUE_MIN_AGREE_PERMILLE)
+                continue;
+              fp_warn ("GXFP51A0 ROTATION_RESCUE_QA angle=%d baseline=%d "
+                       "rotated_score=%d view=%u overlap=%d zncc=%d agree=%d",
+                       (int)angles[a], best, score, i, overlap, zncc, agree);
+              return GX_MATCH_THRESHOLD;
+            }
+        }
+    }
+
   if (best >= GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN &&
       best < GX_MATCH_THRESHOLD && views)
     for (guint i = 0; i < views->len; i++)
@@ -4123,7 +4233,10 @@ gx_score_probe_against_print (FpPrint *tmpl,
 
   if (g_getenv ("GXFP_MATCH_DIAGNOSTICS"))
     {
-      fp_info ("gallery scores: %d@%u %d@%u %d@%u %d@%u %d@%u (views=%u)",
+      fp_warn ("GXFP51A0 MATCH_QUALITY_QA probe_keypoints=%u enrolled_views=%u best=%d threshold=%d",
+               gx_sift_keypoints (probe), views ? views->len : 0,
+               best, GX_MATCH_THRESHOLD);
+      fp_warn ("GXFP51A0 MATCH_QUALITY_QA gallery scores: %d@%u %d@%u %d@%u %d@%u %d@%u (views=%u)",
                top[0], top_idx[0], top[1], top_idx[1], top[2], top_idx[2],
                top[3], top_idx[3], top[4], top_idx[4],
                views ? views->len : 0);
@@ -4139,7 +4252,7 @@ gx_score_probe_against_print (FpPrint *tmpl,
             if (gx_sift_pixel_overlap_metrics (probe,
                                                g_ptr_array_index (views, idx),
                                                &inliers, &overlap, &zncc, &agree))
-              fp_info ("pixel diagnostic: rank=%u view=%u baseline=%d "
+              fp_warn ("GXFP51A0 MATCH_QUALITY_QA pixel diagnostic: rank=%u view=%u baseline=%d "
                        "inliers=%d overlap=%d zncc_milli=%d agree_permille=%d",
                        rank, idx, top[rank], inliers, overlap, zncc, agree);
           }
@@ -4181,7 +4294,7 @@ gx_score_probe_against_gallery (GPtrArray            *gallery,
   for (guint i = 0; gallery && i < gallery->len; i++)
     {
       FpPrint *candidate = g_ptr_array_index (gallery, i);
-      int score = gx_score_probe_against_print (candidate, probe, NULL, NULL);
+      int score = gx_score_probe_against_print (candidate, probe, FALSE, NULL, NULL);
 
       if (score > best)
         {
@@ -4304,7 +4417,7 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe,
+        score = gx_score_probe_against_print (tmpl, probe, TRUE,
                                               &base_views, &adapt_views);
 
       if (perf_qa)
@@ -4721,7 +4834,18 @@ gx_run_state (FpiSsm *ssm, FpDevice *dev)
                    t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
         fp_info ("finger status: needed=1 present=0 changed=%d",
                  changed ? 1 : 0);
-        self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
+        /* Only pre-held six-zone contacts skip the first wait. */
+        gboolean fast = t->verifying && t->tries == 0 &&
+          self->fast_first_poll_armed &&
+          g_strcmp0 (g_getenv ("GXFP_FIRST_POLL_HELD_QA"), "1") == 0;
+        self->fast_first_poll_armed = FALSE;
+        if (fast)
+          {
+            fp_warn ("GXFP51A0 FIRST_HELD_POLL_QA: 1ms first, 100ms fallback");
+            self->poll_id = g_timeout_add (1, gx_poll_first_held, ssm);
+          }
+        else
+          self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
         break;                     /* the poll drives the next state */
       }
 
@@ -4917,6 +5041,7 @@ gx_warm_abandon (FpiDeviceGoodix51A0 *self)
    * close_notify over a session that may no longer exist. */
   self->warm_valid = FALSE;
   self->production_ready = FALSE;
+  self->fast_first_poll_armed = FALSE;
   self->have_fdt = FALSE;
   self->bg_dirty = FALSE;
   self->bg_last_refresh_us = 0;
@@ -4964,6 +5089,13 @@ gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
 
   mean = gx_fdt_mean (cur);
   self->warm_last_activity_us = g_get_monotonic_time ();
+
+  /* QA49: only a full, stable 6/6 finger detected at warm Claim may
+   * skip the initial FDT poll delay. Partial/absent contacts take the
+   * unchanged 100ms path. A fresh FDT proof and the complete biometric
+   * matcher are still mandatory when this hint is consumed. */
+  self->fast_first_poll_armed =
+    (touchflag & 0x3fu) == 0x3fu && mean < self->fdt_abs;
 
   if (!gx_fdt_touch_is_finger (touchflag) && mean >= GOODIX_FDT_ABS)
     {
