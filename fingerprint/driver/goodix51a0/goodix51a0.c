@@ -5104,6 +5104,13 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
       before_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();
+      /* QA50: a six-zone held finger confirmed before Verify READY. */
+      if ((before_touchflag & 0x3fu) == 0x3fu &&
+          before_mean < self->fdt_abs)
+        {
+          self->fast_first_poll_armed = TRUE;
+          fp_warn ("GXFP51A0 QA50_REBASE_TOUCH_ARMED stage=before");
+        }
       fp_warn ("GXFP51A0 WARM_REBASE deferred: finger already present "
                "(FDT mean=%d floor=%d); retaining previous background",
                before_mean, GOODIX_FDT_ABS);
@@ -5131,6 +5138,14 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
       after_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();
+      /* QA50: proof after a rejected ImageBase is also useful as a
+       * one-shot scheduling hint; never accept finger-contaminated pixels. */
+      if ((after_touchflag & 0x3fu) == 0x3fu &&
+          after_mean < self->fdt_abs)
+        {
+          self->fast_first_poll_armed = TRUE;
+          fp_warn ("GXFP51A0 QA50_REBASE_TOUCH_ARMED stage=after");
+        }
       fp_warn ("GXFP51A0 WARM_REBASE discarded: finger landed during "
                "background capture (FDT mean=%d floor=%d)",
                after_mean, GOODIX_FDT_ABS);
