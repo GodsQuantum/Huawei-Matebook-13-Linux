@@ -1534,6 +1534,18 @@ gx_fail_get_image_after_tls_timeout (FpiDeviceGoodix51A0 *self)
 }
 
 
+/* QA58: bounded opt-in settling BEFORE the post-capture FDT-down.
+ * Keep strict typed ACK + report and unchanged pre-capture FDT timing. */
+#define GX_POST_NAV_SETTLE_QA_US 50000u
+static guint
+gx_post_nav_settle_us (guint8 previous, guint8 current)
+{
+  if (previous != 0x50u || current != 0x32u)
+    return 0;
+  return g_strcmp0 (g_getenv ("GXFP_POST_NAV_SETTLE_QA"), "1") == 0
+           ? GX_POST_NAV_SETTLE_QA_US : 0;
+}
+
 /* The 51x7 reference requires an FDT-up image, NAV and final FDT-down after a
  * finger frame. The intermediate image record must be AUTHENTICATED/decrypted,
  * not merely discarded: AES-GCM record sequence numbers advance for every
@@ -1559,6 +1571,23 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
       if (self->s3_presleep_deadline_us > 0 &&
           g_get_monotonic_time () >= self->s3_presleep_deadline_us)
         goto out;
+
+      /* The completed NAV may precede a missing final 0x32 report.
+       * Wait before sending 0x32, never after an uncertain ACK. */
+      guint settle_us = i > 0
+        ? gx_post_nav_settle_us (recipe.steps[i - 1].inner[0],
+                                 packet->inner[0])
+        : 0;
+      if (settle_us)
+        {
+          if (self->s3_presleep_deadline_us > 0 &&
+              g_get_monotonic_time () + (gint64) settle_us >=
+                self->s3_presleep_deadline_us)
+            goto out;
+          fp_warn ("GXFP51A0 POST_NAV_SETTLE_QA phase=cleanup "
+                   "prev=0x50 next=0x32 extra_ms=%u", settle_us / 1000u);
+          g_usleep (settle_us);
+        }
 
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         goto out;

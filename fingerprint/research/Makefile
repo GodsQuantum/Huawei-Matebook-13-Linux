@@ -594,3 +594,8 @@ test_qa54_rotation_qa:
 test: test_qa57_capture_protocol_pacing
 test_qa57_capture_protocol_pacing:
 	python3 ./tests/test_qa57_capture_protocol_pacing.py
+
+.PHONY: test_qa58_post_nav_settle
+test: test_qa58_post_nav_settle
+test_qa58_post_nav_settle:
+	python3 ./tests/test_qa58_post_nav_settle.py
