@@ -24,7 +24,7 @@ auth=s[a:b]
 # biometric score is computed.
 contrast=auth.index("probe = gx_features_from_pixels")
 kp=auth.index("keypoints < GX_MIN_CAPTURE_KEYPOINTS")
-score_v=auth.index("gx_score_probe_against_print (tmpl, probe")
+score_v=re.search(r"gx_score_probe_against_print\s*\(\s*tmpl,\s*probe", auth).start()
 score_i=auth.index("gx_score_probe_against_gallery (gallery, probe")
 first_score=min(score_v, score_i)
 assert contrast < kp < first_score

@@ -11,6 +11,16 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
 | S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
 
+## Champion de vitesse : référence pour les futures QA
+
+- Record matériel **1.181 s** en première pose : **rel71.74-qa42** (lock-20261030-qa42-0144).
+- Examiner d'abord le code du champion, jamais uniquement la dernière branche QA ; comparer aussi à la version en production.
+- Ne pas confondre un gain de READY→DETECT avec une authentification plus rapide ou plus fiable. Les échecs du matcher disqualifient un candidat même si la détection est accélérée.
+- Conserver les correctifs indépendants validés (dont KDE sans souris), TLS, FDT strict et seuil biométrique 7.
+- Promotion uniquement après comparaisons mesurées : première pose, READY→DETECT, DETECT→succès, capture, matching, nettoyage, KDE bout-en-bout et validation LOCK/S3/S4 avec doigt inconnu rejeté.
+- Source du champion QA42 : branche `qa/gxfp71.74-fdt-typed32-20261030`, commit moteur `b98b437` (incluant le correctif `dcdb043`), avec KDE #47 séparé. Les QA43, QA48 et QA50 ont régressé ; QA49 n'a pas amélioré la latence observée.
+- Fiabilité du champion QA42 : seulement **1/5 LOCK** à la première pose dans le registre. Ce chrono n'est **pas** une certification de production.
+
 ## Fiabilité par version
 
 | Version | Situation | 1ère pose | Certification de ce scénario |
@@ -52,6 +62,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa42 | S3 | 1/1 | Nombre insuffisant |
 | rel71.74-qa42 | BOOT | 1/1 | Nombre insuffisant |
 | rel71.74-qa42+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
+| rel71.74-qa49+kde47 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.74-qa50+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -115,6 +127,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261031-qa42-2343-hidden-ui-fail | 2026-10-31T23:43:39.438447+01:00 | rel71.74-qa42 | LOCK | multiple (operator; exact unknown) | fail | — | 0.083 | 1.758 | — | — | 16/7 |
 | lock-20261101-qa42-kde47-hidden-ui-first-pose | 2026-11-01T00:00:14.998207+01:00 | rel71.74-qa42+kde47 | LOCK | 1 | pass | — | 0.083 | 1.800 | — | — | 14/7 |
 | lock-20261101-qa42-kde47-two-poses-0148 | 2026-11-01T01:48:01.584950+01:00 | rel71.74-qa42+kde47 | LOCK | 2 | fail | — | 0.240 | 1.302 | — | — | 7/7 |
+| lock-20261101-qa49-held-poll-0310 | 2026-11-01T03:10:00.468928+01:00 | rel71.74-qa49+kde47 | LOCK | 1 | pass | — | 0.052 | 1.328 | — | — | 7/7 |
+| lock-20261101-qa50-failed-0357 | 2026-11-01T03:57:04.139771+01:00 | rel71.74-qa50+kde47 | LOCK | 5+ | fail | — | 0.052 | — | — | — | 4/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
