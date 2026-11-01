@@ -24,7 +24,12 @@ assert "case 0x32u: expected_plain_replies = 2" in f
 assert "FDT-down ACK + data" in f
 assert "#define GX_FDT_DOWN_SECOND_REPLY_TIMEOUT_MS 100" in f
 assert "GX_FDT_DOWN_SECOND_REPLY_POLLS == 10" in f
-assert "body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE" in f
+assert "fdt_late_report_qa ? GX_FDT_DOWN_LATE_REPLY_POLLS" in f
+assert 'GXFP_FDT_DOWN_LATE_REPORT_QA' in f
+assert 'gboolean fdt_late_report_qa = fdt_typed_qa &&' in f
+assert 'fdt_typed_qa ?' not in f or 'GXFP_FDT_DOWN_LATE_REPORT_QA' in f
+assert 'valid_data=%d' in f
+assert 'gx_capture_transport_desync (self)' in f
 assert "GXFP51A0 FDT_DOWN_DRAIN replies=%d expected=%d ack=%d" in f
 assert "case 0x36u: expected_plain_replies = 2" in f
 assert "case 0x50u: expected_plain_replies = 2" in f
