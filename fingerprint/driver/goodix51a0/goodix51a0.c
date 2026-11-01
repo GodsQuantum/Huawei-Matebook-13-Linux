@@ -107,6 +107,7 @@ struct _FpiDeviceGoodix51A0
   gint64        s3_saved_bg_age_us;
 
   guint         poll_id;     /* finger-detection timeout source */
+  gboolean      fast_first_poll_armed; /* proved full touch at warm Claim */
   int           poll_count;  /* poll iterations, bounded to avoid hanging */
   GPtrArray    *enroll_feats;/* descriptor sets accumulated during enrolment */
   int           fdt_base[GXFP_FDT_ZONE_COUNT]; /* FDT baseline (finger absent) */
@@ -3963,6 +3964,22 @@ again:
   return G_SOURCE_CONTINUE;
 }
 
+/* QA49 one-shot: a 1ms repeating timeout would overload the sensor.
+ * The first held-finger probe runs once; if it sees no finger, rearm the
+ * original 100ms recurring poll. Cancellation and changed SSM states
+ * return REMOVE without installing a second source. */
+static gboolean
+gx_poll_first_held (gpointer user_data)
+{
+  FpiSsm *ssm = user_data;
+  FpDevice *dev = fpi_ssm_get_device (ssm);
+  FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
+
+  if (gx_poll_on (user_data) == G_SOURCE_CONTINUE)
+    self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
+  return G_SOURCE_REMOVE;
+}
+
 static gboolean
 gx_poll_off (gpointer user_data)
 {
@@ -4778,7 +4795,18 @@ gx_run_state (FpiSsm *ssm, FpDevice *dev)
                    t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
         fp_info ("finger status: needed=1 present=0 changed=%d",
                  changed ? 1 : 0);
-        self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
+        /* Only pre-held six-zone contacts skip the first wait. */
+        gboolean fast = t->verifying && t->tries == 0 &&
+          self->fast_first_poll_armed &&
+          g_strcmp0 (g_getenv ("GXFP_FIRST_POLL_HELD_QA"), "1") == 0;
+        self->fast_first_poll_armed = FALSE;
+        if (fast)
+          {
+            fp_warn ("GXFP51A0 FIRST_HELD_POLL_QA: 1ms first, 100ms fallback");
+            self->poll_id = g_timeout_add (1, gx_poll_first_held, ssm);
+          }
+        else
+          self->poll_id = g_timeout_add (GX_POLL_MS, gx_poll_on, ssm);
         break;                     /* the poll drives the next state */
       }
 
@@ -4974,6 +5002,7 @@ gx_warm_abandon (FpiDeviceGoodix51A0 *self)
    * close_notify over a session that may no longer exist. */
   self->warm_valid = FALSE;
   self->production_ready = FALSE;
+  self->fast_first_poll_armed = FALSE;
   self->have_fdt = FALSE;
   self->bg_dirty = FALSE;
   self->bg_last_refresh_us = 0;
@@ -5021,6 +5050,13 @@ gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
 
   mean = gx_fdt_mean (cur);
   self->warm_last_activity_us = g_get_monotonic_time ();
+
+  /* QA49: only a full, stable 6/6 finger detected at warm Claim may
+   * skip the initial FDT poll delay. Partial/absent contacts take the
+   * unchanged 100ms path. A fresh FDT proof and the complete biometric
+   * matcher are still mandatory when this hint is consumed. */
+  self->fast_first_poll_armed =
+    (touchflag & 0x3fu) == 0x3fu && mean < self->fdt_abs;
 
   if (!gx_fdt_touch_is_finger (touchflag) && mean >= GOODIX_FDT_ABS)
     {
