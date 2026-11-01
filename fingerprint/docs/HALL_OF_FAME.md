@@ -69,6 +69,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa54+kde47 | LOCK | 1/1 | Nombre insuffisant |
 | rel71.74-qa55+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa55+kde47 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa56+kde47 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -140,6 +142,8 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261101-qa54-1213 | 2026-11-01T12:13:59.438957+01:00 | rel71.74-qa54+kde47 | S3 | 1-2 uncertain operator; 1 detected | unknown | 3.787 | 0.083 | 1.711 | — | 7.384 | 7/7 |
 | lock-20261101-qa55-1557-regression | 2026-11-01T15:57:18.020806+01:00 | rel71.74-qa55+kde47 | LOCK | 5 (detected; success on 5th) | fail | — | 0.072 | 22.043 | — | — | 7/7 |
 | s3-20261101-qa55-1558-fail | 2026-11-01T15:58:31.575078+01:00 | rel71.74-qa55+kde47 | S3 | 8+ detected, no success | fail | 3.555 | 0.083 | — | — | — | 3/7 |
+| lock-20261101-qa56-1633 | 2026-11-01T16:33:19.842273+01:00 | rel71.74-qa56+kde47 | LOCK | 1 | pass | — | 0.051 | 1.193 | — | — | 7/7 |
+| s3-20261101-qa56-1634 | 2026-11-01T16:34:11.890969+01:00 | rel71.74-qa56+kde47 | S3 | 2 | fail | 3.542 | 0.084 | 1.679 | — | 11.780 | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

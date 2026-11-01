@@ -65,3 +65,5 @@ lock-20261101-qa54-1212,2026-11-01T12:12:39.943902+01:00,rel71.74-qa54+kde47,LOC
 s3-20261101-qa54-1213,2026-11-01T12:13:59.438957+01:00,rel71.74-qa54+kde47,S3,unknown,1-2 uncertain operator; 1 detected,3787,83,1711,,7384,7,7,qa54-lock-and-s3-first-physical-20261101.md
 lock-20261101-qa55-1557-regression,2026-11-01T15:57:18.020806+01:00,rel71.74-qa55+kde47,LOCK,fail,5 (detected; success on 5th),,72,22043,,,7,7,qa55-lock-s3-regression-and-rollback-20261101.md
 s3-20261101-qa55-1558-fail,2026-11-01T15:58:31.575078+01:00,rel71.74-qa55+kde47,S3,fail,"8+ detected, no success",3555,83,,,,3,7,qa55-lock-s3-regression-and-rollback-20261101.md
+lock-20261101-qa56-1633,2026-11-01T16:33:19.842273+01:00,rel71.74-qa56+kde47,LOCK,pass,1,,51,1193,,,7,7,qa56-lock-and-s3-first-hardware-20261101.md
+s3-20261101-qa56-1634,2026-11-01T16:34:11.890969+01:00,rel71.74-qa56+kde47,S3,fail,2,3542,84,1679,,11780,7,7,qa56-lock-and-s3-first-hardware-20261101.md
