@@ -66,6 +66,34 @@ class HallOfFameTests(unittest.TestCase):
                            int(ids["lock-20261101-qa54-1212"]["press_to_terminal_ms"]))
         self.assertIn("s3-20261101-qa56-1634", hof.render(self.rows))
 
+    def test_qa56_followup_not_misclassified_as_first_touch_records(self):
+        ids = {r["trial_id"]: r for r in self.rows}
+        names = [
+            "lock-20261101-qa56-165011",
+            "lock-20261101-qa56-165023",
+            "lock-20261101-qa56-165032",
+            "lock-20261101-qa56-165039",
+            "s3-20261101-qa56-165120",
+            "s3-20261101-qa56-165147",
+        ]
+        batch = [ids[name] for name in names]
+        self.assertEqual([r["kind"] for r in batch],
+                         ["LOCK"] * 4 + ["S3"] * 2)
+        self.assertEqual([r["first_touch"] for r in batch],
+                         ["fail", "unknown", "unknown", "unknown",
+                          "unknown", "unknown"])
+        self.assertEqual([r["press_to_terminal_ms"] for r in batch],
+                         ["1719", "1696", "1713", "1725", "1794", "1732"])
+        self.assertEqual([r["prewarm_ms"] for r in batch[-2:]],
+                         ["4147", "4155"])
+        self.assertEqual([r["wake_to_terminal_ms"] for r in batch[-2:]],
+                         ["6852", "11317"])
+        # Source-defined physical first-touch must be confirmed by the
+        # operator; first software capture is never sufficient.
+        self.assertFalse(any(r["first_touch"] == "pass" for r in batch))
+        qa54 = ids["lock-20261101-qa54-1212"]
+        self.assertEqual(qa54["press_to_terminal_ms"], "1158")
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
