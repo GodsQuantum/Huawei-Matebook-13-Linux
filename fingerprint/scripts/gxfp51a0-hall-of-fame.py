@@ -93,18 +93,19 @@ def render(rows):
             "un candidat même si la détection est accélérée.",
             "- Conserver les correctifs indépendants validés (dont KDE sans "
             "souris), TLS, FDT strict et seuil biométrique 7.",
+            "- Ce record est une observation matérielle unique : ne jamais le prendre pour une certification de fiabilité ou de sécurité biométrique.",
             "- Promotion uniquement après comparaisons mesurées : première pose, "
             "READY→DETECT, DETECT→succès, capture, matching, nettoyage, KDE "
             "bout-en-bout et validation LOCK/S3/S4 avec doigt inconnu rejeté.",
         ]
-        if champion["version"] == "rel71.74-qa42":
+        if any(r["version"] == "rel71.74-qa42" for r in rows):
             parts += [
-                "- Source du champion QA42 : branche "
+                "- Source du précédent champion QA42 : branche "
                 "`qa/gxfp71.74-fdt-typed32-20261030`, commit moteur "
                 "`b98b437` (incluant le correctif `dcdb043`), "
                 "avec KDE #47 séparé. Les QA43, QA48 et QA50 ont régressé ; "
                 "QA49 n'a pas amélioré la latence observée.",
-                "- Fiabilité du champion QA42 : seulement **1/5 LOCK** "
+                "- Fiabilité de l’ancien champion QA42 : seulement **1/5 LOCK** "
                 "à la première pose dans le registre. Ce chrono n'est "
                 "**pas** une certification de production.",
             ]
