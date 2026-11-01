@@ -76,7 +76,7 @@ static int gx51_wait_irq_gpio48(int fd,int timeout_ms)
  clock_us+=(gint64)timeout_ms*1000;
  if(!ack_sent)return 0;
  if((scenario==4 || scenario==6) && !duplicate_sent && clock_us>=50000)return 0;
- if(!data_sent && scenario!=2 && scenario!=6 && scenario!=7 && clock_us >= ((scenario==0 || scenario==4 || scenario==8) ? 70000 : 180000))
+ if(!data_sent && scenario!=2 && scenario!=6 && scenario!=7 && clock_us >= ((scenario==0 || scenario==4 || scenario==8) ? 70000 : scenario==9 ? 280000 : 180000))
    return 0;
  return (errno=ETIMEDOUT,-1);
 }
@@ -92,8 +92,10 @@ static int gx_read_frame(FpiDeviceGoodix51A0 *d,guint8 *type,
 """ + BLOCK + r"""
 int main(int argc,char **argv)
 {
- if(argc != 3)return 98;
+ if(argc != 3 && argc != 4)return 98;
  scenario=atoi(argv[1]);
+ if(argc == 4 && atoi(argv[3]))setenv("GXFP_FDT_DOWN_LATE_REPORT_QA","1",1);
+ else unsetenv("GXFP_FDT_DOWN_LATE_REPORT_QA");
  if(atoi(argv[2]))setenv("GXFP_FDT_DOWN_TYPED_REPLY_QA","1",1);
  else unsetenv("GXFP_FDT_DOWN_TYPED_REPLY_QA");
  if(scenario==7)unsetenv("GXFP_FDT_DOWN_PROOF_QA");
@@ -120,9 +122,9 @@ class FdtDownTypedReply(unittest.TestCase):
                        check=True,capture_output=True,text=True)
     @classmethod
     def tearDownClass(cls): cls.tmp.cleanup()
-    def case(self,scenario,optin):
-        return subprocess.run([str(self.exe),str(scenario),str(int(optin))],
-                              check=False).returncode
+    def case(self,scenario,optin,late=False):
+        return subprocess.run([str(self.exe),str(scenario),str(int(optin)),
+                               str(int(late))], check=False).returncode
     def test_early_ack_and_data_default(self):
         self.assertEqual(self.case(0,False),0)
     def test_late_second_reply_default_fails_closed(self):
@@ -131,6 +133,20 @@ class FdtDownTypedReply(unittest.TestCase):
         self.assertEqual(self.case(1,True),1)
     def test_qa_forces_proof_even_when_base_flag_is_unset(self):
         self.assertEqual(self.case(7,True),1)
+    def test_qa56_late_report_requires_both_flags(self):
+        self.assertEqual(self.case(1,False,True),1)
+        self.assertEqual(self.case(1,True,False),1)
+        self.assertEqual(self.case(1,True,True),0)
+    def test_qa56_missing_and_over_200ms_reports_fail_closed(self):
+        self.assertEqual(self.case(2,True,True),1)
+        self.assertEqual(self.case(9,True,True),1)
+    def test_qa56_invalid_plain_and_duplicate_ack_still_rejected(self):
+        self.assertEqual(self.case(3,True,True),1)
+        self.assertEqual(self.case(6,True,True),1)
+        self.assertEqual(self.case(5,True,True),1)
+    def test_qa56_valid_normal_and_mixed_tag_stay_accepted(self):
+        self.assertEqual(self.case(0,True,True),0)
+        self.assertEqual(self.case(8,True,True),0)
     def test_missing_second_reply_remains_fail_closed(self):
         self.assertEqual(self.case(2,True),1)
     def test_unrelated_plain_frame_does_not_count(self):
