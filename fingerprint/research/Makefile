@@ -589,3 +589,8 @@ test_qa53_quality_diagnostics:
 test: test_qa54_rotation_qa
 test_qa54_rotation_qa:
 	python3 ./tests/test_qa54_rotation_qa.py
+
+.PHONY: test_qa57_capture_protocol_pacing
+test: test_qa57_capture_protocol_pacing
+test_qa57_capture_protocol_pacing:
+	python3 ./tests/test_qa57_capture_protocol_pacing.py

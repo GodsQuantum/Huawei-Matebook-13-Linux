@@ -2125,15 +2125,26 @@ gx_capture_transport_desync (FpiDeviceGoodix51A0 *self)
            previous, self->capture_gap_scale, gx_capture_gap_us (self));
 }
 
+/* QA57: protocol ACK misses do not establish an image capture timing fault.
+ * Keep strict FDT/TLS recovery, but avoid slowing biometric frames solely
+ * because an unrelated control-plane ACK was missed. Default is QA54. */
+static int
+gx_capture_protocol_floor (FpiDeviceGoodix51A0 *self)
+{
+  if (g_strcmp0 (g_getenv ("GXFP_DECOUPLE_ACK_PACING_QA"), "1") == 0)
+    return GX_CAPTURE_SCALE_MIN;
+
+  return CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
+                GX_CAPTURE_SCALE_MIN, 250);
+}
+
 static void
 gx_capture_pacing_success (FpiDeviceGoodix51A0 *self)
 {
   if (self->capture_retry_seen)
     {
       int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
-      int protocol_floor =
-        CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
-               GX_CAPTURE_SCALE_MIN, 250);
+      int protocol_floor = gx_capture_protocol_floor (self);
       int target = MIN (GX_CAPTURE_SCALE_MAX,
                         MAX (previous + GX_CAPTURE_SCALE_STEP, protocol_floor));
 
@@ -5287,9 +5298,7 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
    * 300% protocol -> 250% capture on the reference MateBook; a nominal/fast
    * controller stays at 100%.  This remains process-local and non-persistent. */
   {
-    int protocol_floor =
-      CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
-             GX_CAPTURE_SCALE_MIN, 250);
+    int protocol_floor = gx_capture_protocol_floor (self);
     int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
 
     if (protocol_floor > previous)
