@@ -29,6 +29,9 @@ extern "C"
   /* Free an SigfmImgInfo.  Do not use plain free(). */
   void sigfm_free_info(SigfmImgInfo *info);
 
+  /* Experimental rotation of in-memory normalized probe; never persists pixels. */
+  SigfmImgInfo *sigfm_rotate_extract(const SigfmImgInfo *probe, double degrees);
+
   /* Score how closely frame matches enrolled.
    * Returns >=0 on success (higher = better match), <0 on error. */
   int sigfm_match_score(SigfmImgInfo *frame, SigfmImgInfo *enrolled);

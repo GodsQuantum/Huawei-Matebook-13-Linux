@@ -4092,6 +4092,7 @@ gx_pixel_rescue_view_pass (const GxSiftFeatures *probe,
 static int
 gx_score_probe_against_print (FpPrint *tmpl,
                               const GxSiftFeatures *probe,
+                              gboolean rotation_verify,
                               guint *out_base_views,
                               guint *out_adapt_views)
 {
@@ -4157,6 +4158,41 @@ gx_score_probe_against_print (FpPrint *tmpl,
           }
     }
 
+  /* QA54: extra orientation coverage, same authenticated frame. Strict
+   * baseline>=3 and corroborating SAME-VIEW photometric agreement required
+   * before any rotated FAST/BRIEF score can authenticate. Identify disabled
+   * until cross-finger corpus and per-candidate calibration are available. */
+  if (rotation_verify &&
+      g_strcmp0 (g_getenv ("GXFP_ROTATION_RESCUE_QA"), "1") == 0 &&
+      best >= 3 && best < GX_MATCH_THRESHOLD && views)
+    {
+      static const double angles[] = { -12.0, 12.0, -6.0, 6.0 };
+      for (guint a = 0; a < G_N_ELEMENTS (angles); a++)
+        {
+          g_autoptr(GxSiftFeatures) rotated = NULL;
+          rotated = gx_sift_rotate_extract (probe, angles[a]);
+          if (!rotated || gx_sift_keypoints (rotated) < GX_MIN_CAPTURE_KEYPOINTS)
+            continue;
+          for (guint i = 0; i < views->len; i++)
+            {
+              GxSiftFeatures *view = g_ptr_array_index (views, i);
+              int score = gx_sift_match (rotated, view);
+              int inliers = 0, overlap = 0, zncc = 0, agree = 0;
+              if (score < GX_MATCH_THRESHOLD ||
+                  !gx_sift_pixel_overlap_metrics (rotated, view,
+                     &inliers, &overlap, &zncc, &agree) ||
+                  overlap < GX_PIXEL_RESCUE_MIN_OVERLAP ||
+                  zncc < GX_PIXEL_RESCUE_MIN_ZNCC_MILLI ||
+                  agree < GX_PIXEL_RESCUE_MIN_AGREE_PERMILLE)
+                continue;
+              fp_warn ("GXFP51A0 ROTATION_RESCUE_QA angle=%d baseline=%d "
+                       "rotated_score=%d view=%u overlap=%d zncc=%d agree=%d",
+                       (int)angles[a], best, score, i, overlap, zncc, agree);
+              return GX_MATCH_THRESHOLD;
+            }
+        }
+    }
+
   if (best >= GX_PIXEL_RESCUE_CANDIDATE_BEST_MIN &&
       best < GX_MATCH_THRESHOLD && views)
     for (guint i = 0; i < views->len; i++)
@@ -4197,7 +4233,10 @@ gx_score_probe_against_print (FpPrint *tmpl,
 
   if (g_getenv ("GXFP_MATCH_DIAGNOSTICS"))
     {
-      fp_info ("gallery scores: %d@%u %d@%u %d@%u %d@%u %d@%u (views=%u)",
+      fp_warn ("GXFP51A0 MATCH_QUALITY_QA probe_keypoints=%u enrolled_views=%u best=%d threshold=%d",
+               gx_sift_keypoints (probe), views ? views->len : 0,
+               best, GX_MATCH_THRESHOLD);
+      fp_warn ("GXFP51A0 MATCH_QUALITY_QA gallery scores: %d@%u %d@%u %d@%u %d@%u %d@%u (views=%u)",
                top[0], top_idx[0], top[1], top_idx[1], top[2], top_idx[2],
                top[3], top_idx[3], top[4], top_idx[4],
                views ? views->len : 0);
@@ -4213,7 +4252,7 @@ gx_score_probe_against_print (FpPrint *tmpl,
             if (gx_sift_pixel_overlap_metrics (probe,
                                                g_ptr_array_index (views, idx),
                                                &inliers, &overlap, &zncc, &agree))
-              fp_info ("pixel diagnostic: rank=%u view=%u baseline=%d "
+              fp_warn ("GXFP51A0 MATCH_QUALITY_QA pixel diagnostic: rank=%u view=%u baseline=%d "
                        "inliers=%d overlap=%d zncc_milli=%d agree_permille=%d",
                        rank, idx, top[rank], inliers, overlap, zncc, agree);
           }
@@ -4255,7 +4294,7 @@ gx_score_probe_against_gallery (GPtrArray            *gallery,
   for (guint i = 0; gallery && i < gallery->len; i++)
     {
       FpPrint *candidate = g_ptr_array_index (gallery, i);
-      int score = gx_score_probe_against_print (candidate, probe, NULL, NULL);
+      int score = gx_score_probe_against_print (candidate, probe, FALSE, NULL, NULL);
 
       if (score > best)
         {
@@ -4378,7 +4417,7 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe,
+        score = gx_score_probe_against_print (tmpl, probe, TRUE,
                                               &base_views, &adapt_views);
 
       if (perf_qa)

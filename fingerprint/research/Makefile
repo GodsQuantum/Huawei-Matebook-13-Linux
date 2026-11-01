@@ -579,3 +579,13 @@ test_fdt_down_typed_drain_behavior:
 .PHONY: test_first_held_poll_qa
 test_first_held_poll_qa:
 	python3 ./tests/test_first_held_poll_qa.py
+
+.PHONY: test_qa53_quality_diagnostics
+test: test_qa53_quality_diagnostics
+test_qa53_quality_diagnostics:
+	python3 ./tests/test_qa53_quality_diagnostics.py
+
+.PHONY: test_qa54_rotation_qa
+test: test_qa54_rotation_qa
+test_qa54_rotation_qa:
+	python3 ./tests/test_qa54_rotation_qa.py

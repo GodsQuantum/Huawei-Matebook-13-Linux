@@ -969,6 +969,45 @@ sigfm_keypoints_count(SigfmImgInfo *info)
  *   [width * height] normalised 8-bit enrollment image
  * ---------------------------------------------------------------------- */
 
+
+/* QA54: re-extract a single captured 80x64 probe at a bounded orientation.
+ * This is still the SAME physical image, not a second biometric draw.
+ * Only used after a failed baseline and independently gated by same-view
+ * photometric evidence. No fingerprint raster is ever logged or stored. */
+SigfmImgInfo *
+sigfm_rotate_extract (const SigfmImgInfo *probe, double degrees)
+{
+  uint8_t *rotated;
+  SigfmImgInfo *ret;
+  int w, h;
+  double cs, sn, cx, cy, radians;
+
+  if (!probe || !probe->pix || probe->width != 80 || probe->height != 64 ||
+      !isfinite (degrees) || fabs (degrees) > 20.0)
+    return NULL;
+  w = probe->width;
+  h = probe->height;
+  radians = degrees * 3.14159265358979323846 / 180.0;
+  cs = cos (radians);
+  sn = sin (radians);
+  cx = (w - 1) * .5;
+  cy = (h - 1) * .5;
+  rotated = g_malloc ((gsize)w * h);
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+      {
+        double dx = x - cx, dy = y - cy;
+        int sx = (int)lround (cx + dx * cs + dy * sn);
+        int sy = (int)lround (cy - dx * sn + dy * cs);
+        rotated[y * w + x] = (sx >= 0 && sx < w && sy >= 0 && sy < h)
+                              ? probe->pix[sy * w + sx] : 127;
+      }
+  ret = sigfm_extract (rotated, w, h);
+  memset (rotated, 0, (size_t)w * h);
+  g_free (rotated);
+  return ret;
+}
+
 #define SIGFM_MAGIC 0x4D474653u
 #define SIGFM_VERSION 3u
 
