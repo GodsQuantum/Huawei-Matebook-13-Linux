@@ -138,13 +138,35 @@ class HallOfFameTests(unittest.TestCase):
                          ("S3", "fail", "5", "3530", "23045", "7", "7"))
         self.assertEqual((good["first_touch"], good["poses"]), ("pass", "1"))
 
+    def test_qa59_three_real_s3_trials_keep_physical_evidence_separate(self):
+        rows = {r["trial_id"]: r for r in self.rows}
+        a = rows["s3-20261102-qa59-132144"]
+        b = rows["s3-20261102-qa59-132231"]
+        c = rows["s3-20261102-qa59-132429"]
+        self.assertEqual((a["first_touch"], a["prewarm_ms"], a["poses"]),
+                         ("fail", "3537", "3 detected; user 3-4"))
+        self.assertEqual((b["first_touch"], b["poses"],
+                          b["press_to_terminal_ms"], b["wake_to_terminal_ms"]),
+                         ("pass", "1", "1248", "5918"))
+        self.assertEqual((c["first_touch"], c["prewarm_ms"]),
+                         ("unknown", "3538"))
+        self.assertIn("mixed deep+s2idle", c["poses"])
+        eligible = [x for x in self.rows if x["kind"] == "S3" and
+                    x["first_touch"] == "pass" and x["wake_to_terminal_ms"]]
+        self.assertIn(b, eligible)
+        self.assertNotIn(a, eligible)
+        self.assertNotIn(c, eligible)
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
         champion = min(s3, key=lambda r: int(r["wake_to_terminal_ms"]))
-        self.assertEqual(champion["version"], "rel71.74-qa57+kde47")
-        self.assertEqual(champion["trial_id"], "s3-20261101-qa57-214932")
-        self.assertEqual(int(champion["wake_to_terminal_ms"]), 6609)
+        self.assertEqual(champion["version"], "rel71.74-qa59+kde47")
+        self.assertEqual(champion["trial_id"], "s3-20261102-qa59-132231")
+        self.assertEqual(int(champion["wake_to_terminal_ms"]), 5918)
+        historical = next(x for x in self.rows if x["trial_id"] ==
+                          "s3-20261101-qa57-214932")
+        self.assertEqual(historical["wake_to_terminal_ms"], "6609")
         old = next(x for x in self.rows if x["trial_id"] == "s3-20261023-1")
         self.assertEqual(old["wake_to_terminal_ms"], "6951")
         self.assertFalse(any(r["version"] == "rel71.56" for r in s3))
