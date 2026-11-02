@@ -146,6 +146,7 @@ static gboolean gx_warm_crossed_sleep (FpiDeviceGoodix51A0 *self);
 static gboolean gx_warm_validate (FpiDeviceGoodix51A0 *self);
 static void gx_warm_abandon (FpiDeviceGoodix51A0 *self);
 static gboolean gx_cold_prepare (FpiDeviceGoodix51A0 *self);
+static gboolean gx_s3_try_early_finger_reference (FpiDeviceGoodix51A0 *self);
 static void gx_transport_close (FpiDeviceGoodix51A0 *self);
 static gboolean gx_transport_open (FpDevice *dev, GError **error);
 
@@ -1534,6 +1535,18 @@ gx_fail_get_image_after_tls_timeout (FpiDeviceGoodix51A0 *self)
 }
 
 
+/* QA58: bounded opt-in settling BEFORE the post-capture FDT-down.
+ * Keep strict typed ACK + report and unchanged pre-capture FDT timing. */
+#define GX_POST_NAV_SETTLE_QA_US 50000u
+static guint
+gx_post_nav_settle_us (guint8 previous, guint8 current)
+{
+  if (previous != 0x50u || current != 0x32u)
+    return 0;
+  return g_strcmp0 (g_getenv ("GXFP_POST_NAV_SETTLE_QA"), "1") == 0
+           ? GX_POST_NAV_SETTLE_QA_US : 0;
+}
+
 /* The 51x7 reference requires an FDT-up image, NAV and final FDT-down after a
  * finger frame. The intermediate image record must be AUTHENTICATED/decrypted,
  * not merely discarded: AES-GCM record sequence numbers advance for every
@@ -1559,6 +1572,23 @@ gx_send_capture_cleanup (FpiDeviceGoodix51A0 *self)
       if (self->s3_presleep_deadline_us > 0 &&
           g_get_monotonic_time () >= self->s3_presleep_deadline_us)
         goto out;
+
+      /* The completed NAV may precede a missing final 0x32 report.
+       * Wait before sending 0x32, never after an uncertain ACK. */
+      guint settle_us = i > 0
+        ? gx_post_nav_settle_us (recipe.steps[i - 1].inner[0],
+                                 packet->inner[0])
+        : 0;
+      if (settle_us)
+        {
+          if (self->s3_presleep_deadline_us > 0 &&
+              g_get_monotonic_time () + (gint64) settle_us >=
+                self->s3_presleep_deadline_us)
+            goto out;
+          fp_warn ("GXFP51A0 POST_NAV_SETTLE_QA phase=cleanup "
+                   "prev=0x50 next=0x32 extra_ms=%u", settle_us / 1000u);
+          g_usleep (settle_us);
+        }
 
       if (!gx_send_plain_drain (self, packet->inner, packet->inner_len, NULL, NULL))
         goto out;
@@ -2125,15 +2155,26 @@ gx_capture_transport_desync (FpiDeviceGoodix51A0 *self)
            previous, self->capture_gap_scale, gx_capture_gap_us (self));
 }
 
+/* QA57: protocol ACK misses do not establish an image capture timing fault.
+ * Keep strict FDT/TLS recovery, but avoid slowing biometric frames solely
+ * because an unrelated control-plane ACK was missed. Default is QA54. */
+static int
+gx_capture_protocol_floor (FpiDeviceGoodix51A0 *self)
+{
+  if (g_strcmp0 (g_getenv ("GXFP_DECOUPLE_ACK_PACING_QA"), "1") == 0)
+    return GX_CAPTURE_SCALE_MIN;
+
+  return CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
+                GX_CAPTURE_SCALE_MIN, 250);
+}
+
 static void
 gx_capture_pacing_success (FpiDeviceGoodix51A0 *self)
 {
   if (self->capture_retry_seen)
     {
       int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
-      int protocol_floor =
-        CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
-               GX_CAPTURE_SCALE_MIN, 250);
+      int protocol_floor = gx_capture_protocol_floor (self);
       int target = MIN (GX_CAPTURE_SCALE_MAX,
                         MAX (previous + GX_CAPTURE_SCALE_STEP, protocol_floor));
 
@@ -2398,19 +2439,38 @@ gx_fdt_clear_stable_sample (guint8 touchflag,
   return now_us - *clean_since_us >= dwell_us;
 }
 
+/* QA59 never attempts to reuse a stored ImageBase without FULL live contact,
+ * a previously independently verified clear RAM reference and explicit opt-in.
+ * The original age limit, second FDT proof, real image and biometric matcher
+ * gates are implemented by gx_s3_try_early_finger_reference(). */
+static gboolean
+gx_s3_calibration_early_reuse_eligible (FpiDeviceGoodix51A0 *self,
+                                        guint8 touchflag, int mean)
+{
+  return self->s3_saved_bg &&
+    g_strcmp0 (g_getenv ("GXFP_S3_CALIBRATION_EARLY_REUSE_QA"), "1") == 0 &&
+    (touchflag & 0x3fu) == 0x3fu &&
+    mean < GOODIX_FDT_ABS - 30 &&
+    mean < self->s3_saved_abs;
+}
+
 /* Only called inside a genuine libfprint OPEN/VERIFY action with a valid
  * cancellable. Unlike rejected rel71.39, never invoke this from idle resume. */
 static gboolean
 gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
                              int anchor_mean,
                              int *out_mean,
-                             gint64 dwell_us)
+                             gint64 dwell_us,
+                             gboolean *out_s3_reference_restored)
 {
   gint64 deadline_us = g_get_monotonic_time () +
                        (gint64) GX_CLEAR_WAIT_MS * 1000;
   gint64 clean_since_us = 0;
   int cur[GXFP_FDT_ZONE_COUNT];
   gboolean warned = FALSE;
+
+  if (out_s3_reference_restored)
+    *out_s3_reference_restored = FALSE;
 
   while (g_get_monotonic_time () <= deadline_us)
     {
@@ -2426,6 +2486,25 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
         {
           mean = gx_fdt_mean (cur);
           now_us = g_get_monotonic_time ();
+
+          /* QA59: if the user puts a full finger onto the sensor BETWEEN
+           * the initial clean anchor and the first ImageBase acquisition,
+           * do not wait 15 seconds for a lift. Use the existing prior
+           * independently verified, age-limited RAM-only clean reference
+           * only after a second live strict 6/6 FDT probe confirms contact.
+           * A new TLS image and normal biometric score remain mandatory.
+           * Fail closed if the saved reference is missing or FDT disagrees. */
+          if (out_s3_reference_restored &&
+              gx_s3_calibration_early_reuse_eligible (self, touchflag, mean) &&
+              gx_s3_try_early_finger_reference (self))
+            {
+              *out_s3_reference_restored = TRUE;
+              fp_warn ("GXFP51A0 S3_CALIBRATION_EARLY_REUSE_QA "
+                       "full_contact=1 stable_clean_reference_restored=1 "
+                       "next=TLS_image_and_strict_match");
+              return TRUE;
+            }
+
           if (gx_fdt_clear_stable_sample (touchflag, mean, anchor_mean,
                                           now_us, dwell_us,
                                           &clean_since_us))
@@ -2462,11 +2541,13 @@ gx_wait_stable_sensor_clear (FpiDeviceGoodix51A0 *self,
 }
 
 static gboolean
-gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean)
+gx_wait_clean_anchor (FpiDeviceGoodix51A0 *self, int *out_mean,
+                      gboolean *out_s3_reference_restored)
 {
   gboolean ok = gx_wait_stable_sensor_clear (self, -1, out_mean,
-                                              GX_CALIB_CLEAN_DWELL_US);
-  if (ok)
+                                              GX_CALIB_CLEAN_DWELL_US,
+                                              out_s3_reference_restored);
+  if (ok && (!out_s3_reference_restored || !*out_s3_reference_restored))
     fp_info ("GXFP51A0 clean calibration anchor: mean=%d", *out_mean);
   return ok;
 }
@@ -2478,16 +2559,18 @@ gx_wait_sensor_clear_stable (FpiDeviceGoodix51A0 *self,
                              gint64 dwell_us)
 {
   return gx_wait_stable_sensor_clear (self, off_anchor_mean, out_mean,
-                                      dwell_us);
+                                      dwell_us, NULL);
 }
 
 static gboolean
 gx_wait_sensor_clear (FpiDeviceGoodix51A0 *self,
                       int off_anchor_mean,
-                      int *out_mean)
+                      int *out_mean,
+                      gboolean *out_s3_reference_restored)
 {
-  return gx_wait_sensor_clear_stable (self, off_anchor_mean, out_mean,
-                                     GX_CALIB_PREIMAGE_DWELL_US);
+  return gx_wait_stable_sensor_clear (self, off_anchor_mean, out_mean,
+                                     GX_CALIB_PREIMAGE_DWELL_US,
+                                     out_s3_reference_restored);
 }
 
 static gboolean
@@ -2517,7 +2600,7 @@ gx_diag_press_countdown (FpiDeviceGoodix51A0 *self, int off_anchor_mean)
                 {
                   fp_warn ("GXFP51A0 CAPTURE_DIAGNOSTIC_COUNTDOWN_RESTART: REMOVE_FINGER mean=%d anchor=%d",
                            mean, off_anchor_mean);
-                  if (!gx_wait_sensor_clear (self, off_anchor_mean, NULL))
+                  if (!gx_wait_sensor_clear (self, off_anchor_mean, NULL, NULL))
                     return FALSE;
                   restart = TRUE;
                   break;
@@ -2728,6 +2811,7 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
 {
   int q, k;
   int off_anchor_mean = -1;
+  gboolean s3_reference_restored = FALSE;
 
   if (!gx_tls_session (self))
     return FALSE;
@@ -2810,8 +2894,12 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
      * a 2 s timeout and then accepted a contaminated background anyway; on
      * reference MateBook that learned idle≈211 while the true finger-off level is≈353,
      * making every subsequent press invisible. Never do that. */
-    if (!gx_wait_clean_anchor (self, &off_anchor_mean))
+    if (!gx_wait_clean_anchor (self, &off_anchor_mean,
+                               capture_diagnostic ? NULL :
+                               &s3_reference_restored))
       return FALSE;
+    if (s3_reference_restored)
+      return TRUE;
 
     if (capture_diagnostic)
       fp_info ("GXFP51A0 CAPTURE_DIAGNOSTIC_CLEAR_SENSOR_ANCHOR: mean=%d",
@@ -2822,8 +2910,12 @@ gx_prepare_capture_context_once (FpiDeviceGoodix51A0 *self,
         int clear_mean = off_anchor_mean;
         int mean;
 
-        if (!gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean))
+        if (!gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean,
+                                   capture_diagnostic ? NULL :
+                                   &s3_reference_restored))
           return FALSE;
+        if (s3_reference_restored)
+          return TRUE;
         if (clear_mean > off_anchor_mean)
           off_anchor_mean = clear_mean;
 
@@ -5287,9 +5379,7 @@ gx_cold_prepare (FpiDeviceGoodix51A0 *self)
    * 300% protocol -> 250% capture on the reference MateBook; a nominal/fast
    * controller stays at 100%.  This remains process-local and non-persistent. */
   {
-    int protocol_floor =
-      CLAMP (self->timing_scale - GX_CAPTURE_SCALE_STEP,
-             GX_CAPTURE_SCALE_MIN, 250);
+    int protocol_floor = gx_capture_protocol_floor (self);
     int previous = MAX (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN);
 
     if (protocol_floor > previous)

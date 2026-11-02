@@ -8,7 +8,13 @@ src = (Path(__file__).resolve().parents[2] / "driver/goodix51a0/goodix51a0.c").r
 assert "GXFP_FDT_DOWN_LATE_REPLY_QA" not in src, "must be based on stable rel71.74, not PR #40"
 start = "static void\ngx_capture_transport_desync (FpiDeviceGoodix51A0 *self)"
 end = "static void\ngx_capture_pacing_success (FpiDeviceGoodix51A0 *self)"
+qa57_helper = "static int\ngx_capture_protocol_floor (FpiDeviceGoodix51A0 *self)"
 assert src.count(start) == 1 and src.count(end) == 1
+if qa57_helper in src:
+    # The separate QA57 unit test compiles the production helper itself.
+    # Extract only the desync function here: the C-only test has no GLib.
+    assert src.count(qa57_helper) == 1
+    end = qa57_helper
 pacing = src[src.index(start):src.index(end)]
 start = "          gboolean was_pacing_suppressed = self->capture_pacing_suppressed;"
 assert src.count(start) == 1
