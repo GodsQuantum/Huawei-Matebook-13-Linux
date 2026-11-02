@@ -6,7 +6,7 @@ from pathlib import Path
 import sys, tempfile, subprocess
 s=Path(sys.argv[1]).read_text()
 start=s.index("static gboolean\ngx_fdt_clear_stable_sample (")
-end=s.index("\n/* Only called inside a genuine libfprint",start)
+end=s.index("\n/* QA59 never attempts",start)
 helper=s[start:end]
 assert "touchflag & 0x3fu" in helper
 assert "mean < GOODIX_FDT_ABS" in helper

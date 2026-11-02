@@ -29,6 +29,7 @@ behavior for automation and CI.
 Options:
   --menu                     Force the Whiptail audit/install menu.
   --doctor-only              Read-only hardware/software audit.
+  --fingerprint-only         Update GXFP51A0 only; do not touch GPU/platform settings.
   --no-fingerprint           Skip GXFP51A0 installation even when detected.
   --no-gpu                   Skip MX250 on-demand power/offload installation.
   --gpu-driver-preinstalled  Never install NVIDIA packages; require R580 already present.
@@ -73,6 +74,7 @@ for arg in "$@"; do
   case "$arg" in
     --menu) FORCE_MENU=1 ;;
     --doctor-only) DOCTOR_ONLY=1 ;;
+    --fingerprint-only) DO_PLATFORM=0; DO_GPU=0; DO_FINGERPRINT=1 ;;
     --no-fingerprint) DO_FINGERPRINT=0 ;;
     --no-gpu) DO_GPU=0 ;;
     --gpu-driver-preinstalled) GPU_DRIVER_PREINSTALLED=1 ;;
@@ -265,6 +267,12 @@ install_user_launcher() {
   (( EUID == 0 )) && return 0
   local bindir="$HOME/.local/bin" launcher="$HOME/.local/bin/HUAWEI"
   mkdir -p "$bindir"
+  # A regular user-maintained HUAWEI wrapper may add offline/NFS diagnostics.
+  # Never replace it with a symlink on a fingerprint-only update.
+  if [[ -e "$launcher" && ! -L "$launcher" ]]; then
+    printf '==> Existing HUAWEI user wrapper preserved: %s\n' "$launcher"
+    return 0
+  fi
   ln -sfn "$ROOT/install.sh" "$launcher"
   if [[ ":$PATH:" != *":$bindir:"* ]]; then
     printf 'INFO: HUAWEI launcher installed at %s; add %s to PATH if needed.\n' "$launcher" "$bindir"

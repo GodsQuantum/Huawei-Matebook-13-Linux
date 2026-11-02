@@ -14,8 +14,10 @@ s=Path(sys.argv[1]).read_text()
 a=s.index("gx_prepare_capture_context_once (")
 b=s.index("gx_preprocess (", a)
 f=s[a:b]
-assert "gx_wait_clean_anchor (self, &off_anchor_mean)" in f
-assert "gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean)" in f
+assert "gx_wait_clean_anchor (self, &off_anchor_mean," in f
+assert "gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean," in f
+assert "s3_reference_restored" in f
+assert "out_s3_reference_restored" in s
 assert "off_anchor_mean - mean <= GX_DIAG_BASELINE_MAX_DRIFT" in f
 assert "off_anchor_mean - baseline_mean > GX_DIAG_BASELINE_MAX_DRIFT" in f
 assert "capture_diagnostic && off_anchor_mean" not in f

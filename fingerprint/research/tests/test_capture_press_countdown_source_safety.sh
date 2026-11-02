@@ -16,7 +16,7 @@ assert "for (q = 3; q > 0; q--)" in f
 assert "gx_fdt_probe_ex (self, cur, &touchflag)" in f
 assert "gx_fdt_touch_is_finger (touchflag)" in f
 assert "off_anchor_mean - mean > GX_DIAG_BASELINE_MAX_DRIFT" in f
-assert "gx_wait_sensor_clear (self, off_anchor_mean, NULL)" in f
+assert "gx_wait_sensor_clear (self, off_anchor_mean, NULL, NULL)" in f
 assert "restart = TRUE" in f
 a=s.index("gx_prepare_capture_context_once (")
 b=s.index("gx_session_start (", a)
