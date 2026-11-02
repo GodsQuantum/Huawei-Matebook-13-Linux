@@ -22,7 +22,11 @@ assert "CALIBRATION_LIFT_REQUIRED" in f
 a=s.index("gx_prepare_capture_context_once (")
 b=s.index("gx_preprocess (", a)
 f=s[a:b]
-assert "gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean)" in f
+assert "gx_wait_sensor_clear (self, off_anchor_mean, &clear_mean," in f
+assert "capture_diagnostic ? NULL :" in f
+assert "s3_reference_restored" in f
+assert "gx_s3_calibration_early_reuse_eligible" in s
+assert "gx_s3_try_early_finger_reference (self)" in s
 assert "FDT baseline contaminated by touch" in f
 assert "gx_wait_sensor_clear_stable (self, off_anchor_mean, NULL," in f
 assert "(touchflag & 0x3fu) == 0" in f

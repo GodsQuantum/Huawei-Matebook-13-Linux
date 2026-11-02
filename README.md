@@ -1,3 +1,9 @@
+**Installateur HUAWEI (source GitHub) : pilote GXFP51A0 candidat QA59.2.**
+La version stable publique reste rel71.74 ; QA59.2 est la version testée
+sur Pegasus, avec des échecs de première pose encore observés en S3.
+Le mode HUAWEI --fingerprint-only ne touche ni au GPU ni aux réglages
+d'alimentation ; il conserve les empreintes existantes.
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux

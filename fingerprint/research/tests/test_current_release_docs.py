@@ -4,8 +4,9 @@ import re
 import unittest
 ROOT=pathlib.Path(__file__).resolve().parents[3]
 PKG=ROOT/'fingerprint/packaging/arch/PKGBUILD'
-PKGREL=re.search(r'^pkgrel=(\d+\.\d+)$',PKG.read_text(),re.M).group(1)
-CURRENT='rel'+PKGREL
+# Public tagged stable release and installable QA candidate are independent.
+CURRENT=(ROOT/'fingerprint/STABLE_RELEASE').read_text().strip()
+assert re.fullmatch(r'rel[1-9]\d*\.[0-9]+', CURRENT)
 class CurrentRelease(unittest.TestCase):
  def test_current_mainline_in_navigation_and_agent_contract(self):
   for file in ('README.md','AGENTS.md','docs/PROJECT_MAP.md',

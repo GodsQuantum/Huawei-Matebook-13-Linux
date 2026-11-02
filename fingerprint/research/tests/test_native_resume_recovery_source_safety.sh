@@ -107,7 +107,8 @@ assert "gx_gpio_reset (self)" in tls
 
 PY2
 
-grep -Fq 'pkgrel=71' "$pkg"
+grep -Eq '^pkgrel=([1-9][0-9]*([.][0-9]+)*)$' "$pkg"
+grep -Fq 'pkgver=1.94.100.goodix51a0.qa59' "$pkg"
 ! grep -Fq 'integration/resume-prewarm' "$pkg"
 ! grep -Fq 'systemd/system-sleep/gxfp51a0-resume-prewarm' "$pkg"
 ! grep -Fq 'systemd/system-sleep/gxfp51a0-resume-prewarm' "$arch"

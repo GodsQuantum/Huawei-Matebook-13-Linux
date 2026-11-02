@@ -1,3 +1,13 @@
+**Latest QA59.2 installable field candidate (2026-11-02):** Full HUAWEI
+installer and driver-only scripts now select version
+libfprint-goodix51a0 1.94.100.goodix51a0.qa59-2 on Arch, or
+portable rel71.74-qa59.2 via source install on supported distros.
+The one fprintd resident service carries the previously verified QA57/58/59
+feature flags and keeps password fallback and enrolled prints. No new daemon.
+**Not fully hardware certified:** S4, wrong-finger and repeated first
+placement gates remain open (see docs/qa59-s3-abc-20261102.md).
+The historical rel71.74 release is not the latest source install from main.
+
 **Current rel71.74 (2026-10-28)** supersedes rel71.69. Normal installation enables the same reference-machine wake and post-auth recovery settings. Repeatable S4 is not yet certified; retain passwords and rollback packages. [Release evidence](docs/rel71.74-production-20261028.md).
 
 **Historical rel71.69 fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
