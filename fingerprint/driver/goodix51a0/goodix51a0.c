@@ -5743,6 +5743,13 @@ gx_resume_preflight_thread (GTask *task,
     g_strcmp0 (g_getenv ("GXFP_RESUME_FAST_SETTLE_QA"), "1") == 0;
   gboolean profile =
     g_strcmp0 (g_getenv ("GXFP_RESUME_PERF_QA"), "1") == 0;
+  /* QA65, controlled A/B: only reduce the post-reset S3 idle settling
+   * wait from verified 500ms to 300ms. Preserve 250ms pre-reset wait,
+   * detached GPIO264 HIGH10/LOW150, TLS/PMK, full-session recovery and
+   * FDT/biometric gates. Default-off so QA63 behavior is unchanged. */
+  gboolean qa65_postreset_300ms =
+    fast_settle &&
+    g_strcmp0 (g_getenv ("GXFP_S3_POSTRESET_300MS_QA"), "1") == 0;
   gint64 t_start = g_get_monotonic_time ();
   gint64 t_prepare;
 
@@ -5759,8 +5766,13 @@ gx_resume_preflight_thread (GTask *task,
    * default or device semantics before a real hardware A/B. */
   g_usleep (fast_settle ? (250 * 1000) : G_USEC_PER_SEC);
   gx_reset_detached_s3_boundary (self);
-  g_usleep (fast_settle ? (500 * 1000) : G_USEC_PER_SEC);
+  g_usleep (qa65_postreset_300ms ? (300 * 1000) :
+            fast_settle ? (500 * 1000) : G_USEC_PER_SEC);
   t_prepare = g_get_monotonic_time ();
+  if (qa65_postreset_300ms)
+    fp_warn ("GXFP51A0 QA65_S3_POSTRESET selected=300ms "
+             "default=500ms stage_reset_ms=%ld; MCU/TLS validation required",
+             (long) ((t_prepare - t_start) / 1000));
 
   if (gx_transport_open (dev, &err))
     {
