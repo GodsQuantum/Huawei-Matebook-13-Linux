@@ -73,3 +73,22 @@ lock-20261101-qa56-165032,2026-11-01T16:50:32.084544+01:00,rel71.74-qa56+kde47,L
 lock-20261101-qa56-165039,2026-11-01T16:50:39.274858+01:00,rel71.74-qa56+kde47,LOCK,unknown,1 detected; physical unconfirmed,,84,1725,,,7,7,qa56-followup-lock-s3-20261101.md
 s3-20261101-qa56-165120,2026-11-01T16:51:20.881670+01:00,rel71.74-qa56+kde47,S3,unknown,1 detected; physical unconfirmed,4147,84,1794,,6852,7,7,qa56-followup-lock-s3-20261101.md
 s3-20261101-qa56-165147,2026-11-01T16:51:47.548953+01:00,rel71.74-qa56+kde47,S3,unknown,2 detected; physical unconfirmed,4155,83,1732,,11317,7,7,qa56-followup-lock-s3-20261101.md
+lock-20261101-qa57-194519,2026-11-01T19:45:19.316071+01:00,rel71.74-qa57+kde47,LOCK,pass,1,,60,1157,,,9,7,qa57-lock-s3-first-hardware-20261101.md
+s3-20261101-qa57-195500,2026-11-01T19:55:00.285666+01:00,rel71.74-qa57+kde47,S3,unknown,2 detected; physical count unconfirmed,3781,84,1227,,,7,7,qa57-lock-s3-first-hardware-20261101.md
+s3-20261101-qa57-214932,2026-11-01T21:49:32.205312+01:00,rel71.74-qa57+kde47,S3,pass,1,3538,83,1173,,6609,21,7,qa57-lock-s3-first-hardware-20261101.md
+s3-20261101-qa57-fprintd259-222809,2026-11-01T22:28:09.499958+01:00,rel71.74-qa57+fprintd-mr259,S3,fail,5,3530,83,16356,,23045,7,7,qa57-s3-regression-after-fprintd-mr259-20261101.md
+s3-20261102-qa59-132144,2026-11-02T13:21:44.318871+01:00,rel71.74-qa59+kde47,S3,fail,3 detected; user 3-4,3537,88,19492,,25991,7,7,qa59-s3-abc-20261102.md
+s3-20261102-qa59-132231,2026-11-02T13:22:31.373465+01:00,rel71.74-qa59+kde47,S3,pass,1,3544,83,1248,,5918,7,7,qa59-s3-abc-20261102.md
+s3-20261102-qa59-132429,2026-11-02T13:24:29.030792+01:00,rel71.74-qa59+kde47,S3,unknown,2 user reported; 1 detected mixed deep+s2idle,3538,85,1232,,7556,7,7,qa59-s3-abc-20261102.md
+s3-20261103-qa59.2-102743,2026-11-03T10:27:43.639536+01:00,rel71.74-qa59.2+kde47,S3,fail,"5 detected; operator reports failure, physical count unknown",3563,84,,,,5,7,qa59.2-deep-s3-st411-fdt-ack-only-20261103.md
+lock-20261103-qa60-114706,2026-11-03T11:47:06.651727+01:00,rel71.74-qa60+kde47,LOCK,fail,2,,61,1338,,,7,7,qa60-lock-two-regressions-20261103.md
+lock-20261103-qa60-114750,2026-11-03T11:47:50.258043+01:00,rel71.74-qa60+kde47,LOCK,fail,>=6 operator; 6 detected,,295,1230,,,9,7,qa60-lock-two-regressions-20261103.md
+lock-20261103-qa60-120806,2026-11-03T12:08:07.699155+01:00,rel71.74-qa60+kde47,LOCK,pass,1,,84,1240,,,7,7,qa60-lock-preheld-120806-20261103.md
+lock-20261103-qa61-133446,2026-11-03T13:34:46.686154+01:00,rel71.74-qa61+kde47,LOCK,fail,5 detected; human physical count unknown,,52,,,,3,7,qa61-lock-failure-133446-20261103.md
+lock-20261103-qa62-140657,2026-11-03T14:06:57.844077+01:00,rel71.74-qa62+kde47,LOCK,fail,"6 detected, operator multiple; final success after five failures",,52,1303,,,7,7,qa62-lock-regression-20261103.md
+lock-20261103-qa57-hof-flags-preheld-144439,2026-11-03T14:44:39.601925+01:00,rel71.74-qa57+kde47,LOCK,fail,"multiple operator; 8 detected, final success",,246,1268,,,7,7,qa57-restored-flags-preheld-lock-failure-20261103.md
+lock-20261103-qa63-151103,2026-11-03T15:11:03.329488+01:00,rel71.74-qa63+kde47,LOCK,pass,1,,52,1177,,,14,7,qa63-lock-s3-five-first-touch-20261103.md
+lock-20261103-qa63-151120,2026-11-03T15:11:20.530517+01:00,rel71.74-qa63+kde47,LOCK,pass,1,,62,1159,,,10,7,qa63-lock-s3-five-first-touch-20261103.md
+lock-20261103-qa63-151133,2026-11-03T15:11:33.670268+01:00,rel71.74-qa63+kde47,LOCK,pass,1,,62,1246,,,7,7,qa63-lock-s3-five-first-touch-20261103.md
+s3-20261103-qa63-151605,2026-11-03T15:16:05.473086+01:00,rel71.74-qa63+kde47,S3,pass,1,2862,83,1223,,,7,7,qa63-lock-s3-five-first-touch-20261103.md
+s3-20261103-qa63-151632,2026-11-03T15:16:32.159235+01:00,rel71.74-qa63+kde47,S3,pass,1,2626,85,1212,,5597,7,7,qa63-lock-s3-five-first-touch-20261103.md
