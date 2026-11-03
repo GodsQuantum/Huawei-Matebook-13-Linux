@@ -1,5 +1,5 @@
 pkgname=libfprint-goodix51a0
-pkgver=1.94.100.goodix51a0.qa61
+pkgver=1.94.100.goodix51a0.qa62
 pkgrel=1
 pkgdesc="libfprint 1.94.100 with native Goodix GXFP51A0 SPI driver"
 arch=('x86_64')
