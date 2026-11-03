@@ -14,3 +14,15 @@ At 14:44–14:45 Pegasus original QA57 failed multiple pre-held genuine contacts
 - Extra angles may cost CPU when no match and increase the set of accepted orientations. Wrong-finger hardware rejection and repeated first touch LOCK/S3/S4 required before promotion.
 - This change does not resolve FDT typed response loss or force the background to refresh while a finger is already present.
 - NO production readiness or faster-than-HOF claim without actual Pegasus evidence.
+
+
+## 2026-11-03 — build and installation evidence (Pegasus)
+
+- Candidate Git commit fc26910ab04ba5d11b9d1c0964437f8ecad39ba7; QA63 branch remains independent of main.
+- CT700 software baseline 2026-11-03: SOFTWARE_BASELINE_EXIT=0 with FDT/TLS, capture, same-press single-image, S3/S4 simulations, legacy QA54 and QA57 rotation/safety suites, QA63 source contract, and synthetic FAST/BRIEF tests. QA63 source contract RED before change and GREEN after.
+- CT700 native libfprint v1.94.100 116-target build complete EXIT0, Goodix object and ACPI ID, Identify, RANSAC, no release image dumping: PASS. No physical device touched by build.
+- Pegasus native makepkg EXIT0, pkg libfprint-goodix51a0 1.94.100.goodix51a0.qa63-1, package SHA256 553c9fc2611d86f345eca1ad96f6ada501e9a4ea98371267a9ce7f1042f41b3c.
+- Package installed on Pegasus, pacman QA57-1 -> QA63-1. Auto Snapper 2090 PRE, 2091 POST. Post-install health QA63_INSTALL_HEALTH_PASSED: 32/32 files 0 altered; fprintd 1.94.5-2.1 active PID199661 and maps /usr/lib/libfprint-2.so.2.0.0; right-index-finger enrollment preserved; original strictly-validated FDT and both HOF flags plus QA63 wide rotation present in actual systemd Environment. No reboot, re-enrollment, or new service.
+- Reversible rollback SHA256-verified QA57-1 package in Pegasus /var/cache/pacman/pkg, SHA e0d5fde84daa42a89936076050781b455e483e7425b699ed9b5c0d3270aa7a16. QA63 package also cached and archived on Cloud9 at private/candidates/qa63-angular-rescue-20261103 with verified SHA256.
+- Primary code branch pushed via authorized Pegasus gh to GitHub, no main merge and no HUAWEI installer changes.
+- PENDING: actual human LOCK, preheld finger, unknown finger, deep S3, S4 and time-to-terminal. Do not assert speed or reliability improved yet; QA63 is a deliberately bounded A/B candidate, not a certified release. Preserve exact 7/7 threshold and wrong-finger security.
