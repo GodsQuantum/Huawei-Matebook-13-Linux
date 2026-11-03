@@ -48,3 +48,12 @@ Scope: Huawei MateBook 13 Pegasus Goodix GXFP51A0 ST411/GF_ST411SEC_APP_14115. R
 - Official libfprint verify_report and verify_complete API https://fprint.freedesktop.org/libfprint-dev/libfprint-2-Internal-FpDevice.html
 - Official fprintd VerifyStatus contract https://fprint.freedesktop.org/fprintd-dev/Device.html
 - Own issue on S4 ImageBase and prewarm https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32
+
+
+## 2026-11-03 14:40 correction — rollback archive lacked runtime flags
+
+The true QA57 archive was reinstalled on 2026-11-03 around 14:13 but the original separate /etc/systemd fprintd service drop-in was absent. Both GXFP_DECOUPLE_ACK_PACING_QA=1 and GXFP_ROTATION_RESCUE_QA=1 are opt-in in QA57 source. Thus the 14:13 to 14:38 installed package did NOT reproduce the Nov 1 Hall of Fame runtime. The original QA57 documentation explicitly confirms both were ON during the 1156.903ms result.
+
+Restored /etc/systemd/system/fprintd.service.d/70-gxfp-qa57-pacing-decouple.conf with exactly those two Environment settings; reload/restart fprintd; verified package32/32 files, index finger retained, active env, native TLS/PMK success at 14:39:28. QA57 archive SHA e0d5fde84daa42a89936076050781b455e483e7425b699ed9b5c0d3270aa7a16.
+
+This recovers the historical configuration; it is NOT a verified first-touch rate or faster-than-record measured lock. The stale ImageBase/early-finger race remains unresolved. No new unproven QA driver was installed. Note: newer Berkekbgz Chicago code only targets a sibling with different MCU; not safe to swap blindly.
