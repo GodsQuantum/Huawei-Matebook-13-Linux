@@ -157,6 +157,22 @@ class HallOfFameTests(unittest.TestCase):
         self.assertNotIn(a, eligible)
         self.assertNotIn(c, eligible)
 
+    def test_qa59_2_failed_nov03_deep_s3_not_hof(self):
+        rows = {r["trial_id"]: r for r in self.rows}
+        trial = rows["s3-20261103-qa59.2-102743"]
+        self.assertEqual(trial["kind"], "S3")
+        self.assertEqual(trial["first_touch"], "fail")
+        self.assertEqual(trial["score"], "5")
+        self.assertEqual(trial["threshold"], "7")
+        self.assertEqual(trial["prewarm_ms"], "3563")
+        self.assertEqual(trial["fast_ready_ms"], "84")
+        self.assertEqual(trial["wake_to_terminal_ms"], "")
+        self.assertIn("physical count unknown", trial["poses"])
+        valid = [row for row in self.rows if row["kind"] == "S3" and
+                 row["first_touch"] == "pass" and row["wake_to_terminal_ms"]]
+        self.assertNotIn(trial, valid)
+        self.assertEqual(rows["s3-20261102-qa59-132231"]["wake_to_terminal_ms"], "5918")
+
     def test_no_failed_s3_can_win(self):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
