@@ -76,6 +76,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa57+fprintd-mr259 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa59+kde47 | S3 | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa59.2+kde47 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa60+kde47 | LOCK | 1/3 | ÉCHEC de première pose |
 
 ## Essais horodatés
 
@@ -163,6 +164,9 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | s3-20261102-qa59-132231 | 2026-11-02T13:22:31.373465+01:00 | rel71.74-qa59+kde47 | S3 | 1 | pass | 3.544 | 0.083 | 1.248 | — | 5.918 | 7/7 |
 | s3-20261102-qa59-132429 | 2026-11-02T13:24:29.030792+01:00 | rel71.74-qa59+kde47 | S3 | 2 user reported; 1 detected mixed deep+s2idle | unknown | 3.538 | 0.085 | 1.232 | — | 7.556 | 7/7 |
 | s3-20261103-qa59.2-102743 | 2026-11-03T10:27:43.639536+01:00 | rel71.74-qa59.2+kde47 | S3 | 5 detected; operator reports failure, physical count unknown | fail | 3.563 | 0.084 | — | — | — | 5/7 |
+| lock-20261103-qa60-114706 | 2026-11-03T11:47:06.651727+01:00 | rel71.74-qa60+kde47 | LOCK | 2 | fail | — | 0.061 | 1.338 | — | — | 7/7 |
+| lock-20261103-qa60-114750 | 2026-11-03T11:47:50.258043+01:00 | rel71.74-qa60+kde47 | LOCK | >=6 operator; 6 detected | fail | — | 0.295 | 1.230 | — | — | 9/7 |
+| lock-20261103-qa60-120806 | 2026-11-03T12:08:07.699155+01:00 | rel71.74-qa60+kde47 | LOCK | 1 | pass | — | 0.084 | 1.240 | — | — | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
