@@ -594,3 +594,12 @@ test_qa54_rotation_qa:
 test: test_qa57_capture_protocol_pacing
 test_qa57_capture_protocol_pacing:
 	python3 ./tests/test_qa57_capture_protocol_pacing.py
+
+
+.PHONY: test_qa63_rotation_synthetic test_qa63_wide_rotation
+test: test_qa63_rotation_synthetic test_qa63_wide_rotation
+test_qa63_rotation_synthetic: prepare-build
+	$(CC) $(CFLAGS) $$(pkg-config --cflags glib-2.0) tests/test_qa63_rotation_synthetic.c ../driver/goodix51a0/fastbrief/sigfm.c -lm $$(pkg-config --libs glib-2.0) -o "$(BUILD_DIR)/test_qa63_rotation_synthetic"
+	"$(BUILD_DIR)/test_qa63_rotation_synthetic"
+test_qa63_wide_rotation:
+	python3 ./tests/test_qa63_wide_rotation.py

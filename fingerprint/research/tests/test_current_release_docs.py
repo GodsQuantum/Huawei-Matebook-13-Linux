@@ -4,8 +4,13 @@ import re
 import unittest
 ROOT=pathlib.Path(__file__).resolve().parents[3]
 PKG=ROOT/'fingerprint/packaging/arch/PKGBUILD'
-PKGREL=re.search(r'^pkgrel=(\d+\.\d+)$',PKG.read_text(),re.M).group(1)
-CURRENT='rel'+PKGREL
+PKGVER=re.search(r'^pkgver=(.+)$',PKG.read_text(),re.M).group(1)
+PKGREL=re.search(r'^pkgrel=(\d+(?:\.\d+)?)$',PKG.read_text(),re.M).group(1)
+# Experimental QA packages must not redefine mainline release pointers.
+CURRENT=('rel'+PKGREL if '.' in PKGREL else
+         re.search(r'releases/tag/matebook13-(rel\d+\.\d+)',
+                   (ROOT/'README.md').read_text()).group(1))
+assert '.' in PKGREL or re.fullmatch(r'1\.94\.100\.goodix51a0\.qa\d+', PKGVER)
 class CurrentRelease(unittest.TestCase):
  def test_current_mainline_in_navigation_and_agent_contract(self):
   for file in ('README.md','AGENTS.md','docs/PROJECT_MAP.md',
