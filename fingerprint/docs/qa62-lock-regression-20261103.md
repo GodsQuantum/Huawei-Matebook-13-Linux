@@ -1,0 +1,9 @@
+# QA62 field rejection — user LOCK multiple poses on Pegasus, 2026-11-03
+
+User confirmed "LOCK : plusieurs poses". Pegasus 14:06:57.844 FAST_READY52ms, touch0x00. ImageBase aged1,147,834ms (~19min); three background refresh attempts discarded because finger landed during ~0.8–0.9s background capture. Independent full-FDT typed reply missing twice with GPIO48 IRQ low (ACK without DATA); recovered strictly, not bypassed.
+
+Six DETECTED_HOLD, first five genuinely scored 4,3,2,2,2 below threshold7. QA62 shadow-score for these five = 4,2,2,2,3, therefore shadow filter gives no improvement. Sixth DETECTED_HOLD 14:07:14.649863; raw4 rotated +12deg to score7/7 on existing matcher, shadow3; auth terminal 14:07:15.952189, final physical contact-to-terminal 1302.326ms. This is NOT a new HOF first-touch record because five earlier contacts failed. All captures were TLS decrypted; cleanup protocol sometimes failed ACK-only and QA57 strict recovery/positive preservation applied. The QA62 diagnostic is empirically disproven as a performance/robustness improvement for this trace.
+
+Root cause evidence: an ImageBase 19+ minutes old plus racing attempts to refresh it during contact correlates with low scores. Strict causal isolation absent because placement changes can also alter scores. Need no-finger reference acquisition before contact or validated alternative that is independent of old reference, without using unproven shadow matches as authorization.
+
+On 2026-11-03 ~14:13 Pegasus rollback to archived QA57-1 file SHA256 e0d5fde84daa42a89936076050781b455e483e7425b699ed9b5c0d3270aa7a16. Pacman reported 32 files/0 altered, stock fprintd 1.94.5-2.1 active, enrolled index preserved, TLS/PMK cold prewarm success; Snapper snapshots 2088/2089. This restores observed record but does not certify reliability.
