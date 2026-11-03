@@ -71,7 +71,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa55+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
-| rel71.74-qa57+kde47 | LOCK | 1/1 | Nombre insuffisant |
+| rel71.74-qa57+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa57+kde47 | S3 | 1/1 | Nombre insuffisant |
 | rel71.74-qa57+fprintd-mr259 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa59+kde47 | S3 | 1/2 | ÉCHEC de première pose |
@@ -171,6 +171,7 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261103-qa60-120806 | 2026-11-03T12:08:07.699155+01:00 | rel71.74-qa60+kde47 | LOCK | 1 | pass | — | 0.084 | 1.240 | — | — | 7/7 |
 | lock-20261103-qa61-133446 | 2026-11-03T13:34:46.686154+01:00 | rel71.74-qa61+kde47 | LOCK | 5 detected; human physical count unknown | fail | — | 0.052 | — | — | — | 3/7 |
 | lock-20261103-qa62-140657 | 2026-11-03T14:06:57.844077+01:00 | rel71.74-qa62+kde47 | LOCK | 6 detected, operator multiple; final success after five failures | fail | — | 0.052 | 1.303 | — | — | 7/7 |
+| lock-20261103-qa57-hof-flags-preheld-144439 | 2026-11-03T14:44:39.601925+01:00 | rel71.74-qa57+kde47 | LOCK | multiple operator; 8 detected, final success | fail | — | 0.246 | 1.268 | — | — | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 
