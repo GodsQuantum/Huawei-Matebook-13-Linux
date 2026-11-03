@@ -1,10 +1,12 @@
-**Version actuelle sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
+**Version installée sur Pegasus et par défaut sur GitHub main : QA63-1 (3 novembre 2026).** Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
+
+**Version historique publiée sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
 
 **Ancien avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
 
 # Goodix GXFP51A0 / GF3658 ST411 sous Linux
 
-> **Note historique QA (rel71.55, 23 octobre 2026) :** les corrections natives S3 et la connexion biométrique parallèle de Plasma Login Manager 6.8.1 ont réussi leurs tests logiciels. **La veille S3, le redémarrage et le démarrage à froid ne sont PAS encore certifiés sur le matériel.** Pegasus teste actuellement rel71.55 sans certification matérielle ; le retour arrière vers rel71.49 et KDE 6.8.1 d'origine est conservé. [Critères de certification](docs/real-hardware-certification.md).
+> **Note historique QA (rel71.55, 23 octobre 2026) :** les corrections natives S3 et la connexion biométrique parallèle de Plasma Login Manager 6.8.1 ont réussi leurs tests logiciels. **La veille S3, le redémarrage et le démarrage à froid ne sont PAS encore certifiés sur le matériel.** À cette époque, Pegasus testait rel71.55 sans certification matérielle ; la version installée aujourd’hui est QA63 ; le retour arrière vers rel71.49 et KDE 6.8.1 d'origine est conservé. [Critères de certification](docs/real-hardware-certification.md).
 
 Pilote libfprint natif expérimental pour le Goodix SPI GXFP51A0 présent dans la
 famille Huawei MateBook 13 2021.
