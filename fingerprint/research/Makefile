@@ -604,3 +604,8 @@ test_qa58_post_nav_settle:
 test: test_qa59_s3_calibration_early_reuse
 test_qa59_s3_calibration_early_reuse:
 	python3 ./tests/test_qa59_s3_calibration_early_reuse.py
+
+.PHONY: test_qa60_fdt_irq_miss_diagnostics
+test: test_qa60_fdt_irq_miss_diagnostics
+test_qa60_fdt_irq_miss_diagnostics:
+	python3 ./tests/test_qa60_fdt_irq_miss_diagnostics.py
