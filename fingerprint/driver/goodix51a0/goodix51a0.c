@@ -296,6 +296,37 @@ gx_send_plain_raw (FpiDeviceGoodix51A0 *self, const guint8 *body, gsize n)
   return gx_write_frame (self, GOODIX_PKT_PLAIN, body, n);
 }
 
+/* QA60: no change to SPI control, retry timing, checksum or authentication.
+ * On a missing authenticated FDT 0x32 data report, sample only the current
+ * GPIO48 IRQ level and previously-observed IRQ events.  The level snapshot
+ * is non-intrusive and deliberately happens after the bounded wait: it
+ * cannot repair the failure or justify accepting an ACK alone.  Never
+ * output sensor bytes, fingerprint data, templates, PSK or GPIO paths. */
+static void
+gx_fdt_missing_report_irq_diag (FpiDeviceGoodix51A0 *self,
+                                gint64 ack_at_us,
+                                guint irq_after_ack,
+                                int timeout_polls)
+{
+  struct gpio_v2_line_values val = { .bits = 0, .mask = 1 };
+  int level = -1;
+
+  if (g_strcmp0 (g_getenv ("GXFP_FDT_IRQ_DIAG_QA"), "1") != 0)
+    return;
+
+  if (self->irq_fd >= 0 &&
+      ioctl (self->irq_fd, GPIO_V2_LINE_GET_VALUES_IOCTL, &val) == 0)
+    level = (val.bits & 1) ? 1 : 0;
+
+  fp_warn ("GXFP51A0 FDT_IRQ_DIAG_QA missing_typed_data=1 "
+           "irq_level=%d irq_after_ack=%u silence_polls=%d ack_age_ms=%ld "
+           "action=existing_strict_recovery",
+           level, irq_after_ack, timeout_polls,
+           ack_at_us > 0
+             ? (long) ((g_get_monotonic_time () - ack_at_us) / 1000)
+             : -1L);
+}
+
 /* Sends a cleartext command and drains every plain response. A TLS record
  * arriving instead is stashed for the BIO layer to pick up. */
 static gboolean
@@ -396,6 +427,7 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
       gboolean fdt_data_seen = FALSE;
       guint8 fdt_data_tag = 0;
       gint64 fdt_ack_us = 0, fdt_report_us = 0;
+      guint fdt_irq_after_ack = 0;
       int post_reply_miss_limit =
         body[0] == 0x32u ? GX_FDT_DOWN_SECOND_REPLY_POLLS : GX_DRAIN_SILENCE;
 
@@ -434,6 +466,11 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
                 break;
               continue;
             }
+
+          /* An observed high IRQ after the ACK differs from true IRQ silence,
+           * even if the subsequent SPI frame cannot be parsed. */
+          if (fdt_typed_qa && ack_seen && !fdt_data_seen)
+            fdt_irq_after_ack++;
 
           r = gx_read_frame (self, &ty, scratch, sizeof scratch);
           if (r > 0 && ty == GOODIX_PKT_PLAIN)
@@ -547,6 +584,10 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
           fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
                    "replies=%d expected=%d ack=%d; bounded session recovery",
                    got, expected_plain_replies, ack_seen ? 1 : 0);
+          if (body[0] == 0x32u && fdt_typed_qa && ack_seen &&
+              !fdt_data_seen)
+            gx_fdt_missing_report_irq_diag (self, fdt_ack_us,
+                                             fdt_irq_after_ack, misses);
           self->capture_pacing_suppressed = TRUE;
           gx_capture_transport_desync (self);
           self->capture_pacing_suppressed = was_pacing_suppressed;
