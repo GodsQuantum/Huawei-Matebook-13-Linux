@@ -85,3 +85,4 @@ lock-20261103-qa60-114706,2026-11-03T11:47:06.651727+01:00,rel71.74-qa60+kde47,L
 lock-20261103-qa60-114750,2026-11-03T11:47:50.258043+01:00,rel71.74-qa60+kde47,LOCK,fail,>=6 operator; 6 detected,,295,1230,,,9,7,qa60-lock-two-regressions-20261103.md
 lock-20261103-qa60-120806,2026-11-03T12:08:07.699155+01:00,rel71.74-qa60+kde47,LOCK,pass,1,,84,1240,,,7,7,qa60-lock-preheld-120806-20261103.md
 lock-20261103-qa61-133446,2026-11-03T13:34:46.686154+01:00,rel71.74-qa61+kde47,LOCK,fail,5 detected; human physical count unknown,,52,,,,3,7,qa61-lock-failure-133446-20261103.md
+lock-20261103-qa62-140657,2026-11-03T14:06:57.844077+01:00,rel71.74-qa62+kde47,LOCK,fail,"6 detected, operator multiple; final success after five failures",,52,1303,,,7,7,qa62-lock-regression-20261103.md
