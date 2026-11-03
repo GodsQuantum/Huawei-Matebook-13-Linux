@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <linux/gpio.h>
 #include <linux/ioctl.h>
+#include <poll.h>
 #include <linux/spi/spidev.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -183,26 +184,139 @@ static int gx51_open_int34bb(void)
     return -1;
 }
 
-int gx51_open_irq_gpio48(void)
+/* Use the existing GPIO48 request for IRQ-event diagnostics, rather than
+ * requesting an already-owned line (which Linux correctly refuses EBUSY).
+ * Edge timestamps use CLOCK_MONOTONIC. Unsupported edge requests fall back
+ * to the original level-only input, without losing fingerprint availability.
+ * The default (QA flag unset) is byte-for-byte the original GPIO v2 setup.
+ */
+int gx51_open_irq_gpio48_ex(int *edge_enabled)
 {
     struct gpio_v2_line_request req = {0};
+    const char *flag = getenv("GXFP_FDT_IRQ_EDGE_WATCH_QA");
+    const int want_edges = flag && strcmp(flag, "1") == 0;
     int chip = gx51_open_int34bb();
 
+    if (edge_enabled)
+        *edge_enabled = 0;
     if (chip < 0)
         return -1;
 
     req.num_lines = 1;
     req.offsets[0] = GX51_EXPECTED_HWIRQ;
-    req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
+    req.config.flags = GPIO_V2_LINE_FLAG_INPUT |
+                       (want_edges ? GPIO_V2_LINE_FLAG_EDGE_RISING : 0);
+    if (want_edges)
+        req.event_buffer_size = 64;
     strncpy(req.consumer, "goodix51a0-irq", sizeof(req.consumer) - 1);
 
     if (ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &req) < 0 || req.fd < 0) {
-        close(chip);
-        return -1;
+        if (!want_edges) {
+            close(chip);
+            return -1;
+        }
+        /* Do not make optional instrumentation a new login dependency. */
+        req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
+        req.event_buffer_size = 0;
+        req.fd = -1;
+        if (ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &req) < 0 || req.fd < 0) {
+            close(chip);
+            return -1;
+        }
+    } else if (edge_enabled && want_edges) {
+        *edge_enabled = 1;
     }
 
     close(chip);
     return req.fd;
+}
+
+int gx51_open_irq_gpio48(void)
+{
+    return gx51_open_irq_gpio48_ex(NULL);
+}
+
+/* Drain timestamped rising events without reading a single SPI byte.
+ * Uses the IRQ fd already owned by fprintd and never changes its config.
+ * timeout_ms is bounded by the caller and measured against CLOCK_MONOTONIC.
+ * Missing IRQ is NOT evidence that the MCU did not generate a response:
+ * GPIO controller, sub-ms electrical behaviour and later unobserved time
+ * remain separate hypotheses. Observation can never authorize GET_IMAGE.
+ */
+int gx51_irq_edge_observe(int line_fd, uint64_t ack_monotonic_ns,
+                         unsigned int timeout_ms,
+                         struct gx51_irq_edge_result *result)
+{
+    struct timespec now;
+    uint64_t deadline_ns;
+    uint32_t last_seqno = 0;
+    unsigned int records_read = 0;
+
+    if (line_fd < 0 || !result || timeout_ms > 2000)
+        return -1;
+    memset(result, 0, sizeof(*result));
+    result->first_after_ack_ms = -1;
+    result->last_after_ack_ms = -1;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) < 0)
+        return -1;
+    deadline_ns = (uint64_t) now.tv_sec * 1000000000u +
+                  (uint64_t) now.tv_nsec +
+                  (uint64_t) timeout_ms * 1000000u;
+
+    for (;;) {
+        struct pollfd pfd = {.fd = line_fd, .events = POLLIN};
+        struct gpio_v2_line_event event;
+        uint64_t now_ns;
+        unsigned int remaining_ms;
+        int polled;
+        ssize_t got;
+
+        if (clock_gettime(CLOCK_MONOTONIC, &now) < 0)
+            return -1;
+        now_ns = (uint64_t) now.tv_sec * 1000000000u + (uint64_t) now.tv_nsec;
+        remaining_ms = now_ns < deadline_ns
+                       ? (unsigned int) ((deadline_ns - now_ns + 999999u)
+                                         / 1000000u)
+                       : 0;
+        polled = poll(&pfd, 1, (int)remaining_ms);
+        if (polled < 0) {
+            if (errno == EINTR)
+                continue;
+            return -1;
+        }
+        if (polled == 0)
+            break;
+        if (!(pfd.revents & POLLIN))
+            return -1;
+        got = read(line_fd, &event, sizeof event);
+        if (got < 0 && errno == EINTR)
+            continue;
+        if (got != (ssize_t)sizeof event)
+            return -1;
+        /* A malicious/noisy line cannot hold a failed auth indefinitely. */
+        if (++records_read > 256)
+            break;
+        if (event.id != GPIO_V2_LINE_EVENT_RISING_EDGE ||
+            event.offset != GX51_EXPECTED_HWIRQ)
+            continue;
+        if (last_seqno && event.seqno > last_seqno + 1)
+            result->sequence_gaps += event.seqno - last_seqno - 1;
+        last_seqno = event.seqno;
+        if (event.timestamp_ns < ack_monotonic_ns) {
+            result->rising_before_ack++;
+        } else {
+            uint64_t delta_ms =
+                (event.timestamp_ns - ack_monotonic_ns) / 1000000u;
+            if (result->rising_after_ack == 0)
+                result->first_after_ack_ms =
+                    delta_ms > 2147483647u ? -1 : (int)delta_ms;
+            result->last_after_ack_ms =
+                delta_ms > 2147483647u ? -1 : (int)delta_ms;
+            result->rising_after_ack++;
+        }
+    }
+    return 0;
 }
 
 static int

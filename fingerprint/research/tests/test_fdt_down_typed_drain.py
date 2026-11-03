@@ -30,7 +30,13 @@ typedef unsigned char guint8;
 typedef uint16_t guint16;
 typedef size_t gsize;
 typedef long long gint64;
+typedef uint64_t guint64;
 typedef int gboolean;
+#define MIN(a,b) ((a)<(b)?(a):(b))
+struct gx51_irq_edge_result {
+  unsigned int rising_after_ack, rising_before_ack, sequence_gaps;
+  int first_after_ack_ms, last_after_ack_ms;
+};
 #define TRUE 1
 #define FALSE 0
 #define GOODIX_RX_MAX 512
@@ -45,7 +51,7 @@ typedef int gboolean;
 #define GX_GET_IMAGE_ATTEMPTS 2
 #define GX_GET_IMAGE_ACK_TIMEOUT_MS 1000
 typedef struct {
-  int s3_presleep_deadline_us,timing_scale,irq_fd,desync;
+  int s3_presleep_deadline_us,timing_scale,irq_fd,desync,irq_edge_watch_enabled;
   int capture_retry_seen, capture_pacing_suppressed;
   guint8 tls_rx[512];
   int tls_rxlen,tls_rxpos;
@@ -65,6 +71,12 @@ static int gx_write_frame(FpiDeviceGoodix51A0 *d,int type,
 {(void)d;(void)type;(void)body;(void)n;return TRUE;}
 static void gx_capture_transport_desync(FpiDeviceGoodix51A0 *d)
 {d->desync++;}
+/* Hardware diagnostic is default-off in this harness and must not alter
+ * deterministic FDT acceptance. The instrumented path is separately
+ * exercised by the QA64 kernel-event pipe unit test. */
+static int gx51_irq_edge_observe(int fd, uint64_t ack_ns, unsigned int ms,
+                                 struct gx51_irq_edge_result *result)
+{(void)fd;(void)ack_ns;(void)ms;(void)result; return -1;}
 static gboolean gxfp_parse_ack(const guint8 *b,gsize n,guint8 cmd,guint8 *status)
 {(void)n;(void)cmd;*status=1;return b[0]==0xA1;}
 static gboolean gxfp_ack_status_success(guint8 s){return (s & 1)!=0;}

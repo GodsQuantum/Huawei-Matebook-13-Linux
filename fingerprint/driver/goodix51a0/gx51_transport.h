@@ -25,6 +25,19 @@ size_t gx51_read_chunk_size(size_t remaining);
 int gx51_write_frame_fd(int spi_fd, uint8_t type,
                         const uint8_t *body, size_t len);
 int gx51_open_irq_gpio48(void);
+/* Optional QA-only GPIO v2 rising-edge observation on the ALREADY OWNED
+ * GPIO48 input request. Never requests a second consumer or clocks SPI. */
+struct gx51_irq_edge_result {
+    unsigned int rising_after_ack;
+    unsigned int rising_before_ack;
+    unsigned int sequence_gaps;
+    int first_after_ack_ms;
+    int last_after_ack_ms;
+};
+int gx51_open_irq_gpio48_ex(int *edge_enabled);
+int gx51_irq_edge_observe(int line_fd, uint64_t ack_monotonic_ns,
+                         unsigned int timeout_ms,
+                         struct gx51_irq_edge_result *result);
 int gx51_wait_irq_gpio48(int line_fd, unsigned int timeout_ms);
 int gx51_wait_irq_gpio48_low(int line_fd, unsigned int timeout_ms);
 int gx51_read_frame_fd(int spi_fd, int irq_gpio_fd, uint8_t *type,

@@ -80,6 +80,7 @@ struct _FpiDeviceGoodix51A0
 
   int           spi_fd;
   int           irq_fd;
+  int           irq_edge_watch_enabled; /* opt-in diag only */
   FpiSsm       *task_ssm;
 
   /* TLS stack. Note the sensor is the client and we are the server. */
@@ -469,7 +470,7 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
               if (good_ack)
                 {
                   ack_seen = TRUE;
-                  if (fdt_typed_qa)
+                  if (body[0] == 0x32u)
                     fdt_ack_us = g_get_monotonic_time ();
                 }
               if (expected_plain_replies > 0 && got >= expected_plain_replies)
@@ -541,6 +542,43 @@ G_STATIC_ASSERT (GX_GET_IMAGE_NO_REPLY_POLLS == 100);
            * repair it; keep full MCU/TLS recovery but do not ratchet the
            * session-local capture pacing for this specific FDT failure.
            * Preserve any suppression requested by the lifecycle caller. */
+          /* QA64: only on an already failed strict 2/2 FDT-down and ACK.
+           * Collect kernel-timestamped GPIO48 edges for <=1000ms, with NO
+           * SPI reads/writes. Always perform the ORIGINAL fail-closed reset
+           * afterwards, even when an edge is seen. Never use this as a
+           * delayed-reply acceptance window or a relaxed match.
+           */
+          if (self->irq_edge_watch_enabled && ack_seen &&
+              got < expected_plain_replies && fdt_ack_us > 0)
+            {
+              struct gx51_irq_edge_result obs;
+              unsigned int watch_ms = 1000;
+              int status;
+
+              if (self->s3_presleep_deadline_us > 0)
+                {
+                  gint64 remain_us = self->s3_presleep_deadline_us -
+                                     g_get_monotonic_time ();
+                  watch_ms = remain_us > 0
+                             ? MIN (watch_ms, (unsigned int)(remain_us / 1000))
+                             : 0;
+                }
+              status = gx51_irq_edge_observe (self->irq_fd,
+                                              (guint64) fdt_ack_us * 1000,
+                                              watch_ms, &obs);
+              if (status == 0)
+                fp_warn ("GXFP51A0 FDT_IRQ_EDGE_WATCH_QA "
+                         "rising_after_ack=%u rising_before_ack=%u "
+                         "first_ms=%d last_ms=%d seq_gaps=%u "
+                         "watch_ms=%u; diagnostic only, reset mandatory",
+                         obs.rising_after_ack, obs.rising_before_ack,
+                         obs.first_after_ack_ms, obs.last_after_ack_ms,
+                         obs.sequence_gaps, watch_ms);
+              else
+                fp_warn ("GXFP51A0 FDT_IRQ_EDGE_WATCH_QA unavailable; "
+                         "strict MCU/TLS recovery unchanged");
+            }
+
           gboolean was_pacing_suppressed = self->capture_pacing_suppressed;
 
           fp_warn ("GXFP51A0 FDT_DOWN_PROOF incomplete before GET_IMAGE: "
@@ -4920,6 +4958,7 @@ gx_transport_close (FpiDeviceGoodix51A0 *self)
     {
       close (self->irq_fd);
       self->irq_fd = -1;
+      self->irq_edge_watch_enabled = 0;
     }
 
   if (self->spi_fd >= 0)
@@ -4975,7 +5014,11 @@ gx_transport_open (FpDevice *dev, GError **error)
       return FALSE;
     }
 
-  self->irq_fd = gx51_open_irq_gpio48 ();
+  self->irq_fd = gx51_open_irq_gpio48_ex (&self->irq_edge_watch_enabled);
+  if (g_strcmp0 (g_getenv ("GXFP_FDT_IRQ_EDGE_WATCH_QA"), "1") == 0)
+    fp_info ("GXFP51A0 FDT_IRQ_EDGE_WATCH_QA mode=%s "
+             "(default off; no second GPIO owner)",
+             self->irq_edge_watch_enabled ? "edge-enabled" : "level-fallback");
   if (self->irq_fd < 0)
     {
       gx_transport_close (self);
