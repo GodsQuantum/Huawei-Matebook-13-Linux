@@ -121,6 +121,7 @@ struct _FpiDeviceGoodix51A0
   gboolean      capture_recovery_pending; /* transport failed; rebuild between presses */
   gboolean      bg_dirty;    /* background taken with a finger down */
   gboolean      production_ready; /* TLS + fresh background + FDT prepared during open */
+  gint64        warm_open_contact_at_us; /* FDT-held finger observed at warm Claim */
   gboolean      warm_valid;       /* TLS/background/FDT retained across fp_device close */
   gint64        warm_last_activity_us; /* monotonic time of last validated sensor activity */
   gint64        bg_last_refresh_us; /* monotonic time of last accepted finger-off ImageBase */
@@ -3315,6 +3316,12 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
   if (self->production_ready && self->tls_up && self->have_fdt &&
       self->bg_frame)
     {
+      gboolean held_fast_qa =
+        g_strcmp0 (g_getenv ("GXFP_EARLY_HELD_FAST_AUTH_QA"), "1") == 0 &&
+        self->warm_open_contact_at_us > 0 &&
+        g_get_monotonic_time () >= self->warm_open_contact_at_us &&
+        g_get_monotonic_time () - self->warm_open_contact_at_us <= 500 * 1000;
+
       /* FAST_READY proves that the retained TLS/FDT transport is alive, but
        * ImageBase drifts much faster than the TLS lifecycle. reference MateBook 13 traces
        * show that a background only tens of seconds old can collapse genuine
@@ -3323,7 +3330,18 @@ gx_session_start (FpiDeviceGoodix51A0 *self)
        * biometric READY. If the user is already touching the sensor,
        * gx_warm_validate() safely defers the refresh and the bounded reposition
        * path remains available. */
-      if (!gx_background_is_fresh (self))
+      if (!gx_background_is_fresh (self) && held_fast_qa)
+        {
+          /* FDT already proved a finger during this warm Open. A second
+           * FDT probe and attempted background would necessarily defer the
+           * refresh while the finger remains down. Authenticate that first
+           * held pose immediately instead, using the last proven-clean
+           * ImageBase. Image quality, strict matcher threshold and TLS
+           * capture cleanup are unchanged; this is NOT a biometric match. */
+          fp_warn ("GXFP51A0 EARLY_HELD_FAST_AUTH_QA: held finger "
+                   "at Claim; redundant occupied ImageBase rebase skipped");
+        }
+      else if (!gx_background_is_fresh (self))
         {
           gint64 age_us = gx_background_age_us (self);
           gint64 previous_refresh = self->bg_last_refresh_us;
@@ -5175,6 +5193,7 @@ gx_warm_abandon (FpiDeviceGoodix51A0 *self)
   self->warm_valid = FALSE;
   self->production_ready = FALSE;
   self->fast_first_poll_armed = FALSE;
+  self->warm_open_contact_at_us = 0;
   self->have_fdt = FALSE;
   self->bg_dirty = FALSE;
   self->bg_last_refresh_us = 0;
@@ -5210,6 +5229,7 @@ gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
   int cur[GXFP_FDT_ZONE_COUNT];
   guint8 touchflag = 0;
   int mean;
+  gboolean held_contact = FALSE;
   gint64 t0 = g_get_monotonic_time ();
 
   /* Fast path for an already prepared sensor: prove only that the FDT path is
@@ -5223,12 +5243,25 @@ gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
   mean = gx_fdt_mean (cur);
   self->warm_last_activity_us = g_get_monotonic_time ();
 
+  /* The current FDT reading also proves a finger placed BEFORE Claim.
+   * Retain that short-lived hint for the session worker. The subsequent
+   * actual capture still requires an independent FDT physical-contact
+   * proof and the original strict biometric match. */
+  held_contact =
+    gx_fdt_touch_is_finger (touchflag) ||
+    gx_fdt_drop (self->fdt_base, cur) > GOODIX_FDT_DROP ||
+    mean < self->fdt_abs;
+  self->warm_open_contact_at_us =
+    held_contact ? self->warm_last_activity_us : 0;
+
   /* QA49: only a full, stable 6/6 finger detected at warm Claim may
    * skip the initial FDT poll delay. Partial/absent contacts take the
    * unchanged 100ms path. A fresh FDT proof and the complete biometric
    * matcher are still mandatory when this hint is consumed. */
   self->fast_first_poll_armed =
-    (touchflag & 0x3fu) == 0x3fu && mean < self->fdt_abs;
+    ((touchflag & 0x3fu) == 0x3fu && mean < self->fdt_abs) ||
+    (held_contact &&
+     g_strcmp0 (g_getenv ("GXFP_EARLY_HELD_FAST_AUTH_QA"), "1") == 0);
 
   if (!gx_fdt_touch_is_finger (touchflag) && mean >= GOODIX_FDT_ABS)
     {
@@ -5522,6 +5555,8 @@ gx_dev_open (FpDevice *dev)
   gboolean had_warm = self->warm_valid || self->tls != NULL || self->tls_up;
   gboolean warm_candidate;
 
+  self->warm_open_contact_at_us = 0;
+
   /* An idle libfprint device may not receive the driver suspend vfunc. Detect
    * that case before touching hardware, while stale TLS can still be discarded
    * host-side without sending anything to the sensor. */
@@ -5626,6 +5661,7 @@ gx_dev_close (FpDevice *dev)
   FpiDeviceGoodix51A0 *self = FPI_DEVICE_GOODIX51A0 (dev);
 
   g_clear_handle_id (&self->poll_id, g_source_remove);
+  self->warm_open_contact_at_us = 0;
 
   /* Close may be requested more than once around a short-lived fprintd Claim:
    * the first close marks production_ready=FALSE, while later cleanup can call

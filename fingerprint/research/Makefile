@@ -609,3 +609,8 @@ test_qa59_s3_calibration_early_reuse:
 test: test_qa60_fdt_irq_miss_diagnostics
 test_qa60_fdt_irq_miss_diagnostics:
 	python3 ./tests/test_qa60_fdt_irq_miss_diagnostics.py
+
+.PHONY: test_qa61_held_finger_fast
+test: test_qa61_held_finger_fast
+test_qa61_held_finger_fast:
+	python3 ./tests/test_qa61_held_finger_fast.py
