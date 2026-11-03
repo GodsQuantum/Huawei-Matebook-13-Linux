@@ -1,3 +1,10 @@
+**Installation depuis `main` : GXFP51A0 QA63.1, pilote actuellement installé sur Pegasus.**
+Le paquet Arch et le chemin portable sélectionnent QA63.1 ; `HUAWEI --fingerprint-only`
+préserve les empreintes, le GPU et les paramètres de la machine. QA63 a obtenu
+3/3 LOCK et 2/2 S3 en une pose sur Pegasus, mais rejet d'un doigt inconnu
+avec ±18°, véritable S4 et démarrage à froid restent à certifier.
+La release historique rel71.74 reste identifiée séparément.
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux

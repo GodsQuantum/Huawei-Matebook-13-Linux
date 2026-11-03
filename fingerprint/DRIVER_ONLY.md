@@ -1,3 +1,11 @@
+**Current GitHub `main` installable driver: QA63.1 (2026-11-03).**
+The Arch package uses `libfprint-goodix51a0 1.94.100.goodix51a0.qa63-1`;
+the portable installer uses `rel71.74-qa63.1`. They reproduce the
+driver and native fprintd feature flags tested on Pegasus (3/3 LOCK and 2/2
+true deep S3, first physical placement). This is not full hardware/safety
+certification: unknown-finger tests with ±18°, S4, BOOT and REBOOT remain open.
+No extra daemon or sleep hook; enrollment and password fallback remain untouched.
+
 **Current rel71.74 (2026-10-28)** supersedes rel71.69. Normal installation enables the same reference-machine wake and post-auth recovery settings. Repeatable S4 is not yet certified; retain passwords and rollback packages. [Release evidence](docs/rel71.74-production-20261028.md).
 
 **Historical rel71.69 fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
