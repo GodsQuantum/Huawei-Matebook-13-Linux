@@ -36,6 +36,8 @@ body = r"""
 #define TRUE 1
 #define FALSE 0
 #define fp_warn(...) ((void)0)
+typedef unsigned char guint8;
+typedef long long gint64;
 typedef unsigned int guint;
 typedef unsigned long long guint64;
 typedef int gboolean;
@@ -43,8 +45,18 @@ typedef struct { int capture_gap_scale, capture_clean_streak; gboolean capture_r
 static __attribute__((unused)) guint gx_capture_gap_us(FpiDeviceGoodix51A0 *self)
  { return (guint)((guint64)GX_SEQ_GAP_US*(guint)CLAMP(self->capture_gap_scale,GX_CAPTURE_SCALE_MIN,GX_CAPTURE_SCALE_MAX)/100u); }
 """ + pacing + r"""
+/* QA60 actual GPIO helper has its own no-hardware C test.  This harness
+ * tests only pacing suppression while the diagnostic observes a miss. */
+static void gx_fdt_missing_report_irq_diag(FpiDeviceGoodix51A0 *s,
+                                           gint64 ack,guint irq,int misses)
+{(void)s;(void)ack;(void)irq;(void)misses;}
 static void fdt_failure(FpiDeviceGoodix51A0 *self) {
  int got=1, expected_plain_replies=2, ack_seen=1;
+ guint8 body[1]={0x32};
+ gboolean fdt_typed_qa=TRUE, fdt_data_seen=FALSE;
+ gint64 fdt_ack_us=1000000;
+ guint fdt_irq_after_ack=0;
+ int misses=10;
  (void)got; (void)expected_plain_replies; (void)ack_seen;
 """ + fragment + r"""
 }

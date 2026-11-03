@@ -26,6 +26,7 @@ C = r"""
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+typedef unsigned int guint;
 typedef unsigned char guint8;
 typedef uint16_t guint16;
 typedef size_t gsize;
@@ -70,6 +71,12 @@ static gboolean gxfp_parse_ack(const guint8 *b,gsize n,guint8 cmd,guint8 *status
 static gboolean gxfp_ack_status_success(guint8 s){return (s & 1)!=0;}
 static gboolean gxfp_parse_fdt_down_reply(const guint8 *b,gsize n)
 {return n==20 && (b[0]==0xD1 || b[0]==0xD2);}
+/* The hardware-level QA60 GPIO helper is separately compiled/tested with a
+ * deterministic ioctl mock in test_qa60_fdt_irq_miss_diagnostics.py.
+ * This drain-only harness stubs it: same call boundary, no GPIO access. */
+static void gx_fdt_missing_report_irq_diag(FpiDeviceGoodix51A0 *d,
+                                            gint64 ack,unsigned int polls,int misses)
+{(void)d;(void)ack;(void)polls;(void)misses;}
 static int gx51_wait_irq_gpio48(int fd,int timeout_ms)
 {
  (void)fd;
