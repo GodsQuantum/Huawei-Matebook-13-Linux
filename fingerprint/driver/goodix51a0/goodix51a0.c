@@ -3597,6 +3597,68 @@ gx_features_from_pixels (FpiDeviceGoodix51A0 *self, const guint16 *px)
   return gx_sift_extract (img, GOODIX_IMG_WIDTH, GOODIX_IMG_HEIGHT);
 }
 
+/* QA62 read-only image-processing experiment. Extract an independent
+ * shadow descriptor from the SAME already-decrypted finger frame. A
+ * 9x9 local mean removes slow baseline/temperature drift, leaving ridge
+ * contrast. The resulting score is telemetry only and NEVER influences
+ * authentication or enrollment. No image, template or descriptors are
+ * stored on disk or included in logs. */
+static GxSiftFeatures *
+gx_stale_shadow_features (FpiDeviceGoodix51A0 *self, const guint16 *px)
+{
+  const int w = GOODIX_IMG_WIDTH;
+  const int h = GOODIX_IMG_HEIGHT;
+  const int n = GOODIX_IMG_PIXELS;
+  const int stride = w + 1;
+  g_autofree double *resid = g_new (double, n);
+  g_autofree double *integral = g_new0 (double, (w + 1) * (h + 1));
+  g_autofree double *ridge = g_new (double, n);
+  double avg = 0.0, variance = 0.0;
+
+  for (int y = 0; y < h; y++)
+    {
+      double row_sum = 0.0;
+      for (int x = 0; x < w; x++)
+        {
+          int pos = y * w + x;
+          double v = (double) px[pos] - self->bg_frame[pos];
+          resid[pos] = v;
+          row_sum += v;
+          integral[(y + 1) * stride + x + 1] =
+            integral[y * stride + x + 1] + row_sum;
+        }
+    }
+
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+      {
+        int x0 = MAX (0, x - 4);
+        int x1 = MIN (w - 1, x + 4);
+        int y0 = MAX (0, y - 4);
+        int y1 = MIN (h - 1, y + 4);
+        double total =
+          integral[(y1 + 1) * stride + x1 + 1] -
+          integral[y0 * stride + x1 + 1] -
+          integral[(y1 + 1) * stride + x0] +
+          integral[y0 * stride + x0];
+        double local = total / (double) ((x1 - x0 + 1) * (y1 - y0 + 1));
+        int pos = y * w + x;
+        ridge[pos] = MAX (0.0, resid[pos] - local);
+        avg += ridge[pos];
+      }
+  avg /= n;
+  for (int i = 0; i < n; i++)
+    {
+      double d = ridge[i] - avg;
+      variance += d * d;
+    }
+  variance = sqrt (variance / n);
+  if (variance < GOODIX_FINGER_STD / 3.0)
+    return NULL;
+
+  return gx_sift_extract (ridge, w, h);
+}
+
 /* Captures one press and extracts its descriptors. */
 static GxSiftFeatures *
 gx_capture_features (FpiDeviceGoodix51A0 *self)
@@ -4570,6 +4632,34 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       else
         score = gx_score_probe_against_print (tmpl, probe, TRUE,
                                               &base_views, &adapt_views);
+
+      /* SHADOW ONLY: compare normalization on this SAME frame with the
+       * unmodified enrollment, and emit metadata. Never pass shadow score
+       * to FPI_MATCH_SUCCESS, retry policy, or template adaptation. A false
+       * finger remains subject exclusively to the regular matcher. */
+      if (tmpl && !gallery &&
+          g_strcmp0 (g_getenv ("GXFP_STALE_LOCAL_SHADOW_QA"), "1") == 0 &&
+          gx_background_age_us (self) > GX_BG_FRESH_MAX_US)
+        {
+          GxSiftFeatures *shadow = gx_stale_shadow_features (self, px);
+          guint shadow_points = shadow ? gx_sift_keypoints (shadow) : 0;
+          int shadow_best = 0;
+
+          if (shadow && shadow_points >= GX_MIN_CAPTURE_KEYPOINTS)
+            {
+              g_autoptr(GPtrArray) views = gx_views_from_print (tmpl);
+
+              for (guint j = 0; views && j < views->len; j++)
+                shadow_best = MAX (shadow_best,
+                    gx_sift_match (shadow, g_ptr_array_index (views, j)));
+            }
+          fp_warn ("GXFP51A0 STALE_SHADOW_QA age_ms=%d "
+                   "primary_score=%d shadow_score=%d shadow_points=%u "
+                   "decision=primary_only",
+                   (int) (gx_background_age_us (self) / 1000),
+                   score, shadow_best, shadow_points);
+          g_clear_pointer (&shadow, gx_sift_free);
+        }
 
       if (perf_qa)
         {

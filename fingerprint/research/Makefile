@@ -614,3 +614,8 @@ test_qa60_fdt_irq_miss_diagnostics:
 test: test_qa61_held_finger_fast
 test_qa61_held_finger_fast:
 	python3 ./tests/test_qa61_held_finger_fast.py
+
+.PHONY: test_qa62_stale_shadow
+test: test_qa62_stale_shadow
+test_qa62_stale_shadow:
+	python3 ./tests/test_qa62_stale_shadow.py
