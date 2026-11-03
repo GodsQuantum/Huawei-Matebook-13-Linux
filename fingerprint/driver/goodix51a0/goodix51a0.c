@@ -4178,10 +4178,17 @@ gx_score_probe_against_print (FpPrint *tmpl,
       best >= 3 && best < GX_MATCH_THRESHOLD && views)
     {
       static const double angles[] = { -12.0, 12.0, -6.0, 6.0 };
-      for (guint a = 0; a < G_N_ELEMENTS (angles); a++)
+      static const double additional_angles[] = { -18.0, 18.0 };
+      gboolean wide_rotation =
+        g_strcmp0 (g_getenv ("GXFP_WIDE_ROTATION_QA"), "1") == 0;
+      guint angle_count = G_N_ELEMENTS (angles) +
+                          (wide_rotation ? G_N_ELEMENTS (additional_angles) : 0);
+      for (guint a = 0; a < angle_count; a++)
         {
+          double angle = a < G_N_ELEMENTS (angles)
+                           ? angles[a] : additional_angles[a - G_N_ELEMENTS (angles)];
           g_autoptr(GxSiftFeatures) rotated = NULL;
-          rotated = gx_sift_rotate_extract (probe, angles[a]);
+          rotated = gx_sift_rotate_extract (probe, angle);
           if (!rotated || gx_sift_keypoints (rotated) < GX_MIN_CAPTURE_KEYPOINTS)
             continue;
           for (guint i = 0; i < views->len; i++)
@@ -4198,7 +4205,7 @@ gx_score_probe_against_print (FpPrint *tmpl,
                 continue;
               fp_warn ("GXFP51A0 ROTATION_RESCUE_QA angle=%d baseline=%d "
                        "rotated_score=%d view=%u overlap=%d zncc=%d agree=%d",
-                       (int)angles[a], best, score, i, overlap, zncc, agree);
+                       (int)angle, best, score, i, overlap, zncc, agree);
               return GX_MATCH_THRESHOLD;
             }
         }
