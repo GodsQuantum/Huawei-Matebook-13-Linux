@@ -87,7 +87,7 @@ grep -Fq 'native graphical Settings' "$a"
 grep -Fq -- '--pre-enroll' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$i"
 ! grep -Eq '^[[:space:]]*fprintd-(enroll|verify)[[:space:]]' "$a"
-grep -Fq 'PORTABLE_RELEASE="rel71.74-qa63.1"' "$i"
+grep -Fq 'PORTABLE_RELEASE="rel71.74-qa64.1"' "$i"
 
 # Never delete biometric templates or the validated per-unit PMK cache.
 ! grep -Eq 'rm .*goodix51a0-pmk' "$i"
@@ -118,7 +118,7 @@ echo 'test_portable_installer_source_safety: OK (production zero-to-working path
 
 # Reference rel71.74 native runtime config must be identical across distro
 # package and source installers and include all three proven opt-ins.
-for knob in GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1 GXFP_S4_MIDCAPTURE_REUSE_QA=1 GXFP_RESUME_PERF_QA=1 GXFP_CAPTURE_PERF_QA=1 GXFP_RESUME_FAST_SETTLE_QA=1 GXFP_RESUME_STAGE_QA=1 GXFP_PMK_CACHE_SKIP_RESET_QA=1 GXFP_HELD_FINGER_ROLLING_BG_QA=1 GXFP_POSTAUTH_CLEANUP_DEFER_QA=1 GXFP_DECOUPLE_ACK_PACING_QA=1 GXFP_ROTATION_RESCUE_QA=1 GXFP_WIDE_ROTATION_QA=1; do
+for knob in GXFP_S3_FRESH_BG_QA=1 GXFP_FDT_DOWN_PROOF_QA=1 GXFP_SPI_CS_SETUP_QA=1 GXFP_S4_MIDCAPTURE_REUSE_QA=1 GXFP_RESUME_PERF_QA=1 GXFP_CAPTURE_PERF_QA=1 GXFP_RESUME_FAST_SETTLE_QA=1 GXFP_RESUME_STAGE_QA=1 GXFP_PMK_CACHE_SKIP_RESET_QA=1 GXFP_HELD_FINGER_ROLLING_BG_QA=1 GXFP_POSTAUTH_CLEANUP_DEFER_QA=1 GXFP_DECOUPLE_ACK_PACING_QA=1 GXFP_ROTATION_RESCUE_QA=1 GXFP_WIDE_ROTATION_QA=1 GXFP_FDT_IRQ_EDGE_WATCH_QA=1; do
   grep -Fq "$knob" "$root/packaging/arch/fprintd-goodix51a0.conf"
   grep -Fq "$knob" "$i"
 done
