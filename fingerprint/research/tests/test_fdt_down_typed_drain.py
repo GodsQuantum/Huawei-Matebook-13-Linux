@@ -56,7 +56,7 @@ typedef struct {
   guint8 tls_rx[512];
   int tls_rxlen,tls_rxpos;
 } FpiDeviceGoodix51A0;
-static int scenario, ack_sent, data_sent, duplicate_sent;
+static int scenario, ack_sent, data_sent, duplicate_sent, edge_watch_calls;
 static gint64 clock_us;
 #define fp_dbg(...) ((void)0)
 #define fp_info(...) do { if(0) printf(__VA_ARGS__); } while(0)
@@ -76,7 +76,12 @@ static void gx_capture_transport_desync(FpiDeviceGoodix51A0 *d)
  * exercised by the QA64 kernel-event pipe unit test. */
 static int gx51_irq_edge_observe(int fd, uint64_t ack_ns, unsigned int ms,
                                  struct gx51_irq_edge_result *result)
-{(void)fd;(void)ack_ns;(void)ms;(void)result; return -1;}
+{
+ (void)fd;(void)ack_ns;(void)ms;
+ edge_watch_calls++;
+ memset(result,0,sizeof *result);
+ return 0;
+}
 static gboolean gxfp_parse_ack(const guint8 *b,gsize n,guint8 cmd,guint8 *status)
 {(void)n;(void)cmd;*status=1;return b[0]==0xA1;}
 static gboolean gxfp_ack_status_success(guint8 s){return (s & 1)!=0;}
@@ -104,7 +109,7 @@ static int gx_read_frame(FpiDeviceGoodix51A0 *d,guint8 *type,
 """ + BLOCK + r"""
 int main(int argc,char **argv)
 {
- if(argc != 3)return 98;
+ if(argc != 3 && argc != 4)return 98;
  scenario=atoi(argv[1]);
  if(atoi(argv[2]))setenv("GXFP_FDT_DOWN_TYPED_REPLY_QA","1",1);
  else unsetenv("GXFP_FDT_DOWN_TYPED_REPLY_QA");
@@ -112,10 +117,13 @@ int main(int argc,char **argv)
  else setenv("GXFP_FDT_DOWN_PROOF_QA","1",1);
  FpiDeviceGoodix51A0 dev={0};
  dev.timing_scale=100;
+ dev.irq_edge_watch_enabled=(argc==4 && atoi(argv[3])==1);
  const guint8 body[]={0x32};
  int ok=gx_send_plain_drain(&dev,body,sizeof body,NULL,NULL);
  if(ok && dev.desync!=0)return 97;
  if(!ok && dev.desync!=1)return 96;
+ if(dev.irq_edge_watch_enabled && edge_watch_calls!=(scenario==2 ? 1 : 0))
+   return 95;
  return ok?0:1;
 }
 """
@@ -132,9 +140,15 @@ class FdtDownTypedReply(unittest.TestCase):
                        check=True,capture_output=True,text=True)
     @classmethod
     def tearDownClass(cls): cls.tmp.cleanup()
-    def case(self,scenario,optin):
-        return subprocess.run([str(self.exe),str(scenario),str(int(optin))],
-                              check=False).returncode
+    def case(self,scenario,optin,edge_watch=False):
+        cmd=[str(self.exe),str(scenario),str(int(optin))]
+        if edge_watch:
+            cmd.append("1")
+        return subprocess.run(cmd,check=False).returncode
+    def test_qa64_edge_watch_on_missing_fdt_still_fails_closed(self):
+        self.assertEqual(self.case(2,False,True),1)
+    def test_qa64_edge_watch_not_invoked_on_good_report(self):
+        self.assertEqual(self.case(0,False,True),0)
     def test_early_ack_and_data_default(self):
         self.assertEqual(self.case(0,False),0)
     def test_late_second_reply_default_fails_closed(self):

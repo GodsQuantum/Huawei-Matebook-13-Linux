@@ -17,3 +17,11 @@
 ## Reversibility
 - QA64 Arch package: 1.94.100.goodix51a0.qa64-1, opt-in GPIO observer enabled solely for experiment. QA63 rollback package is preserved on Pegasus and Cloud9, SHA256 553c9fc2611d86f345eca1ad96f6ada501e9a4ea98371267a9ce7f1042f41b3c.
 - Rollback via local pacman -U, no print re-enrollment, firmware flash, sleep hook or reboot.
+
+## Actual Pegasus QA64 package / hardware smoke (2026-11-03, ~20:48-20:54 CET)
+- Experimental branch commit: 947bd31e44786b71e1e6e3b3ab296a1550869dcf, GitHub remote branch published; GitHub/main QA63 SHA 309978d unchanged.
+- Native Arch makepkg on Pegasus EXIT0 with 116/116 libfprint targets and no biosensor IO during build. Package SHA256 efd3cdd6dfde94bd37f4c5048e7667f725c9e2653259575a20703aad67e20cba; installed native libfprint SO SHA256 1dfbcfe2b9ed64411a31a9cecb834946bb18f3cccc650fcf15f8d97097d4f3fc, exact package extraction match.
+- First pacman -U directly from Cloud9 NFS was refused to root due to NFS root-squash; this did NOT install QA64. The fail-safe command reinstalled the unchanged SHA-verified QA63 package (Snapper root 2092/2093). Corrected by copying QA64 package to Pegasus local /tmp, SHA256 checked both as normal user and sudo/root, and installed with local pacman -U, Snapper root 2094 PRE / 2095 POST. 32/32 package files intact, fprintd stock 1.94.5-2.1 active, enrolled right-index-finger present, no enrollment changes, password preserved.
+- Verified on live GPIO cdev during a bounded 8s fprintd-verify smoke: gpioinfo reports gpiochip0 line48 input edges=rising consumer=goodix51a0-irq. The smoke was intentionally cancelled without a physical finger (timeout rc124, NOT a fingerprint authentication trial); fprintd remained active and ReleaseDevice errors were absent in subsequent logs.
+- QA64 package saved in Pegasus /var/cache/pacman/pkg with matching SHA256 for offline reinstall; QA63-1 stays alongside it for rollback. NFS canonical candidate archive retained. Build and smoke temporaries cleaned.
+- Physical LOCK/S3/S4 first-touch performance and whether an actual ACK-only event produces a rising IRQ remain UNVERIFIED. Never claim the observer repaired an FDT miss before an actual hardware FDT failure and post-watch log.
