@@ -6,14 +6,14 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 
 | Discipline | Temps | Version | Essai |
 |---|---:|---|---|
-| LOCK : doigt → succès | **1.158 s** | rel71.74-qa54+kde47 | lock-20261101-qa54-1212 |
+| LOCK : doigt → succès | **1.157 s** | rel71.74-qa57+kde47 | lock-20261101-qa57-194519 |
 | LOCK : KDE → succès | **3.488 s** | rel71.55 | lock-20261024-1 |
-| S3 : préchauffage | **4.254 s** | rel71.55 | s3-20261023-1 |
-| S3 : réveil → succès | **6.951 s** | rel71.55 | s3-20261023-1 |
+| S3 : préchauffage | **2.626 s** | rel71.74-qa63+kde47 | s3-20261103-qa63-151632 |
+| S3 : réveil → succès | **5.597 s** | rel71.74-qa63+kde47 | s3-20261103-qa63-151632 |
 
 ## Champion de vitesse : référence pour les futures QA
 
-- Record matériel **1.158 s** en première pose : **rel71.74-qa54+kde47** (lock-20261101-qa54-1212).
+- Record matériel **1.157 s** en première pose : **rel71.74-qa57+kde47** (lock-20261101-qa57-194519).
 - Examiner d'abord le code du champion, jamais uniquement la dernière branche QA ; comparer aussi à la version en production.
 - Ne pas confondre un gain de READY→DETECT avec une authentification plus rapide ou plus fiable. Les échecs du matcher disqualifient un candidat même si la détection est accélérée.
 - Conserver les correctifs indépendants validés (dont KDE sans souris), TLS, FDT strict et seuil biométrique 7.
@@ -71,6 +71,16 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | rel71.74-qa55+kde47 | S3 | 0/1 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
 | rel71.74-qa56+kde47 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa57+kde47 | LOCK | 1/2 | ÉCHEC de première pose |
+| rel71.74-qa57+kde47 | S3 | 1/1 | Nombre insuffisant |
+| rel71.74-qa57+fprintd-mr259 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa59+kde47 | S3 | 1/2 | ÉCHEC de première pose |
+| rel71.74-qa59.2+kde47 | S3 | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa60+kde47 | LOCK | 1/3 | ÉCHEC de première pose |
+| rel71.74-qa61+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa62+kde47 | LOCK | 0/1 | ÉCHEC de première pose |
+| rel71.74-qa63+kde47 | LOCK | 3/3 | Nombre insuffisant |
+| rel71.74-qa63+kde47 | S3 | 2/2 | Nombre insuffisant |
 
 ## Essais horodatés
 
@@ -150,6 +160,25 @@ Source canonique : [HARDWARE_TRIALS.csv](HARDWARE_TRIALS.csv). Les premières po
 | lock-20261101-qa56-165039 | 2026-11-01T16:50:39.274858+01:00 | rel71.74-qa56+kde47 | LOCK | 1 detected; physical unconfirmed | unknown | — | 0.084 | 1.725 | — | — | 7/7 |
 | s3-20261101-qa56-165120 | 2026-11-01T16:51:20.881670+01:00 | rel71.74-qa56+kde47 | S3 | 1 detected; physical unconfirmed | unknown | 4.147 | 0.084 | 1.794 | — | 6.852 | 7/7 |
 | s3-20261101-qa56-165147 | 2026-11-01T16:51:47.548953+01:00 | rel71.74-qa56+kde47 | S3 | 2 detected; physical unconfirmed | unknown | 4.155 | 0.083 | 1.732 | — | 11.317 | 7/7 |
+| lock-20261101-qa57-194519 | 2026-11-01T19:45:19.316071+01:00 | rel71.74-qa57+kde47 | LOCK | 1 | pass | — | 0.060 | 1.157 | — | — | 9/7 |
+| s3-20261101-qa57-195500 | 2026-11-01T19:55:00.285666+01:00 | rel71.74-qa57+kde47 | S3 | 2 detected; physical count unconfirmed | unknown | 3.781 | 0.084 | 1.227 | — | — | 7/7 |
+| s3-20261101-qa57-214932 | 2026-11-01T21:49:32.205312+01:00 | rel71.74-qa57+kde47 | S3 | 1 | pass | 3.538 | 0.083 | 1.173 | — | 6.609 | 21/7 |
+| s3-20261101-qa57-fprintd259-222809 | 2026-11-01T22:28:09.499958+01:00 | rel71.74-qa57+fprintd-mr259 | S3 | 5 | fail | 3.530 | 0.083 | 16.356 | — | 23.045 | 7/7 |
+| s3-20261102-qa59-132144 | 2026-11-02T13:21:44.318871+01:00 | rel71.74-qa59+kde47 | S3 | 3 detected; user 3-4 | fail | 3.537 | 0.088 | 19.492 | — | 25.991 | 7/7 |
+| s3-20261102-qa59-132231 | 2026-11-02T13:22:31.373465+01:00 | rel71.74-qa59+kde47 | S3 | 1 | pass | 3.544 | 0.083 | 1.248 | — | 5.918 | 7/7 |
+| s3-20261102-qa59-132429 | 2026-11-02T13:24:29.030792+01:00 | rel71.74-qa59+kde47 | S3 | 2 user reported; 1 detected mixed deep+s2idle | unknown | 3.538 | 0.085 | 1.232 | — | 7.556 | 7/7 |
+| s3-20261103-qa59.2-102743 | 2026-11-03T10:27:43.639536+01:00 | rel71.74-qa59.2+kde47 | S3 | 5 detected; operator reports failure, physical count unknown | fail | 3.563 | 0.084 | — | — | — | 5/7 |
+| lock-20261103-qa60-114706 | 2026-11-03T11:47:06.651727+01:00 | rel71.74-qa60+kde47 | LOCK | 2 | fail | — | 0.061 | 1.338 | — | — | 7/7 |
+| lock-20261103-qa60-114750 | 2026-11-03T11:47:50.258043+01:00 | rel71.74-qa60+kde47 | LOCK | >=6 operator; 6 detected | fail | — | 0.295 | 1.230 | — | — | 9/7 |
+| lock-20261103-qa60-120806 | 2026-11-03T12:08:07.699155+01:00 | rel71.74-qa60+kde47 | LOCK | 1 | pass | — | 0.084 | 1.240 | — | — | 7/7 |
+| lock-20261103-qa61-133446 | 2026-11-03T13:34:46.686154+01:00 | rel71.74-qa61+kde47 | LOCK | 5 detected; human physical count unknown | fail | — | 0.052 | — | — | — | 3/7 |
+| lock-20261103-qa62-140657 | 2026-11-03T14:06:57.844077+01:00 | rel71.74-qa62+kde47 | LOCK | 6 detected, operator multiple; final success after five failures | fail | — | 0.052 | 1.303 | — | — | 7/7 |
+| lock-20261103-qa57-hof-flags-preheld-144439 | 2026-11-03T14:44:39.601925+01:00 | rel71.74-qa57+kde47 | LOCK | multiple operator; 8 detected, final success | fail | — | 0.246 | 1.268 | — | — | 7/7 |
+| lock-20261103-qa63-151103 | 2026-11-03T15:11:03.329488+01:00 | rel71.74-qa63+kde47 | LOCK | 1 | pass | — | 0.052 | 1.177 | — | — | 14/7 |
+| lock-20261103-qa63-151120 | 2026-11-03T15:11:20.530517+01:00 | rel71.74-qa63+kde47 | LOCK | 1 | pass | — | 0.062 | 1.159 | — | — | 10/7 |
+| lock-20261103-qa63-151133 | 2026-11-03T15:11:33.670268+01:00 | rel71.74-qa63+kde47 | LOCK | 1 | pass | — | 0.062 | 1.246 | — | — | 7/7 |
+| s3-20261103-qa63-151605 | 2026-11-03T15:16:05.473086+01:00 | rel71.74-qa63+kde47 | S3 | 1 | pass | 2.862 | 0.083 | 1.223 | — | — | 7/7 |
+| s3-20261103-qa63-151632 | 2026-11-03T15:16:32.159235+01:00 | rel71.74-qa63+kde47 | S3 | 1 | pass | 2.626 | 0.085 | 1.212 | — | 5.597 | 7/7 |
 
 ## Registre antérieur au 13 octobre 2026
 

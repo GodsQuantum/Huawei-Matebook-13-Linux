@@ -19,7 +19,7 @@ class HallOfFameTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(hof.PAGE.read_text(encoding="utf-8"), hof.render(self.rows))
 
-    def test_qa54_new_record_qa42_preserved_and_qa50_rejected(self):
+    def test_qa54_reference_qa42_preserved_qa57_champion_and_qa50_rejected(self):
         by_id = {r["trial_id"]: r for r in self.rows}
         old = by_id["lock-20261030-qa42-0144"]
         latest = by_id["lock-20261101-qa54-1212"]
@@ -36,7 +36,13 @@ class HallOfFameTests(unittest.TestCase):
                  and r["first_touch"] == "pass"
                  and r["press_to_terminal_ms"]]
         champion = min(locks, key=lambda r: int(r["press_to_terminal_ms"]))
-        self.assertEqual(champion["trial_id"], latest["trial_id"])
+        # Historical QA54 stayed immutable; a later genuine first-touch QA57
+        # measured 1157ms (rounded), and must remain the speed champion.
+        self.assertEqual(champion["trial_id"], "lock-20261101-qa57-194519")
+        self.assertEqual(champion["version"], "rel71.74-qa57+kde47")
+        self.assertEqual(champion["press_to_terminal_ms"], "1157")
+        self.assertLess(int(champion["press_to_terminal_ms"]),
+                        int(latest["press_to_terminal_ms"]))
         qa49 = by_id["lock-20261101-qa49-held-poll-0310"]
         qa50 = by_id["lock-20261101-qa50-failed-0357"]
         self.assertEqual((qa49["first_touch"], qa49["press_to_terminal_ms"]),
@@ -98,9 +104,41 @@ class HallOfFameTests(unittest.TestCase):
         s3 = [r for r in self.rows if r["kind"] == "S3" and
               r["first_touch"] == "pass" and r["wake_to_terminal_ms"]]
         champion = min(s3, key=lambda r: int(r["wake_to_terminal_ms"]))
-        self.assertEqual(champion["version"], "rel71.55")
-        self.assertEqual(int(champion["wake_to_terminal_ms"]), 6951)
+        # The QA63 true S3 with an early pre-held finger takes 5597ms from
+        # resume event through verification. Old rel71.55 6951ms is retained.
+        self.assertEqual(champion["version"], "rel71.74-qa63+kde47")
+        self.assertEqual(champion["trial_id"], "s3-20261103-qa63-151632")
+        self.assertEqual(int(champion["wake_to_terminal_ms"]), 5597)
+        historical = next(r for r in s3 if r["version"] == "rel71.55"
+                          and r["wake_to_terminal_ms"] == "6951")
+        self.assertEqual(historical["first_touch"], "pass")
         self.assertFalse(any(r["version"] == "rel71.56" for r in s3))
+
+    def test_qa63_five_real_first_pose_results_and_old_failures_retained(self):
+        by_id = {r["trial_id"]: r for r in self.rows}
+        names = ["lock-20261103-qa63-151103",
+                 "lock-20261103-qa63-151120",
+                 "lock-20261103-qa63-151133",
+                 "s3-20261103-qa63-151605",
+                 "s3-20261103-qa63-151632"]
+        batch = [by_id[n] for n in names]
+        self.assertEqual([r["kind"] for r in batch], ["LOCK"] * 3 + ["S3"] * 2)
+        self.assertTrue(all(r["first_touch"] == "pass" and r["poses"] == "1"
+                            and r["threshold"] == "7" for r in batch))
+        self.assertEqual([r["press_to_terminal_ms"] for r in batch],
+                         ["1177", "1159", "1246", "1223", "1212"])
+        self.assertEqual([r["score"] for r in batch],
+                         ["14", "10", "7", "7", "7"])
+        self.assertEqual([r["prewarm_ms"] for r in batch[-2:]],
+                         ["2862", "2626"])
+        self.assertEqual(batch[-1]["wake_to_terminal_ms"], "5597")
+        self.assertFalse(batch[-2]["wake_to_terminal_ms"])
+        for failed in ("lock-20261103-qa61-133446",
+                       "lock-20261103-qa62-140657",
+                       "lock-20261103-qa57-hof-flags-preheld-144439"):
+            self.assertEqual(by_id[failed]["first_touch"], "fail", failed)
+        assert sum(r["version"] == "rel71.74-qa63+kde47"
+                   for r in self.rows) == 5
 
     def test_version_gates_are_separated(self):
         v = [r for r in self.rows if r["version"] == "rel71.58"]
