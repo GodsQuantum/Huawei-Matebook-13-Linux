@@ -36,7 +36,7 @@ assert "score <= GX_REPOSE_SCORE_CUTOFF" not in s
 assert "decision=final-for-pose" in auth
 assert "keypoints < GX_MIN_CAPTURE_KEYPOINTS" in auth
 assert auth.index("keypoints < GX_MIN_CAPTURE_KEYPOINTS") < min(
-    auth.index("gx_score_probe_against_print (tmpl, probe"),
+    re.search(r"gx_score_probe_against_print\s*\(\s*tmpl,\s*probe", auth).start(),
     auth.index("gx_score_probe_against_gallery (gallery, probe")
 )
 security=auth.index("Security boundary: the first usable image")

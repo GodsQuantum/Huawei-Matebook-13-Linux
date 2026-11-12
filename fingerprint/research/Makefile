@@ -575,3 +575,9 @@ test_fdt_down_typed_reply_behavior: prepare-build
 .PHONY: test_fdt_down_typed_drain_behavior
 test_fdt_down_typed_drain_behavior:
 	python3 ./tests/test_fdt_down_typed_drain.py
+
+# QA52: user-opt-in early accept only after a validated >=7 single-view Verify.
+.PHONY: test_verify_first_accept_qa
+test: test_verify_first_accept_qa
+test_verify_first_accept_qa:
+	python3 ./tests/test_verify_first_accept_qa.py
