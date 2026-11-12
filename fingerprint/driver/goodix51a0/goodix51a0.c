@@ -3340,6 +3340,12 @@ typedef struct
   GPtrArray      *identify_gallery; /* worker-owned FpPrint refs for 1:N */
   GxSiftFeatures *feat;            /* best capture result, NULL on failure */
   guint           same_press_images;
+  /* Score from the ONE quality-checked frame already matched in worker.
+   * QA opt-in reuses it instead of rerunning the entire 20-view matcher on
+   * the same immutable probe in the main-thread Verify callback. */
+  int             cached_verify_score;
+  guint           cached_verify_views;
+  guint           cached_verify_adapt_views;
   gboolean        ok;
 } GxWork;
 
@@ -3347,7 +3353,10 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images);
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_views,
+                            guint                *out_adapt_views);
 
 static void
 gx_work_free (GxWork *w)
@@ -3431,7 +3440,10 @@ gx_capture_thread (GTask *task, gpointer src, gpointer data, GCancellable *c)
   if (w->verify_print || w->identify_gallery)
     w->feat = gx_capture_auth_same_press (self, w->verify_print,
                                           w->identify_gallery,
-                                          &w->same_press_images);
+                                          &w->same_press_images,
+                                          &w->cached_verify_score,
+                                          &w->cached_verify_views,
+                                          &w->cached_verify_adapt_views);
   else
     w->feat = gx_capture_features (self);
   w->ok = (w->feat != NULL);
@@ -3967,7 +3979,10 @@ static GxSiftFeatures *
 gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
                             FpPrint              *tmpl,
                             GPtrArray            *gallery,
-                            guint                *out_images)
+                            guint                *out_images,
+                            int                  *out_score,
+                            guint                *out_views,
+                            guint                *out_adapt_views)
 {
   GxSiftFeatures *best_probe = NULL;
   int best_score = -1;
@@ -4043,7 +4058,8 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       if (gallery)
         score = gx_score_probe_against_gallery (gallery, probe, &candidate);
       else
-        score = gx_score_probe_against_print (tmpl, probe, NULL, NULL);
+        score = gx_score_probe_against_print (tmpl, probe, out_views,
+                                               out_adapt_views);
 
       fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press image %u/%u "
                "score=%d threshold=%d candidate=%u decision=final-for-pose",
@@ -4082,6 +4098,10 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
 
   if (out_images)
     *out_images = images;
+  /* After mandatory capture cleanup. A discarded/failed capture must
+   * never carry a stale match into the main-thread callback. */
+  if (out_score)
+    *out_score = best_probe ? best_score : -1;
 
   fp_warn ("GXFP51A0 AUTH_TRACE mode=%s same-press completed "
            "images=%u best=%d threshold=%d",
@@ -4276,9 +4296,32 @@ gx_capture_done (GObject *src, GAsyncResult *res, gpointer user_data)
               guint base_views = 0, adapt_views = 0;
 
               fpi_device_get_verify_data (dev, &tmpl);
-              int attempt_score = gx_score_probe_against_print (tmpl, t->probe,
-                                                                  &base_views,
-                                                                  &adapt_views);
+              int attempt_score;
+              if (g_strcmp0 (g_getenv ("GXFP_VERIFY_SCORE_CACHE_QA"), "1") == 0)
+                {
+                  /* Single press, single decision: reuse the score produced
+                   * by the capture worker on this exact immutable feature
+                   * set. Keep the established template / per-view rescue /
+                   * threshold 7 unchanged and leave Identify unaffected.
+                   * Bad/no-score images never reach this branch. */
+                  if (w->cached_verify_score < 0 || w->verify_print != tmpl)
+                    {
+                      fpi_ssm_mark_failed (ssm, fpi_device_error_new_msg (
+                        FP_DEVICE_ERROR_GENERAL,
+                        "cached verification score/template mismatch; fail closed"));
+                      return;
+                    }
+                  attempt_score = w->cached_verify_score;
+                  base_views = w->cached_verify_views;
+                  adapt_views = w->cached_verify_adapt_views;
+                  fp_info ("GXFP51A0 VERIFY_SCORE_CACHE_QA reused immutable "
+                           "worker verdict score=%d views=%u (no second match)",
+                           attempt_score, base_views);
+                }
+              else
+                attempt_score = gx_score_probe_against_print (tmpl, t->probe,
+                                                                &base_views,
+                                                                &adapt_views);
               t->best = MAX (t->best, attempt_score);
 
               fp_info ("verify: attempt %d/%d -> %d matches (best=%d threshold=%d, %u views + %u acquired)",
