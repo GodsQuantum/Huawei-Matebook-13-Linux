@@ -364,7 +364,7 @@ See:
 - [provenance](PROVENANCE.md)
 - [driver source](driver/goodix51a0/)
 - [research log](docs/research-log.md)
-- [current handoff](HANDOFF_CURRENT.md)
+- [current handoff](docs/rel71.74-production-20261028.md)
 
 The production driver subtree is `LGPL-2.1-or-later`; see per-file SPDX
 notices and [provenance](PROVENANCE.md).

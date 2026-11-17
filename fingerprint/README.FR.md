@@ -219,7 +219,7 @@ l'empreinte seule comme un facteur de sécurité haute assurance.
 
 Voir [intégration desktop](docs/native-desktop-integration.md),
 [provenance](PROVENANCE.md), [source](driver/goodix51a0/) et
-[research log](docs/research-log.md) et [handoff actuel](HANDOFF_CURRENT.md).
+[research log](docs/research-log.md) et [handoff actuel](docs/rel71.74-production-20261028.md).
 
 Le sous-arbre de production du pilote est `LGPL-2.1-or-later`.
 

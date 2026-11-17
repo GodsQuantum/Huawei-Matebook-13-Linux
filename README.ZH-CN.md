@@ -16,7 +16,7 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 
 </div>
 
-**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/HANDOFF_CURRENT.md)。rel71.69 为实验版（S4 不可靠），旧版本资料仅供历史查阅。
+**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/docs/rel71.74-production-20261028.md)。rel71.69 为实验版（S4 不可靠），旧版本资料仅供历史查阅。
 
 **指纹可靠性警告（2026-10-27）：** rel71.69 现在标记为**实验性预览版本**。一次真实 S4 休眠恢复需要 38.69 秒才能完成传感器准备，且指纹登录未成功。之前个别 LOCK、S3、S4 成功案例不能证明可靠性。参见 [问题 #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32)，务必保留密码登录。
 

@@ -83,4 +83,4 @@ bounded writes, explicit stop conditions and final GPIO264 LOW restoration.
 ## Documentation
 
 Keep `README.md` and `README.FR.md` semantically synchronized. Update
-[HANDOFF_CURRENT.md](HANDOFF_CURRENT.md) whenever the current boundary changes.
+[public release notes](docs/rel71.74-production-20261028.md) and the private HANDOFF_CURRENT.md (which must not be published) whenever the current boundary changes.

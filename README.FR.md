@@ -16,7 +16,7 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 
 </div>
 
-**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/HANDOFF_CURRENT.md). rel71.69 est expérimentale (S4 non fiable) ; les versions antérieures sont historiques.
+**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/docs/rel71.74-production-20261028.md). rel71.69 est expérimentale (S4 non fiable) ; les versions antérieures sont historiques.
 
 **Avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
 

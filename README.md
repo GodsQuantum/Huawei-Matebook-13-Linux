@@ -23,7 +23,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 </div>
 
-**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/HANDOFF_CURRENT.md). rel71.74 is the reference-machine production release; repeated S4 remains unverified (issue #32). Older rel71.69 data are historical.
+**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/docs/rel71.74-production-20261028.md). rel71.74 is the reference-machine production release; repeated S4 remains unverified (issue #32). Older rel71.69 data are historical.
 
 **Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 

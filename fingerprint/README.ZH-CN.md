@@ -183,6 +183,6 @@ rel24–rel61 的旧测试记录保存在[技术历史](docs/history/)、[研究
 - [provenance](PROVENANCE.md)
 - [驱动源码](driver/goodix51a0/)
 - [research log](docs/research-log.md)
-- [当前 handoff](HANDOFF_CURRENT.md)
+- [当前 handoff](docs/rel71.74-production-20261028.md)
 
 生产驱动子树使用 `LGPL-2.1-or-later`，具体以各文件 SPDX 标记和 [PROVENANCE.md](PROVENANCE.md) 为准。
