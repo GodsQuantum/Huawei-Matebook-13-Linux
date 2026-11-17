@@ -188,6 +188,7 @@ def main():
             layout.pack_end(buttons, False, False, 0)
             self.start_button = Gtk.Button(label=lang("Commencer", "Start"))
             self.start_button.connect("clicked", self.start)
+            self.finger.connect("changed", self.on_finger_changed)
             buttons.pack_start(self.start_button, False, False, 0)
             cancel = Gtk.Button(label=lang("Fermer / annuler", "Close / cancel"))
             cancel.connect("clicked", lambda *_: self.window.destroy())
@@ -208,17 +209,27 @@ def main():
                       in FINGERS if id_ not in existing]
             for id_, french, english in unused:
                 self.finger.append(id_, french if fr else english)
-            self.start_button.set_sensitive(bool(unused))
-            if unused:
-                self.finger.set_active(0)
-            self.message.set_text(lang(
-                "Seuls les doigts non enregistrés sont proposés. Pour "
-                "réenregistrer un doigt existant, supprimez uniquement celui-ci "
-                "dans les paramètres système, après vérification du mot de passe.",
-                "Only unenrolled fingers are offered. To replace an existing "
-                "print, delete only that finger in system settings after "
-                "checking your password fallback."))
+            # Never silently select the next available finger: the operator
+            # could present an already-enrolled index and see "duplicate".
+            self.finger.set_active(-1)
+            self.start_button.set_sensitive(False)
+            registered = ", ".join(
+                french if fr else english for id_, french, english in FINGERS
+                if id_ in existing)
+            self.message.set_text(
+                lang("Déjà enregistré(s) : ", "Already enrolled: ") +
+                (registered or lang("aucun", "none")) + ". " +
+                lang("Choisissez explicitement un doigt NON enregistré ci-dessus. "
+                     "Pour refaire l'index droit, vérifiez d'abord votre mot "
+                     "de passe et supprimez uniquement son empreinte dans KDE.",
+                     "Explicitly choose an UNENROLLED finger above. To redo "
+                     "right index, verify password login, then delete only "
+                     "that print using desktop settings."))
             self.render(0)
+
+        def on_finger_changed(self, *_):
+            self.start_button.set_sensitive(
+                self.finger.get_active_id() is not None and not self.claimed)
 
         def render(self, completed):
             index = min(19, completed)
@@ -270,6 +281,24 @@ def main():
                 self.message.set_text(lang(
                     "Testez maintenant les positions habituelles de déverrouillage.",
                     "Now test your normal unlocking positions."))
+                GLib.idle_add(self.cleanup)
+            elif status == "enroll-duplicate":
+                # fprintd runs a duplicate-identification check BEFORE the
+                # driver starts collecting its 20 enrollment views.
+                self.finished = True
+                self.message.set_text(lang(
+                    "Ce doigt a été reconnu comme une empreinte DÉJÀ "
+                    "enregistrée. Aucun nouvel enrôlement n'a commencé. "
+                    "Si vous avez présenté l'index droit, c'est normal : "
+                    "pour le refaire, supprimez uniquement l'ancien index "
+                    "dans KDE après vérification de votre mot de passe. "
+                    "Si c'était un autre doigt, ne supprimez rien : "
+                    "le résultat doit être diagnostiqué.",
+                    "This finger matched an ALREADY enrolled print. "
+                    "No new enrollment began. If this was your right index, "
+                    "remove only that print in desktop settings after "
+                    "checking password login. If it was a different finger, "
+                    "delete nothing: investigate the false duplicate."))
                 GLib.idle_add(self.cleanup)
             elif status in ("enroll-retry-scan", "enroll-finger-not-centered",
                             "enroll-remove-and-retry", "enroll-swipe-too-short",
