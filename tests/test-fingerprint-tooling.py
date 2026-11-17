@@ -82,6 +82,7 @@ for target in ("verify:", "build:", "research:", "passive-audit:"):
     require(target in makefile, f"Makefile target missing: {target}")
 
 require("make -C fingerprint verify" in readme, "README one-shot command missing")
-require("HANDOFF_CURRENT.md" in readme, "README current handoff link missing")
+require("docs/rel71.74-production-20261028.md" in readme, "README public current-release link missing")
+require((ROOT / "fingerprint/docs/rel71.74-production-20261028.md").is_file(), "public release note target missing")
 
 print("FINGERPRINT_TOOLING_TEST=PASS")
