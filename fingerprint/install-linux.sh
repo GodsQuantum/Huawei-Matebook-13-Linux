@@ -30,6 +30,8 @@ EARLY_WANTS_DIR="/etc/systemd/system/graphical.target.wants"
 EARLY_WANTS_LINK="$EARLY_WANTS_DIR/fprintd.service"
 KDE_HELPER_FILE="$LIBEXEC_DIR/gxfp51a0-kde-lockscreen-integrate"
 DOCTOR_FILE="$PREFIX/bin/gxfp51a0-doctor"
+GUIDE_FILE="$PREFIX/bin/gxfp51a0-enroll"
+GUIDE_DESKTOP="$PREFIX/share/applications/gxfp51a0-enroll.desktop"
 
 INSTALL_DEPS=1
 BUILD_ONLY=0
@@ -60,7 +62,7 @@ Options:
       Not needed on current Plasma 6 lock screens; native fprintd/PAM is the
       default and preferred cross-distro integration.
   --no-enroll
-      Compatibility option; enrollment always happens through your desktop GUI.
+      Compatibility option; the installer never enrolls a finger.
   --no-verify
       Compatibility option; verification always happens through your desktop GUI.
   --finger NAME
@@ -129,6 +131,24 @@ if [[ "$distro" == arch && "$BUILD_ONLY" -eq 0 ]]; then
   exec "$ROOT/install-arch.sh" "${ORIGINAL_ARGS[@]}"
 fi
 
+# A UI-only update never triggers a libfprint rebuild or fprintd restart.
+install_guided_helper() {
+  (( ! NO_DESKTOP_INTEGRATION )) || return 0
+  if [[ ! -f "$GUIDE_FILE" ]] || ! cmp -s "$ROOT/tools/gxfp51a0-enroll" "$GUIDE_FILE"; then
+    run_root install -Dm0755 "$ROOT/tools/gxfp51a0-enroll" "$GUIDE_FILE"
+  fi
+  if [[ ! -f "$GUIDE_DESKTOP" ]] || ! cmp -s "$ROOT/tools/gxfp51a0-enroll.desktop" "$GUIDE_DESKTOP"; then
+    run_root install -Dm0644 "$ROOT/tools/gxfp51a0-enroll.desktop" "$GUIDE_DESKTOP"
+  fi
+  if [[ -f "$STATE_DIR/manifest" ]]; then
+    local tmp_manifest
+    tmp_manifest="$(mktemp)"
+    { cat "$STATE_DIR/manifest"; printf '%s\n' "$GUIDE_FILE" "$GUIDE_DESKTOP"; } | sort -u > "$tmp_manifest"
+    run_root install -m0644 "$tmp_manifest" "$STATE_DIR/manifest"
+    rm -f "$tmp_manifest"
+  fi
+}
+
 portable_exact_installed() {
   (( BUILD_ONLY == 0 )) || return 1
   (( LEGACY_KDE_HELPER == 0 )) || return 1
@@ -143,6 +163,7 @@ portable_exact_installed() {
 }
 
 if portable_exact_installed; then
+  install_guided_helper
   echo "==> GXFP51A0 portable stack already exact: $PORTABLE_RELEASE"
   echo "    Preserving the live fprintd/TLS session; no rebuild or restart."
   if fprintd-list "$USER" 2>/dev/null | grep -q -- '-finger'; then
@@ -401,6 +422,9 @@ else
 fi
 printf '%s\n' "$DOCTOR_FILE" >> "$TMP_STATE/manifest"
 if (( ! NO_DESKTOP_INTEGRATION )); then
+  printf '%s\n' "$GUIDE_FILE" "$GUIDE_DESKTOP" >> "$TMP_STATE/manifest"
+fi
+if (( ! NO_DESKTOP_INTEGRATION )); then
   printf '%s\n' "$KDE_HELPER_FILE" >> "$TMP_STATE/manifest"
 fi
 sort -u -o "$TMP_STATE/manifest" "$TMP_STATE/manifest"
@@ -416,6 +440,10 @@ run_root mkdir -p "$PREFIX"
 run_root cp -a "$STAGE$PREFIX/." "$PREFIX/"
 run_root install -Dm0644 "$UDEV_RULE_SRC" "$UDEV_RULE_FILE"
 run_root install -Dm0755 "$ROOT/gxfp51a0-doctor.sh" "$DOCTOR_FILE"
+if (( ! NO_DESKTOP_INTEGRATION )); then
+  run_root install -Dm0755 "$ROOT/tools/gxfp51a0-enroll" "$GUIDE_FILE"
+  run_root install -Dm0644 "$ROOT/tools/gxfp51a0-enroll.desktop" "$GUIDE_DESKTOP"
+fi
 
 if (( ! SYSTEMD_AVAILABLE )); then
   cat > "$TMP_STATE/fprintd-wrapper" <<EOF

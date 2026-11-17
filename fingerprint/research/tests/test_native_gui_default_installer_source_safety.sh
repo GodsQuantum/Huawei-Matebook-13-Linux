@@ -9,8 +9,9 @@ pkgbuild="$root/fingerprint/packaging/arch/PKGBUILD"
 
 # Source-only: never execute install scripts or hardware I/O.
 grep -Eq '^pkgrel=[1-9][0-9]*(\.[0-9]+)*$' "$pkgbuild"
-grep -Fq 'PORTABLE_RELEASE="rel71.31-native-s3-preview1"' "$portable"
-grep -Fq 'rel71.30-portable1' "$controller"
+# Do not freeze the safety test to obsolete historical release IDs.
+grep -Eq '^PORTABLE_RELEASE="rel[0-9]+\.[0-9]+-[a-zA-Z0-9.\-]+"$' "$portable"
+grep -Fq 'fingerprint_expected_version()' "$controller"
 
 for installer in "$arch" "$portable"; do
   bash -n "$installer"
@@ -21,4 +22,8 @@ for installer in "$arch" "$portable"; do
   fi
 done
 
+# Optional guided GUI is packaged, but never automatically launched.
+grep -Fq 'gxfp51a0-enroll' "$pkgbuild"
+grep -Fq 'gxfp51a0-enroll' "$portable"
+! grep -Eq '^[[:space:]]*gxfp51a0-enroll[[:space:]]*$' "$portable"
 echo 'NATIVE_GUI_DEFAULT_INSTALLER_SOURCE_TEST=PASS'

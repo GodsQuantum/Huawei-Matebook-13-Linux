@@ -222,3 +222,16 @@ Voir [intégration desktop](docs/native-desktop-integration.md),
 [research log](docs/research-log.md) et [handoff actuel](HANDOFF_CURRENT.md).
 
 Le sous-arbre de production du pilote est `LGPL-2.1-or-later`.
+
+### Enrôlement guidé facultatif (toutes distributions Linux)
+
+Le package intègre gxfp51a0-enroll, interface GTK3/PyGObject qui utilise
+directement le D-Bus standard de fprintd. Elle guide les 20 captures :
+centre, haut/bas, gauche/droite, petites rotations et position naturelle.
+La progression avance uniquement sur les captures acceptées par le pilote ;
+les positions proposées ne sont pas mesurées par le capteur.
+
+Aucune empreinte existante n'est supprimée. Pour refaire l'index droit,
+vérifier d'abord le déverrouillage par mot de passe puis supprimer uniquement
+cet index dans les paramètres système. Python3, GTK3 et PyGObject sont requis.
+Aucun service, correctif KDE ou affaiblissement du seuil biométrique.

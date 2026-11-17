@@ -16,7 +16,12 @@ class CurrentRelease(unittest.TestCase):
   for file in ('README.md','AGENTS.md','docs/PROJECT_MAP.md',
                'fingerprint/HANDOFF_CURRENT.md','fingerprint/README.md'):
    with self.subTest(file=file):
-    front=(ROOT/file).read_text().splitlines()[:28]
+    path=ROOT/file
+    # The sensitive local handoff is intentionally excluded from the public
+    # GitHub source (privacy scrub). Validate it only when actually present.
+    if file=='fingerprint/HANDOFF_CURRENT.md' and not path.exists():
+     continue
+    front=path.read_text().splitlines()[:28]
     self.assertIn(CURRENT,' '.join(front),file+' current release pointer')
  def test_old_version_not_marked_only_or_current(self):
   for file in ('README.md','AGENTS.md','docs/PROJECT_MAP.md'):
@@ -35,6 +40,9 @@ class CurrentRelease(unittest.TestCase):
  def test_release_warning_not_whitewashed(self):
   for file in ('README.md','fingerprint/README.md','fingerprint/HANDOFF_CURRENT.md'):
    with self.subTest(file=file):
-    self.assertIn('rel71.69',(ROOT/file).read_text())
+    path=ROOT/file
+    if file=='fingerprint/HANDOFF_CURRENT.md' and not path.exists():
+     continue
+    self.assertIn('rel71.69',path.read_text())
   self.assertIn('S4',(ROOT/'fingerprint/docs/rel71.74-production-20261028.md').read_text())
 if __name__=='__main__':unittest.main()

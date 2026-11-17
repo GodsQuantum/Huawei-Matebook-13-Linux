@@ -45,9 +45,12 @@ You can alternatively clone the full repo and execute `./fingerprint/install.sh`
 
 Download the prebuilt `libfprint-goodix51a0-1.94.100.goodix51a0-71.74-x86_64.pkg.tar.zst` release asset. Compare its SHA-256 with the release notes and install via `sudo pacman -U` after reviewing package contents and conflicts. This replaces the distro `libfprint` package with the reviewed driver package; do not force package conflicts. The package includes native libfprint/fprintd resident configuration; no extra prewarm helper or sleep service.
 
-## Fingerprints — native GUI only
+## Fingerprints — native GUI or optional guided wizard
 
-**Do not enroll/delete fingers through the installer or a custom tool.** Open your distribution's graphical settings:
+**The installer never enrolls or deletes fingers.** Native KDE/GNOME
+settings remain the default. The optional packaged gxfp51a0-enroll wizard
+is an alternative fprintd graphical client for new fingers only, never an
+installer hook or a destructive fingerprint manager. Open your distribution's graphical settings:
 
 - **KDE Plasma:** System Settings → Users → Configure Fingerprint Authentication.
 - **GNOME:** Settings → System → Users → Fingerprint Login (wording may vary).
@@ -77,3 +80,10 @@ See [rel71.69 hardware proof](docs/rel71.69-hardware-final-20261027.md), the [Ha
 Cette archive contient **uniquement le pilote et son installateur**, pas le gestionnaire HUAWEI ni les outils GPU. Depuis la racine de l'archive extraite, lancer `./fingerprint/install.sh`. Ensuite, enregistrer et supprimer les empreintes **uniquement dans les paramètres graphiques natifs** (KDE → Utilisateurs ; GNOME → Utilisateurs). Aucun enrôlement n'est lancé automatiquement en ligne de commande.
 
 rel71.69 est la version de référence : LOCK, S4 et S3 réels ont réussi dès la première pose sur Pegasus (seuil 7 inchangé). Le S3 naturel a permis une authentification en 8,218 s depuis le réveil. Vérifier séparément les autres machines, les boots à froid, les cycles répétés et les doigts inconnus. Conserver les paquets de retour arrière vérifiés. Publier les retours avec configuration et statistiques agrégées, jamais avec des empreintes ou secrets.
+
+## Optional desktop-independent guided enrollment
+
+gxfp51a0-enroll is a GTK3 UI using native fprintd D-Bus Claim,
+EnrollStart, EnrollStatus, EnrollStop and Release. It advances only on
+accepted scans, suggests 20 gradually varied poses and preserves all existing
+prints. No PAM, libfprint, or KDE modifications and no automatic enrollment.

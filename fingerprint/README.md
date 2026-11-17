@@ -224,10 +224,27 @@ Non-KDE desktops are left unchanged. On KDE, one package-owned
 LockScreenUi.qml file is intentionally patched by the integration helper and
 restored on driver removal.
 
-Enroll, remove and verify fingerprints through your desktop's native graphical settings (KDE Plasma **System Settings → Users**, GNOME **Settings → Users**). The installer never starts command-line biometric enrollment or verification.
+By default, enroll, remove and verify fingerprints through your desktop's native graphical settings (KDE Plasma **System Settings → Users**, GNOME **Settings → Users**). The installer never starts command-line biometric enrollment or verification.
 
 The driver requests 20 enrollment presses. Move the finger slightly between
 presses so the small 80×64 sensor sees different parts of the fingertip.
+
+### Optional guided enrollment on any Linux desktop
+
+The driver package includes the optional GTK3/PyGObject graphical application
+gxfp51a0-enroll. It uses only the native fprintd D-Bus interface, not patched
+KDE or GNOME. It suggests 20 gently varied positions (center, upper/lower,
+left/right, small rotations, normal unlocking), advancing solely after accepted
+driver stages. Suggested poses are not verified measurements of finger coverage.
+
+Existing fingerprints are never removed or replaced by this application.
+Only unenrolled fingers are selectable. To redo an existing finger, first
+confirm that password login works, then delete only that finger with the
+desktop's native fingerprint settings. The installer never launches enrollment.
+Runtime UI packages: Python3, PyGObject, GTK3 (Arch: python, python-gobject,
+gtk3; Debian/Ubuntu: python3, python3-gi, gir1.2-gtk-3.0).
+No custom daemon, sleep hook, sensor image dump, or biometric threshold change.
+Successful completion is not a hardware/security certification.
 
 ### Existing development templates
 
