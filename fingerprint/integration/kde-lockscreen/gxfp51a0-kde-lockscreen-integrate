@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 TARGET="${GXFP51A0_KDE_LOCKSCREEN_QML:-/usr/share/plasma/shells/org.kde.plasma.desktop/contents/lockscreen/LockScreenUi.qml}"
 V10_MARKER="GXFP51A0 cpp-lifecycle-auth fingerprint integration v10"
+V11_MARKER="GXFP51A0 bounded-lockscreen-auth-retry fingerprint integration v11"
+V12_MARKER="GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12"
 V9_MARKER="GXFP51A0 native-S3-continuity fingerprint integration v9"
 V8_MARKER="GXFP51A0 upstream-suspend-safe fingerprint integration v8"
 V7_MARKER="GXFP51A0 resume-delay-aware fingerprint integration v7"
@@ -83,7 +85,7 @@ rewrite_modern_to_stock() {
 
     $0 == "        Component.onCompleted: {" { hold=$0; next }
     hold != "" && $0 == "            launchAnimation.start();" { hold=hold "\n" $0; next }
-    hold != "" && $0 ~ /GXFP51A0 (window-ready fingerprint integration v[345]|parallel-start fingerprint integration v6|resume-delay-aware fingerprint integration v7|upstream-suspend-safe fingerprint integration v8|native-S3-continuity fingerprint integration v9|cpp-lifecycle-auth fingerprint integration v10)/ { hold=hold "\n" $0; mark=1; next }
+    hold != "" && $0 ~ /GXFP51A0 (window-ready fingerprint integration v[345]|parallel-start fingerprint integration v6|resume-delay-aware fingerprint integration v7|upstream-suspend-safe fingerprint integration v8|native-S3-continuity fingerprint integration v9|cpp-lifecycle-auth fingerprint integration v10|bounded-lockscreen-auth-retry fingerprint integration v11)/ { hold=hold "\n" $0; mark=1; next }
     hold != "" && mark && $0 == "            authenticator.startAuthenticating();" { hold=hold "\n" $0; next }
     hold != "" && mark && $0 == "            gxfp51a0StartupAuthTimer.start();" { hold=hold "\n" $0; next }
     hold != "" && mark && $0 == "        }" {
@@ -494,24 +496,236 @@ apply_v10() {
   rewrite_v9_to_v10
 }
 
+rewrite_v10_to_v11() {
+  local tmp
+  tmp="$(mktemp "$TARGET.XXXXXX")"
+  awk '
+    /\/\/ GXFP51A0 window-ready startup timer BEGIN/ {
+      print
+      print "        Timer {"
+      print "            id: gxfp51a0StartupAuthTimer"
+      print "            interval: 500"
+      print "            repeat: true"
+      print "            triggeredOnStart: true"
+      print "            property int attempts: 0"
+      print "            onTriggered: {"
+      print "                attempts++;"
+      print "                if (attempts === 1) {"
+      print "                    console.info(\"GXFP51A0 v11: starting bounded startup/auth retry\");"
+      print "                }"
+      print "                if (lockScreenRoot.Window.window && !authenticator.unlocked) {"
+      print "                    // KDE 6.8 can drop the first call before its PAM worker is ready."
+      print "                    // Recover uiVisible after ActiveScreenMonitor deactivates"
+      print "                    // it during construction, otherwise KDE heartbeat never runs."
+      print "                    lockScreenRoot.uiVisible = true;"
+      print "                    authenticator.startAuthenticating();"
+      print "                }"
+      print "                if (authenticator.unlocked || attempts >= 16) {"
+      print "                    console.info(\"GXFP51A0 v11: bounded retry stopped attempts=\" + attempts"
+      print "                                 + \" uiVisible=\" + lockScreenRoot.uiVisible);"
+      print "                    stop();"
+      print "                }"
+      print "            }"
+      print "            onRunningChanged: {"
+      print "                if (running) {"
+      print "                    attempts = 0;"
+      print "                }"
+      print "            }"
+      print "        }"
+      inside=1
+      begin++
+      next
+    }
+    inside && /\/\/ GXFP51A0 window-ready startup timer END/ {
+      print
+      inside=0
+      end++
+      next
+    }
+    inside { next }
+    {
+      gsub(/GXFP51A0 cpp-lifecycle-auth fingerprint integration v10/,
+           "GXFP51A0 bounded-lockscreen-auth-retry fingerprint integration v11")
+      print
+      if (/GXFP51A0 bounded-lockscreen-auth-retry fingerprint integration v11/)
+        marker++
+    }
+    END { if (begin != 1 || end != 1 || marker != 1) exit 42 }
+  ' "$TARGET" > "$tmp" || {
+    rm -f "$tmp"
+    echo "GXFP51A0: unsupported QML; no v11 activation retry applied" >&2
+    return 42
+  }
+  chmod --reference="$TARGET" "$tmp"
+  chown --reference="$TARGET" "$tmp"
+  mv -f "$tmp" "$TARGET"
+}
+
+apply_v11() {
+  grep -Fq "$V11_MARKER" "$TARGET" && return 0
+  if ! grep -Fq "$V10_MARKER" "$TARGET"; then
+    apply_v10
+  fi
+  rewrite_v10_to_v11
+}
+
+rewrite_v11_to_v12() {
+  local tmp
+  tmp="$(mktemp "$TARGET.XXXXXX")"
+  awk '
+    $0 == "        property bool uiVisible: false" {
+      print
+      print "        // GXFP51A0 v12 silent-visual state BEGIN"
+      print "        property bool gxfp51a0SilentVisual: true"
+      print "        readonly property bool gxfp51a0ShowPrompt: uiVisible && !gxfp51a0SilentVisual"
+      print "        // GXFP51A0 v12 silent-visual state END"
+      prop++; next
+    }
+    $0 == "        onPressed: uiVisible = true;" {
+      print "        onPressed: { gxfp51a0SilentVisual = false; uiVisible = true; } // GXFP51A0 v12"
+      press++; next
+    }
+    $0 == "            uiVisible = seenPositionChange;" {
+      print
+      print "            // GXFP51A0 v12 mouse interaction BEGIN"
+      print "            if (seenPositionChange) gxfp51a0SilentVisual = false;"
+      print "            // GXFP51A0 v12 mouse interaction END"
+      motion++; next
+    }
+    $0 == "        onUiVisibleChanged: {" {
+      print
+      print "            // GXFP51A0 v12: reset visual state after fade-out/escape."
+      print "            if (!uiVisible) gxfp51a0SilentVisual = true; // GXFP51A0 v12"
+      vis++; next
+    }
+    $0 == "        onBlockUIChanged: {" { inblock=1; print; next }
+    inblock && $0 == "            if (blockUI) {" {
+      print
+      print "                gxfp51a0SilentVisual = false; // GXFP51A0 v12"
+      block++; inblock=0; next
+    }
+    $0 == "        Keys.onPressed: event => {" { inkeys=1; print; next }
+    inkeys && $0 == "            uiVisible = true;" {
+      print "            gxfp51a0SilentVisual = false; // GXFP51A0 v12"
+      print
+      keys++; inkeys=0; next
+    }
+    $0 == "        cursorShape: uiVisible ? Qt.ArrowCursor : Qt.BlankCursor" {
+      print "        cursorShape: gxfp51a0ShowPrompt ? Qt.ArrowCursor : Qt.BlankCursor"
+      cursor++; next
+    }
+    $0 == "            state: lockScreenRoot.uiVisible ? \"on\" : \"off\"" {
+      print "            state: lockScreenRoot.gxfp51a0ShowPrompt ? \"on\" : \"off\""
+      wallpaper++; next
+    }
+    $0 == "            opacity: lockScreenRoot.uiVisible ? 0 : 1" {
+      print "            opacity: lockScreenRoot.gxfp51a0ShowPrompt ? 0 : 1"
+      shadow++; next
+    }
+    $0 == "                lockScreenUiVisible: lockScreenRoot.uiVisible" {
+      print "                lockScreenUiVisible: lockScreenRoot.gxfp51a0ShowPrompt"
+      mainblock++; next
+    }
+    {
+      gsub(/GXFP51A0 bounded-lockscreen-auth-retry fingerprint integration v11/,
+           "GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12")
+      print
+      if (/GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12/)
+        marker++
+    }
+    END {
+      if (prop!=1 || press!=1 || motion!=1 || vis!=1 || block!=1 ||
+          keys!=1 || cursor!=1 || wallpaper!=1 || shadow!=1 ||
+          mainblock!=1 || marker!=1) exit 42
+    }
+  ' "$TARGET" > "$tmp" || {
+    rm -f "$tmp"
+    echo "GXFP51A0: unsupported QML; no v12 visual separation applied" >&2
+    return 42
+  }
+  chmod --reference="$TARGET" "$tmp"
+  chown --reference="$TARGET" "$tmp"
+  mv -f "$tmp" "$TARGET"
+}
+
+rewrite_v12_to_v11() {
+  local tmp
+  tmp="$(mktemp "$TARGET.XXXXXX")"
+  awk '
+    /\/\/ GXFP51A0 v12 silent-visual state BEGIN/ { silent=1; next }
+    silent && /\/\/ GXFP51A0 v12 silent-visual state END/ { silent=0; next }
+    silent { next }
+    /\/\/ GXFP51A0 v12 mouse interaction BEGIN/ { mouse=1; next }
+    mouse && /\/\/ GXFP51A0 v12 mouse interaction END/ { mouse=0; next }
+    mouse { next }
+    $0 == "        onPressed: { gxfp51a0SilentVisual = false; uiVisible = true; } // GXFP51A0 v12" {
+      print "        onPressed: uiVisible = true;"
+      next
+    }
+    /GXFP51A0 v12: reset visual state after fade-out\/escape/ { next }
+    /gxfp51a0SilentVisual = true; \/\/ GXFP51A0 v12/ { next }
+    /gxfp51a0SilentVisual = false; \/\/ GXFP51A0 v12/ { next }
+    $0 == "        cursorShape: gxfp51a0ShowPrompt ? Qt.ArrowCursor : Qt.BlankCursor" {
+      print "        cursorShape: uiVisible ? Qt.ArrowCursor : Qt.BlankCursor"
+      next
+    }
+    $0 == "            state: lockScreenRoot.gxfp51a0ShowPrompt ? \"on\" : \"off\"" {
+      print "            state: lockScreenRoot.uiVisible ? \"on\" : \"off\""
+      next
+    }
+    $0 == "            opacity: lockScreenRoot.gxfp51a0ShowPrompt ? 0 : 1" {
+      print "            opacity: lockScreenRoot.uiVisible ? 0 : 1"
+      next
+    }
+    $0 == "                lockScreenUiVisible: lockScreenRoot.gxfp51a0ShowPrompt" {
+      print "                lockScreenUiVisible: lockScreenRoot.uiVisible"
+      next
+    }
+    {
+      gsub(/GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12/,
+           "GXFP51A0 bounded-lockscreen-auth-retry fingerprint integration v11")
+      print
+    }
+  ' "$TARGET" > "$tmp" || { rm -f "$tmp"; return 42; }
+  chmod --reference="$TARGET" "$tmp"
+  chown --reference="$TARGET" "$tmp"
+  mv -f "$tmp" "$TARGET"
+}
+
+apply_v12() {
+  grep -Fq "$V12_MARKER" "$TARGET" && return 0
+  if ! grep -Fq "$V11_MARKER" "$TARGET"; then
+    apply_v11
+  fi
+  rewrite_v11_to_v12
+}
+
 case "$mode" in
   --apply)
-    apply_v10
+    apply_v12
     ;;
   --remove)
     grep -Fq "$V1_MARKER" "$TARGET" && rewrite_v1_to_stock
     grep -Fq "$V2_MARKER" "$TARGET" && rewrite_v2_to_stock
-    if grep -Fq "$V3_MARKER" "$TARGET" || grep -Fq "$V4_MARKER" "$TARGET" || grep -Fq "$V5_MARKER" "$TARGET" || grep -Fq "$V6_MARKER" "$TARGET" || grep -Fq "$V7_MARKER" "$TARGET" || grep -Fq "$V8_MARKER" "$TARGET" || grep -Fq "$V9_MARKER" "$TARGET" || grep -Fq "$V10_MARKER" "$TARGET"; then
+    grep -Fq "$V12_MARKER" "$TARGET" && rewrite_v12_to_v11
+    if grep -Fq "$V3_MARKER" "$TARGET" || grep -Fq "$V4_MARKER" "$TARGET" || grep -Fq "$V5_MARKER" "$TARGET" || grep -Fq "$V6_MARKER" "$TARGET" || grep -Fq "$V7_MARKER" "$TARGET" || grep -Fq "$V8_MARKER" "$TARGET" || grep -Fq "$V9_MARKER" "$TARGET" || grep -Fq "$V10_MARKER" "$TARGET" || grep -Fq "$V11_MARKER" "$TARGET"; then
       rewrite_modern_to_stock
     fi
     ;;
   --check)
-    grep -Fq "$V10_MARKER" "$TARGET"
+    grep -Fq "$V12_MARKER" "$TARGET"
+    grep -Fq 'property bool gxfp51a0SilentVisual: true' "$TARGET"
+    grep -Fq 'readonly property bool gxfp51a0ShowPrompt: uiVisible && !gxfp51a0SilentVisual' "$TARGET"
+    grep -Fq 'state: lockScreenRoot.gxfp51a0ShowPrompt ? "on" : "off"' "$TARGET"
+    grep -Fq 'lockScreenUiVisible: lockScreenRoot.gxfp51a0ShowPrompt' "$TARGET"
     grep -Fq 'id: gxfp51a0StartupAuthTimer' "$TARGET"
-    grep -Fq 'if (lockScreenRoot.Window.window)' "$TARGET"
+    grep -Fq 'interval: 500' "$TARGET"
+    grep -Fq 'authenticator.unlocked || attempts >= 16' "$TARGET"
+    grep -Fq 'authenticator.startAuthenticating();' "$TARGET"
+    grep -Fq 'if (lockScreenRoot.Window.window && !authenticator.unlocked)' "$TARGET"
     grep -Fq 'gxfp51a0StartupAuthTimer.start();' "$TARGET"
-    grep -A4 -F 'GXFP51A0 cpp-lifecycle-auth fingerprint integration v10' "$TARGET" | grep -Fq 'gxfp51a0StartupAuthTimer.start();'
-    ! grep -A4 -F 'GXFP51A0 cpp-lifecycle-auth fingerprint integration v10' "$TARGET" | grep -Fq 'authenticator.startAuthenticating();'
+    grep -A4 -F 'GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12' "$TARGET" | grep -Fq 'gxfp51a0StartupAuthTimer.start();'
+    ! grep -A4 -F 'GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12' "$TARGET" | grep -Fq 'authenticator.startAuthenticating();'
     grep -Fq 'Window.window.requestActivate();' "$TARGET"
     ! grep -Fq 'GXFP51A0 resume rearm BEGIN' "$TARGET"
     ! grep -Fq 'function onResumingFromSuspend()' "$TARGET"

@@ -603,3 +603,9 @@ test_qa63_rotation_synthetic: prepare-build
 	"$(BUILD_DIR)/test_qa63_rotation_synthetic"
 test_qa63_wide_rotation:
 	python3 ./tests/test_qa63_wide_rotation.py
+
+.PHONY: test_guided_enroll_cross_distro
+test_guided_enroll_cross_distro:
+	./tests/test_guided_enroll_cross_distro.sh
+
+test: test_guided_enroll_cross_distro

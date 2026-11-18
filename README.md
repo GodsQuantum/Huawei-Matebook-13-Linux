@@ -1,9 +1,5 @@
-**Installation depuis `main` : GXFP51A0 QA63.1, pilote actuellement installé sur Pegasus.**
-Le paquet Arch et le chemin portable sélectionnent QA63.1 ; `HUAWEI --fingerprint-only`
-préserve les empreintes, le GPU et les paramètres de la machine. QA63 a obtenu
-3/3 LOCK et 2/2 S3 en une pose sur Pegasus, mais rejet d'un doigt inconnu
-avec ±18°, véritable S4 et démarrage à froid restent à certifier.
-La release historique rel71.74 reste identifiée séparément.
+**Current GitHub `main` installer: GXFP51A0 QA63.1, installed on the reference Pegasus laptop.**
+The Arch and portable installers select QA63.1; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
 
 <div align="center">
 
@@ -23,7 +19,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 </div>
 
-**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/HANDOFF_CURRENT.md). rel71.74 is the reference-machine production release; repeated S4 remains unverified (issue #32). Older rel71.69 data are historical.
+**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/docs/rel71.74-production-20261028.md). QA63.1 is the current installer driver; rel71.74 is the latest **published** reference release. Full hardware certification, especially repeated S4, remains open (issue #32). Older rel71.69 data are historical.
 
 **Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 
@@ -31,7 +27,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 **Fingerprint driver only:** `./fingerprint/install.sh` ([standalone archive](fingerprint/DRIVER_ONLY.md)). **Full MateBook 13 setup (fingerprint + MX250):** `./install.sh`. **Read-only compatibility check:** `./install.sh --doctor-only`.
 
-Run everything as your regular desktop user, **not root**. Enroll or remove fingerprints using **KDE/GNOME's native graphical settings**, never a custom enrollment tool.
+Run installers as your regular desktop user, **not root**. KDE/GNOME native settings manage existing fingerprints. The separate optional [GXFP51A0 guided enrollment application](fingerprint/README.md#optional-guided-enrollment-on-any-linux-desktop) (`gxfp51a0-enroll`) registers new fingers through native fprintd. It **does not open from KDE fingerprint settings**.
 
 ## One command
 
@@ -78,7 +74,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 | Area | Status | Policy |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.74 reference-machine production · repeated S4 not certified** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
+| **Fingerprint** | **QA63.1 current installer · genuine S4 and cold boot not certified** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
 | **MX250 power** | **GPU Manager v3.2** | Intel-first session; MX250 PCI-off while idle; R580 + PRIME only for managed dGPU apps |
 | **Huawei hotkeys / Fn-lock / battery interfaces** | **Mainline Linux** | Use `huawei_wmi`; do not duplicate it |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **Native Linux** | Verify only |
@@ -86,6 +82,16 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 | **Firmware / BIOS** | **Distro/vendor-owned** | Never flash automatically |
 
 ## Fingerprint
+
+**Reference status (18 November 2026):** Pegasus runs QA63.1 with two enrolled
+fingers. The independently launched `gxfp51a0-enroll` app re-enrolled the
+right index. Several direct fingerprint unlocks under KDE Plasma 6.8.3
+succeeded without mouse movement after an **opt-in, Pegasus-specific** KDE
+v12 lockscreen workaround. Five of six recent scored index placements met
+the unchanged threshold 7; one needed repositioning. Two real **deep-S3** sleep/resume cycles after the v12 workaround also recovered fingerprint login, but both needed repositioning. Cold boot, first-touch S3 reliability, battery use and repeatable S4 are **not certified**.
+The password fallback remains available. See
+[hardware certification gates](fingerprint/docs/real-hardware-certification.md)
+and [guided enrollment](fingerprint/README.md#optional-guided-enrollment-on-any-linux-desktop).
 
 **Historical rel71.69 hardware measurements (not current install):** Actual reference MateBook 13 with GXFP51A0 passed three operator-attested first-touch authentications (LOCK, S4 hibernation return, genuine deep S3 on 27 October 2026). Native S3 became ready after 5.153 s, positive after 8.218 s from wake; measured finger-to-positive 2.054 s and score 15/7. rel71.69 adds native 50 µs SPI CS-to-clock setup validated using kernel SPI tracepoints, plus proven clean S3 reference and strict FDT acknowledgement gates. **More S3 cycles, cold boots, reboots and wrong-finger testing are still required for broader certification.** Prior rel71.30 and rel71.24 data are preserved as historical references. See [rel71.69 measured hardware evidence](fingerprint/docs/rel71.69-hardware-final-20261027.md) and the [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 

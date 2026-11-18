@@ -1,0 +1,344 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Portable GXFP51A0 guided enrollment using fprintd's standard D-Bus API.
+
+No biometric material is exported, and existing enrolled fingers are never
+deleted. This is an optional UI, not a replacement fprintd service/driver.
+"""
+import argparse
+import locale
+import sys
+
+BUS = "net.reactivated.Fprint"
+MANAGER_PATH = "/net/reactivated/Fprint/Manager"
+MGR_IFACE = BUS + ".Manager"
+DEV_IFACE = BUS + ".Device"
+
+FINGERS = (
+    ("right-index-finger", "Index droit", "Right index"),
+    ("right-middle-finger", "Majeur droit", "Right middle"),
+    ("right-thumb", "Pouce droit", "Right thumb"),
+    ("right-ring-finger", "Annulaire droit", "Right ring"),
+    ("right-little-finger", "Auriculaire droit", "Right little"),
+    ("left-index-finger", "Index gauche", "Left index"),
+    ("left-middle-finger", "Majeur gauche", "Left middle"),
+    ("left-thumb", "Pouce gauche", "Left thumb"),
+    ("left-ring-finger", "Annulaire gauche", "Left ring"),
+    ("left-little-finger", "Auriculaire gauche", "Left little"),
+)
+
+# Start with a connected central anchor. Positions are *suggestions*, not
+# measured sensor poses. The driver independently decides whether to accept.
+POSES = (
+    ("Centre, position naturelle", "Center, natural position"),
+    ("Centre, reposer naturellement", "Center, natural reposition"),
+    ("Centre, varier très légèrement", "Center, tiny variation"),
+    ("Centre, comme pour déverrouiller", "Center, usual unlocking pose"),
+    ("Un peu plus haut sur la pulpe", "Slightly higher on fingertip"),
+    ("En haut, petit décalage", "Upper part, small shift"),
+    ("Revenir au centre", "Return to center"),
+    ("Un peu plus bas sur la pulpe", "Slightly lower on fingertip"),
+    ("En bas, petit décalage", "Lower part, small shift"),
+    ("Revenir au centre", "Return to center"),
+    ("Pulpe légèrement à gauche", "Slightly left finger pad"),
+    ("À gauche, petit décalage", "Left side, small shift"),
+    ("Revenir au centre", "Return to center"),
+    ("Pulpe légèrement à droite", "Slightly right finger pad"),
+    ("À droite, petit décalage", "Right side, small shift"),
+    ("Revenir au centre", "Return to center"),
+    ("Pivoter légèrement à gauche", "Rotate slightly left"),
+    ("Pivoter légèrement à droite", "Rotate slightly right"),
+    ("Position naturelle, petite variation", "Natural pose, small variation"),
+    ("Position habituelle de déverrouillage", "Usual unlocking pose"),
+)
+
+def stage_count(events, total):
+    """Some fprintd builds insert an extra, internal 21st ID stage."""
+    return min(20, max(0, events - (1 if total == 21 else 0)))
+
+def validate():
+    assert len(POSES) == 20
+    assert len(set(f[0] for f in FINGERS)) == 10
+    assert stage_count(0, 21) == 0
+    assert stage_count(1, 21) == 0
+    assert stage_count(5, 21) == 4
+    assert stage_count(21, 21) == 20
+    assert stage_count(7, 20) == 7
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--check", action="store_true", help="read-only UI and device check")
+    args = parser.parse_args()
+    validate()
+    if args.self_test:
+        print("ENROLL_GUIDE_PLAN=PASS (20 poses, no hardware access)")
+        return 0
+
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gio, GLib, Gtk
+    except (ImportError, ValueError) as exc:
+        print("Missing PyGObject/GTK3 (Arch: python-gobject gtk3; "
+              "Debian: python3-gi gir1.2-gtk-3.0): " + str(exc),
+              file=sys.stderr)
+        return 3
+
+    def proxy(path, iface):
+        return Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SYSTEM,
+            Gio.DBusProxyFlags.NONE, None, BUS, path, iface, None)
+
+    def call(obj, method, args=None):
+        return obj.call_sync(method, args, Gio.DBusCallFlags.NONE, 12000, None)
+
+    try:
+        manager = proxy(MANAGER_PATH, MGR_IFACE)
+        path = call(manager, "GetDefaultDevice").unpack()[0]
+        device = proxy(path, DEV_IFACE)
+        prop = device.get_cached_property("name")
+        devname = str(prop.unpack()) if prop else ""
+        if "GXFP51A0" not in devname:
+            raise RuntimeError("Expected Goodix GXFP51A0; got " + devname)
+    except (GLib.Error, RuntimeError) as exc:
+        print("Fingerprint device unavailable: " + str(exc), file=sys.stderr)
+        return 4
+    if args.check:
+        print("ENROLL_GUIDE_CHECK=PASS (" + devname + ")")
+        return 0
+
+    fr = (locale.getlocale()[0] or "").lower().startswith("fr")
+    def lang(fr_text, en_text):
+        return fr_text if fr else en_text
+
+    def list_prints():
+        try:
+            response = call(device, "ListEnrolledFingers",
+                            GLib.Variant("(s)", ("",)))
+            return set(response.unpack()[0])
+        except GLib.Error as exc:
+            if "NoEnrolledPrints" in str(exc):
+                return set()
+            raise
+
+    def read_num_stages():
+        try:
+            response = device.get_connection().call_sync(
+                BUS, path, "org.freedesktop.DBus.Properties", "Get",
+                GLib.Variant("(ss)", (DEV_IFACE, "num-enroll-stages")),
+                GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 5000, None)
+            value = int(response.unpack()[0])
+            if value in (20, 21):
+                return value
+        except (GLib.Error, ValueError, TypeError):
+            pass
+        return 20
+
+    class Wizard:
+        def __init__(self):
+            self.claimed = False
+            self.active = False
+            self.finished = False
+            self.events = 0
+            self.total = 20
+            self.window = Gtk.Window(title=lang(
+                "GXFP51A0 — Enrôlement guidé", "GXFP51A0 — Guided enrollment"))
+            self.window.set_default_size(625, 380)
+            self.window.set_border_width(20)
+            self.window.connect("destroy", self.close)
+            layout = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+            self.window.add(layout)
+
+            heading = Gtk.Label()
+            heading.set_markup("<b>" + lang(
+                "20 captures guidées — KDE, GNOME et autres distributions",
+                "20 guided captures — KDE, GNOME and other desktops") + "</b>")
+            heading.set_xalign(0)
+            layout.pack_start(heading, False, False, 0)
+
+            intro = Gtk.Label(label=lang(
+                "Déplacez très légèrement le doigt entre les captures. "
+                "Le capteur, pas cet assistant, valide chaque image. "
+                "Aucune empreinte existante n'est supprimée.",
+                "Slightly move your finger between scans. "
+                "The sensor, not this assistant, accepts each frame. "
+                "No existing fingerprint is deleted."))
+            intro.set_line_wrap(True)
+            intro.set_xalign(0)
+            layout.pack_start(intro, False, False, 0)
+
+            self.finger = Gtk.ComboBoxText()
+            layout.pack_start(self.finger, False, False, 0)
+
+            self.instruction = Gtk.Label()
+            self.instruction.set_xalign(0)
+            self.instruction.set_line_wrap(True)
+            layout.pack_start(self.instruction, False, False, 0)
+
+            self.progress = Gtk.ProgressBar()
+            self.progress.set_show_text(True)
+            layout.pack_start(self.progress, False, False, 0)
+
+            self.message = Gtk.Label()
+            self.message.set_line_wrap(True)
+            self.message.set_xalign(0)
+            layout.pack_start(self.message, False, False, 0)
+
+            buttons = Gtk.Box(spacing=12)
+            layout.pack_end(buttons, False, False, 0)
+            self.start_button = Gtk.Button(label=lang("Commencer", "Start"))
+            self.start_button.connect("clicked", self.start)
+            self.finger.connect("changed", self.on_finger_changed)
+            buttons.pack_start(self.start_button, False, False, 0)
+            cancel = Gtk.Button(label=lang("Fermer / annuler", "Close / cancel"))
+            cancel.connect("clicked", lambda *_: self.window.destroy())
+            buttons.pack_start(cancel, False, False, 0)
+            device.connect("g-signal", self.signal)
+            self.refresh()
+            self.window.show_all()
+
+        def refresh(self):
+            try:
+                existing = list_prints()
+            except GLib.Error as exc:
+                self.message.set_text(str(exc))
+                self.start_button.set_sensitive(False)
+                return
+            self.finger.remove_all()
+            unused = [(id_, french, english) for id_, french, english
+                      in FINGERS if id_ not in existing]
+            for id_, french, english in unused:
+                self.finger.append(id_, french if fr else english)
+            # Never silently select the next available finger: the operator
+            # could present an already-enrolled index and see "duplicate".
+            self.finger.set_active(-1)
+            self.start_button.set_sensitive(False)
+            registered = ", ".join(
+                french if fr else english for id_, french, english in FINGERS
+                if id_ in existing)
+            self.message.set_text(
+                lang("Déjà enregistré(s) : ", "Already enrolled: ") +
+                (registered or lang("aucun", "none")) + ". " +
+                lang("Choisissez explicitement un doigt NON enregistré ci-dessus. "
+                     "Pour refaire l'index droit, vérifiez d'abord votre mot "
+                     "de passe et supprimez uniquement son empreinte dans KDE.",
+                     "Explicitly choose an UNENROLLED finger above. To redo "
+                     "right index, verify password login, then delete only "
+                     "that print using desktop settings."))
+            self.render(0)
+
+        def on_finger_changed(self, *_):
+            self.start_button.set_sensitive(
+                self.finger.get_active_id() is not None and not self.claimed)
+
+        def render(self, completed):
+            index = min(19, completed)
+            self.instruction.set_markup("<b>" + lang("Capture", "Scan") +
+                " " + str(index + 1) + "/20</b>\n" + POSES[index][0 if fr else 1])
+            self.progress.set_fraction(completed / 20)
+            self.progress.set_text(str(completed) + "/20")
+
+        def start(self, *_):
+            selected = self.finger.get_active_id()
+            if not selected or self.claimed:
+                return
+            try:
+                call(device, "Claim", GLib.Variant("(s)", ("",)))
+                self.claimed = True
+                if selected in list_prints():
+                    raise RuntimeError(lang("Doigt déjà enregistré",
+                                            "Finger already enrolled"))
+                self.total = read_num_stages()
+                self.events = 0
+                call(device, "EnrollStart", GLib.Variant("(s)", (selected,)))
+                self.active = True
+                self.start_button.set_sensitive(False)
+                self.finger.set_sensitive(False)
+                self.message.set_text(lang(
+                    "Posez puis retirez le doigt à chaque indication.",
+                    "Touch, then lift your finger at each instruction."))
+            except (GLib.Error, RuntimeError) as exc:
+                self.message.set_text(lang("Démarrage impossible : ",
+                                           "Could not start: ") + str(exc))
+                self.cleanup()
+                self.start_button.set_sensitive(True)
+
+        def signal(self, obj, sender, name, parameters):
+            if name != "EnrollStatus" or not self.claimed or self.finished:
+                return
+            status, done = parameters.unpack()
+            if status == "enroll-stage-passed":
+                self.events += 1
+                self.render(stage_count(self.events, self.total))
+                self.message.set_text(lang(
+                    "Capture acceptée. Retirez le doigt, puis suivez la suite.",
+                    "Capture accepted. Lift your finger, then follow the next step."))
+            elif status == "enroll-completed":
+                self.finished = True
+                self.render(20)
+                self.instruction.set_markup("<b>" + lang(
+                    "Enrôlement terminé.", "Enrollment complete.") + "</b>")
+                self.message.set_text(lang(
+                    "Testez maintenant les positions habituelles de déverrouillage.",
+                    "Now test your normal unlocking positions."))
+                GLib.idle_add(self.cleanup)
+            elif status == "enroll-duplicate":
+                # fprintd runs a duplicate-identification check BEFORE the
+                # driver starts collecting its 20 enrollment views.
+                self.finished = True
+                self.message.set_text(lang(
+                    "Ce doigt a été reconnu comme une empreinte DÉJÀ "
+                    "enregistrée. Aucun nouvel enrôlement n'a commencé. "
+                    "Si vous avez présenté l'index droit, c'est normal : "
+                    "pour le refaire, supprimez uniquement l'ancien index "
+                    "dans KDE après vérification de votre mot de passe. "
+                    "Si c'était un autre doigt, ne supprimez rien : "
+                    "le résultat doit être diagnostiqué.",
+                    "This finger matched an ALREADY enrolled print. "
+                    "No new enrollment began. If this was your right index, "
+                    "remove only that print in desktop settings after "
+                    "checking password login. If it was a different finger, "
+                    "delete nothing: investigate the false duplicate."))
+                GLib.idle_add(self.cleanup)
+            elif status in ("enroll-retry-scan", "enroll-finger-not-centered",
+                            "enroll-remove-and-retry", "enroll-swipe-too-short",
+                            "enroll-too-fast"):
+                self.message.set_text(lang(
+                    "Capture refusée : étape inchangée. Réessayez un peu plus "
+                    "au centre, avec moins d'inclinaison.",
+                    "Scan rejected: no progress. Try nearer the center "
+                    "with less rotation."))
+            else:
+                self.message.set_text(lang("Échec / erreur : ", "Failure: ") + status)
+                if done or status in ("enroll-failed", "enroll-duplicate",
+                                      "enroll-data-full", "enroll-disconnected",
+                                      "enroll-unknown-error"):
+                    self.finished = True
+                    GLib.idle_add(self.cleanup)
+
+        def cleanup(self):
+            if self.active:
+                try:
+                    call(device, "EnrollStop")
+                except GLib.Error:
+                    pass
+                self.active = False
+            if self.claimed:
+                try:
+                    call(device, "Release")
+                except GLib.Error:
+                    pass
+                self.claimed = False
+            return False
+
+        def close(self, *_):
+            self.cleanup()
+            Gtk.main_quit()
+
+    Wizard()
+    Gtk.main()
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+

@@ -1,4 +1,10 @@
-**Version installée sur Pegasus et par défaut sur GitHub main : QA63-1 (3 novembre 2026).** Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
+**Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**
+**KDE sur Pegasus (18 novembre) :** le correctif Plasma 6.8.3 v12,
+facultatif, lance la biométrie sans déplacement de souris et masque
+l'invite. L'index réenregistré a déverrouillé plusieurs fois ; une pose
+a été refusée sous le seuil 7. Les autres bureaux gardent fprintd/PAM
+natif. Deux veilles **S3 profondes réelles** depuis v12 ont permis la biométrie après repositionnement. La certification sur trois cycles, la première pose après veille, la consommation, le démarrage à froid et S4 restent ouverts.
+ Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
 
 **Version historique publiée sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
 
@@ -17,11 +23,11 @@ famille Huawei MateBook 13 2021.
 
 Pilote libfprint natif avec temporisation SPI CS de 50 µs vérifiée par traçage noyau. Trois succès matériels à la première pose sur le MateBook 13 (LOCK, hibernation S4, veille profonde S3). S3 : réveil→succès 8,218 s, doigt→succès 2,054 s, score 15/7. L'intégration KDE/Polkit utilise fprintd et préserve le mot de passe. Le seuil 7 et TLS-GCM sont intacts. Voir [preuve rel71.69](docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](docs/HALL_OF_FAME.md). Certification multi-appareils et démarrages froids non réalisée. Les notes rel71.30/71.24 ci-dessous sont historiques.
 
-## État actuel — 8 octobre 2026
+## État historique — 8 octobre 2026
 
 ### Préversion recommandée rel71.30
 
-rel71.30 est désormais installée par défaut. Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
+À l'époque, rel71.30 était installée par défaut (aujourd'hui remplacée par QA63.1). Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
 
 Le recovery décisif s'exécute avant l'énumération libfprint :
 
@@ -108,7 +114,7 @@ Depuis la racine du dépôt :
 
 L'installateur vérifie la présence du `GXFP51A0`, compile le patch libfprint, installe `libfprint-goodix51a0` et `fprintd`, ajoute uniquement l'accès gpiochip nécessaire et installe un prime boot one-shot. Il n'installe ni keepalive périodique ni hook externe de reprise S3. Sur Plasma 6.7.5 uniquement, il applique aussi les intégrations KDE/Plasma Login Manager package-managed, idempotentes et réversibles ; les autres bureaux gardent leur intégration fprintd/PAM native.
 
-Ensuite utilise uniquement l'interface graphique native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**). Le programme d'installation n'exécute pas de commande d'enrôlement ou de vérification biométrique.
+Ensuite, l'interface native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**) reste le choix par défaut ; l'assistant guidé optionnel est une application **distincte**. L'installateur n'enrôle et ne vérifie jamais d'empreintes automatiquement.
 
 Le pilote demande 20 poses. Déplace légèrement le doigt entre les poses afin de
 couvrir plusieurs zones du doigt.
@@ -219,6 +225,26 @@ l'empreinte seule comme un facteur de sécurité haute assurance.
 
 Voir [intégration desktop](docs/native-desktop-integration.md),
 [provenance](PROVENANCE.md), [source](driver/goodix51a0/) et
-[research log](docs/research-log.md) et [handoff actuel](HANDOFF_CURRENT.md).
+[research log](docs/research-log.md) et [handoff actuel](docs/rel71.74-production-20261028.md).
 
 Le sous-arbre de production du pilote est `LGPL-2.1-or-later`.
+
+### Enrôlement guidé facultatif (toutes distributions Linux)
+
+Le package intègre `gxfp51a0-enroll`, interface GTK3/PyGObject utilisant
+le D-Bus standard de fprintd. Ouvrir l'application **Empreintes guidées GXFP51A0**
+dans le menu KDE (ou lancer `gxfp51a0-enroll`). **Paramètres système KDE →
+Utilisateurs → Empreintes** ouvre toujours l'interface KDE native,
+**pas** cet assistant indépendant. Elle guide les 20 captures :
+centre, haut/bas, gauche/droite, petites rotations et position naturelle.
+La progression avance uniquement sur les captures acceptées par le pilote ;
+les positions proposées ne sont pas mesurées par le capteur.
+
+Aucune empreinte existante n'est supprimée. Pour refaire l'index droit,
+vérifier d'abord le déverrouillage par mot de passe puis supprimer uniquement
+cet index dans les paramètres système. Python3, GTK3 et PyGObject sont requis.
+L'assistant ne propose que les doigts non enregistrés. Pour identifier un doigt,
+le pilote compare **toutes les empreintes enregistrées**, pas seulement la
+première, et conserve le meilleur score au-dessus du seuil fixe de 7.
+Après inscription, vérifier le déverrouillage par plusieurs tentatives réelles.
+Aucun service supplémentaire, correctif KDE ou affaiblissement du seuil biométrique.

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=GXFP51A0 Guided Fingerprint Enrollment
+Name[fr]=Empreintes guidées GXFP51A0
+GenericName=Fingerprint Enrollment
+GenericName[fr]=Enrôlement d'empreintes
+Comment=Enroll 20 varied fingerprint views through native fprintd
+Comment[fr]=Enregistrer 20 vues variées via fprintd natif
+Exec=gxfp51a0-enroll
+Icon=dialog-password
+Terminal=false
+Categories=Settings;
+StartupNotify=true
