@@ -10,13 +10,13 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 [![Linux distro builds](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml/badge.svg)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/actions/workflows/fingerprint-portability.yml)
 [![License](https://img.shields.io/badge/license-GPL--2.0%20%2B%20LGPL--2.1-3dd7cf)](LICENSES.md)
 [![Linux](https://img.shields.io/badge/platform-Linux-0B1622)](docs/HARDWARE_SUPPORT_MATRIX.md)
-[![Release](https://img.shields.io/badge/fingerprint-rel71.69%20EXPERIMENTAL-critical)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.69)
+[![Release](https://img.shields.io/badge/fingerprint-rel71.74%20REFERENCE-informational)](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/tag/matebook13-rel71.74)
 
 [**English**](README.md) · [**Français**](README.FR.md) · [**简体中文**](README.ZH-CN.md)
 
 </div>
 
-**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/docs/rel71.74-production-20261028.md)。rel71.69 为实验版（S4 不可靠），旧版本资料仅供历史查阅。
+**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/docs/rel71.74-production-20261028.md)。QA63.1 为当前安装器驱动；rel71.74 为最近的已发布参考版。多次 S4 可靠性仍未认证。
 
 **指纹可靠性警告（2026-10-27）：** rel71.69 现在标记为**实验性预览版本**。一次真实 S4 休眠恢复需要 38.69 秒才能完成传感器准备，且指纹登录未成功。之前个别 LOCK、S3、S4 成功案例不能证明可靠性。参见 [问题 #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32)，务必保留密码登录。
 
@@ -81,6 +81,14 @@ Huawei MateBook 13 `WRTB-WXX9`：
 | **Firmware / BIOS** | **发行版/厂商负责** | 绝不自动刷写 |
 
 ## 指纹
+
+**参考机状态（2026-11-18）：** Pegasus 使用 QA63.1 驱动，已录入右手食指和中指。
+通过独立的 `gxfp51a0-enroll` 向导重新录入食指后，KDE Plasma 6.8.3
+使用**仅限 Pegasus 的可选 v12 补丁**，可在不移动鼠标时直接触摸解锁。
+最近六次评分五次达到不变的阈值 7，一次需重新放置手指。
+新补丁尚未完成冷启动、真正 deep-S3、重复 S4 验证；保留密码登录。
+参见[硬件认证标准](fingerprint/docs/real-hardware-certification.md)和
+[引导式录入](fingerprint/README.ZH-CN.md#可选的图形化指纹录入向导)。
 
 **历史数据 — rel71.69（当前已非默认版本）**。在参考 MateBook 13 上，2026 年 10 月 27 日的普通锁屏、S4 休眠恢复及真实 S3 深度睡眠恢复均一次按指成功。S3 恢复后 5.153 秒完成传感器预热、8.218 秒完成认证，得分 15/7。通过 Linux 内核 SPI 跟踪确认 50 微秒 Chip Select 准备时间；保留密码登录、TLS 和固定阈值 7。其他设备、冷启动、多次 S3 和非录入手指测试仍需进一步验证。参见 [rel71.69 硬件记录](fingerprint/docs/rel71.69-hardware-final-20261027.md)。
 

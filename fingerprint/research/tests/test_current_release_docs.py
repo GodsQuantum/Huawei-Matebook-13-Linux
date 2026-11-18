@@ -45,4 +45,55 @@ class CurrentRelease(unittest.TestCase):
      continue
     self.assertIn('rel71.69',path.read_text())
   self.assertIn('S4',(ROOT/'fingerprint/docs/rel71.74-production-20261028.md').read_text())
+ def test_current_source_vs_published_release(self):
+  pkgver=re.search(r'^pkgver=(.+)$',PKG.read_text(),re.M).group(1)
+  self.assertIn('goodix51a0.qa63',pkgver)
+  self.assertEqual((ROOT/'fingerprint/STABLE_RELEASE').read_text().strip(),'rel71.74')
+  for file in ('README.md','README.FR.md','README.ZH-CN.md',
+               'fingerprint/README.md','fingerprint/README.FR.md','fingerprint/README.ZH-CN.md'):
+   with self.subTest(file=file):
+    text=(ROOT/file).read_text()
+    self.assertIn('QA63.1',text)
+    self.assertIn('rel71.74',text)
+    self.assertIn('gxfp51a0-enroll',text)
+    self.assertIn('fprintd',text)
+    self.assertIn('KDE',text)
+  for file in ('AGENTS.md','docs/PROJECT_MAP.md'):
+   with self.subTest(file=file):
+    text=(ROOT/file).read_text()
+    self.assertIn('QA63.1',text)
+    self.assertIn('rel71.74',text)
+  for file in ('README.md','README.FR.md','README.ZH-CN.md'):
+   with self.subTest(file=file):
+    text=(ROOT/file).read_text()
+    self.assertIn('releases/tag/matebook13-rel71.74',text)
+    self.assertNotIn('fingerprint-rel71.69%20EXPERIMENTAL',text)
+
+ def test_published_asset_urls_and_historical_constraints(self):
+  text=(ROOT/'fingerprint/DRIVER_ONLY.md').read_text()
+  base='https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/download/matebook13-rel71.74/'
+  self.assertIn(base+'gxfp51a0-driver-only-rel71.74.tar.gz',text)
+  self.assertIn(base+'libfprint-goodix51a0-1.94.100.goodix51a0-71.74-x86_64.pkg.tar.zst',text)
+  self.assertNotIn('from the rel71.69 GitHub release',text)
+  self.assertIn('predate',text)
+  zh=(ROOT/'fingerprint/README.ZH-CN.md').read_text()
+  self.assertNotIn('推荐使用 rel71.30 预览版',zh)
+  en=(ROOT/'fingerprint/README.md').read_text()
+  self.assertNotIn('rel71.30 is the default install.',en)
+
+ def test_active_markdown_relative_links_exist(self):
+  import urllib.parse
+  for file in ('README.md','README.FR.md','README.ZH-CN.md',
+               'fingerprint/README.md','fingerprint/README.FR.md',
+               'fingerprint/README.ZH-CN.md','fingerprint/DRIVER_ONLY.md',
+               'fingerprint/docs/README.md','docs/PROJECT_MAP.md'):
+   p=ROOT/file
+   for match in re.finditer(r'(?<!!)\[[^][]+\]\(([^)]+)\)',p.read_text()):
+    target=match.group(1).strip().split(' ')[0].strip('<>')
+    if not target or target.startswith(('http:','https:','#','mailto:')):continue
+    if '{' in target:continue
+    resolved=urllib.parse.unquote(target.split('#')[0].split('?')[0])
+    with self.subTest(file=file,target=target):
+     self.assertTrue((p.parent/resolved).exists())
+
 if __name__=='__main__':unittest.main()

@@ -1,4 +1,11 @@
-**Version installée sur Pegasus et par défaut sur GitHub main : QA63-1 (3 novembre 2026).** Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
+**Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**
+**KDE sur Pegasus (18 novembre) :** le correctif Plasma 6.8.3 v12,
+facultatif, lance la biométrie sans déplacement de souris et masque
+l'invite. L'index réenregistré a déverrouillé plusieurs fois ; une pose
+a été refusée sous le seuil 7. Les autres bureaux gardent fprintd/PAM
+natif. La veille S3 réelle, la batterie, le démarrage à froid et S4
+avec ce nouveau correctif restent à certifier.
+ Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
 
 **Version historique publiée sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
 
@@ -21,7 +28,7 @@ Pilote libfprint natif avec temporisation SPI CS de 50 µs vérifiée par traça
 
 ### Préversion recommandée rel71.30
 
-rel71.30 est désormais installée par défaut. Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
+À l'époque, rel71.30 était installée par défaut (aujourd'hui remplacée par QA63.1). Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
 
 Le recovery décisif s'exécute avant l'énumération libfprint :
 

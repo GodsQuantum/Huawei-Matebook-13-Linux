@@ -82,5 +82,4 @@ bounded writes, explicit stop conditions and final GPIO264 LOW restoration.
 
 ## Documentation
 
-Keep `README.md` and `README.FR.md` semantically synchronized. Update
-[public release notes](docs/rel71.74-production-20261028.md) and the private HANDOFF_CURRENT.md (which must not be published) whenever the current boundary changes.
+Keep all root and fingerprint `README.md`, `README.FR.md` and `README.ZH-CN.md` translations synchronized. Distinguish QA63.1 installer source from separately published rel71.74 release assets. Update [public certification requirements](docs/real-hardware-certification.md) when relevant and the private canonical workspace handoff (never publish) when the current boundary changes.

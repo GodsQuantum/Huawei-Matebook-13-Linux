@@ -1,4 +1,11 @@
-**GitHub main / Pegasus installed default: QA63-1 (3 November 2026).** The Arch package and portable installers select QA63, matching the installed driver on Pegasus. Three LOCK and two genuine deep-S3 trials succeeded on the first physical placement; the ±18° unknown-finger, repeated S4, BOOT and REBOOT gates remain unverified. Keep the password fallback. The rel71.74 tag below remains the previous public release, not the current mainline installer.
+**Current source installer: QA63.1 (18 November 2026); Pegasus currently runs QA63-1.**
+**Pegasus-specific KDE status (18 November):** The opt-in Plasma 6.8.3
+v12 lockscreen workaround starts biometric authentication without pointer
+movement and keeps the prompt visually hidden. A new right-index enrollment
+succeeded and several real unlocks passed, with one below-threshold placement.
+Other desktops use their native fprintd/PAM integration. Genuine S3, battery,
+cold boot and S4 **after this workaround** are not certified.
+ The Arch package and portable installers select QA63, matching the installed driver on Pegasus. Three LOCK and two genuine deep-S3 trials succeeded on the first physical placement; the ±18° unknown-finger, repeated S4, BOOT and REBOOT gates remain unverified. Keep the password fallback. The rel71.74 tag below remains the previous public release, not the current mainline installer.
 
 **Historical tagged reference release: rel71.74 (28 October 2026).** The driver retains a proven clean ImageBase for an already-held finger after sleep, and preserves a TLS-GCM-authenticated positive score if later sensor cleanup fails while invalidating that transport for next use. LOCK succeeded at first physical touch; the operator reported S3 first-touch success. A more recent S3/S4 test was aborted *before suspend* because KDE and the Cloud9 NFS automount blocked the freezer. **Repeatable S4 and cross-device reliability are not established.** Keep password fallback. See [release evidence](docs/rel71.74-production-20261028.md).
 
@@ -24,7 +31,7 @@ Earlier rel71.30 and rel71.24 reference notes below are historical, not the curr
 
 ### Recommended preview: rel71.30 (reference-machine field test)
 
-rel71.30 is the default install. Native KDE enrollment followed by eight successful scored verification captures on the reference MateBook 13 at threshold 7 (7, 10, 7, 13, 9, 11, 11, 19). No post-enrollment ACK/TLS errors were logged during that series. This is not a population-level false-acceptance estimate. rel71.24 is still the last fully cold-boot/deep-S3 validated rollback (rel71.18 older immutable reference).
+At that historical time rel71.30 was the default (superseded by QA63.1). Native KDE enrollment followed by eight successful scored verification captures on the reference MateBook 13 at threshold 7 (7, 10, 7, 13, 9, 11, 11, 19). No post-enrollment ACK/TLS errors were logged during that series. This is not a population-level false-acceptance estimate. rel71.24 is still the last fully cold-boot/deep-S3 validated rollback (rel71.18 older immutable reference).
 
 ### Changes in rel71.30
 
@@ -77,7 +84,7 @@ The installer is idempotent: an exact current release is a no-op for the live se
 
 ## Driver-only distribution (no Huawei/GPU manager)
 
-The [driver-only installation guide](DRIVER_ONLY.md) covers the **independent source archive** and prebuilt Arch/CachyOS package attached to the rel71.30 GitHub pre-release. Both use standard libfprint → fprintd → native Linux desktop interfaces and require no HUAWEI Whiptail manager, GPU tools or project-specific enrollment UI. Only the exact GXFP51A0/ST411 hardware profile is in scope; distribution and board differences require independent confirmation.
+The [driver-only installation guide](DRIVER_ONLY.md) covers current source and the separately published rel71.74 assets. Older rel71.74 archives predate the optional guided wizard. Both use standard libfprint → fprintd → native Linux desktop interfaces and require no HUAWEI Whiptail manager, GPU tools or project-specific enrollment UI. Only the exact GXFP51A0/ST411 hardware profile is in scope; distribution and board differences require independent confirmation.
 
 ## Quick start: zero fingerprint support → working stack
 
@@ -100,9 +107,8 @@ The installer:
 7. uses the desktop's native fprintd/PAM integration by default; optional legacy Plasma integrations are never applied silently;
 8. preserves password authentication in parallel;
 9. preserves existing fingerprint templates and the validated PMK cache;
-10. instructs users to enroll with their distribution's native GUI (KDE/GNOME), without invoking CLI enrollment;
-11. preserves existing finger templates;
-12. finishes with `gxfp51a0-doctor`.
+10. supports KDE/GNOME native settings and a separate optional guided UI, without automatically enrolling fingers;
+11. finishes with `gxfp51a0-doctor`.
 
 The installer deliberately refuses to enable `pam_fprintd` globally when doing
 so would serialize password authentication behind a fingerprint timeout.
