@@ -22,9 +22,11 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 
 ## 选择安装方式
 
+**当前 `main` 安装器默认：QA63.1**（参考机 Pegasus 已有 3/3 次 LOCK 和 2/2 次 deep S3 首次触摸成功；其他场景仍需验证）。rel71.74 为历史发布版本，请始终保留密码登录。
+
 **仅安装指纹驱动：** `./fingerprint/install.sh`（[独立源码包](fingerprint/DRIVER_ONLY.md)）。**完整 MateBook 13 配置（指纹 + MX250）：** `./install.sh`。**只读硬件检查：** `./install.sh --doctor-only`。
 
-请以**普通桌面用户**身份执行，不要直接使用 root。指纹的录入和删除仅通过 **KDE/GNOME 原生图形设置**完成，不使用自定义录入工具。
+请以**普通桌面用户**身份运行安装程序，不要直接使用 root。KDE/GNOME 原生设置可管理已有指纹；另有独立的 [GXFP51A0 可选引导式录入程序](fingerprint/README.ZH-CN.md#可选的图形化指纹录入向导)（`gxfp51a0-enroll`），通过 fprintd 录入新手指。该程序**不会从 KDE 指纹设置中自动启动**。
 
 ## 一条命令
 
@@ -71,7 +73,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **rel71.69 实验性预览 · S4 恢复可能失败** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
+| **指纹** | **QA63.1 当前版本 · S4 尚未认证** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |
@@ -80,7 +82,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-**默认指纹安装版本：rel71.69**。在参考 MateBook 13 上，2026 年 10 月 27 日的普通锁屏、S4 休眠恢复及真实 S3 深度睡眠恢复均一次按指成功。S3 恢复后 5.153 秒完成传感器预热、8.218 秒完成认证，得分 15/7。通过 Linux 内核 SPI 跟踪确认 50 微秒 Chip Select 准备时间；保留密码登录、TLS 和固定阈值 7。其他设备、冷启动、多次 S3 和非录入手指测试仍需进一步验证。参见 [rel71.69 硬件记录](fingerprint/docs/rel71.69-hardware-final-20261027.md)。
+**历史数据 — rel71.69（当前已非默认版本）**。在参考 MateBook 13 上，2026 年 10 月 27 日的普通锁屏、S4 休眠恢复及真实 S3 深度睡眠恢复均一次按指成功。S3 恢复后 5.153 秒完成传感器预热、8.218 秒完成认证，得分 15/7。通过 Linux 内核 SPI 跟踪确认 50 微秒 Chip Select 准备时间；保留密码登录、TLS 和固定阈值 7。其他设备、冷启动、多次 S3 和非录入手指测试仍需进一步验证。参见 [rel71.69 硬件记录](fingerprint/docs/rel71.69-hardware-final-20261027.md)。
 
 - 参考机 warm FAST_READY 约 **82–83 ms**
 - GPIO264 active-HIGH 短脉冲 recovery

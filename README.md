@@ -1,9 +1,5 @@
-**Installation depuis `main` : GXFP51A0 QA63.1, pilote actuellement installé sur Pegasus.**
-Le paquet Arch et le chemin portable sélectionnent QA63.1 ; `HUAWEI --fingerprint-only`
-préserve les empreintes, le GPU et les paramètres de la machine. QA63 a obtenu
-3/3 LOCK et 2/2 S3 en une pose sur Pegasus, mais rejet d'un doigt inconnu
-avec ±18°, véritable S4 et démarrage à froid restent à certifier.
-La release historique rel71.74 reste identifiée séparément.
+**Current GitHub `main` installer: GXFP51A0 QA63.1, installed on the reference Pegasus laptop.**
+The Arch and portable installers select QA63.1; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
 
 <div align="center">
 
@@ -31,7 +27,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 **Fingerprint driver only:** `./fingerprint/install.sh` ([standalone archive](fingerprint/DRIVER_ONLY.md)). **Full MateBook 13 setup (fingerprint + MX250):** `./install.sh`. **Read-only compatibility check:** `./install.sh --doctor-only`.
 
-Run everything as your regular desktop user, **not root**. Enroll or remove fingerprints using **KDE/GNOME's native graphical settings**, never a custom enrollment tool.
+Run installers as your regular desktop user, **not root**. KDE/GNOME native settings manage existing fingerprints. The separate optional [GXFP51A0 guided enrollment application](fingerprint/README.md#optional-guided-enrollment-on-any-linux-desktop) (`gxfp51a0-enroll`) registers new fingers through native fprintd. It **does not open from KDE fingerprint settings**.
 
 ## One command
 

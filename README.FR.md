@@ -22,9 +22,11 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 
 ## Choisir son installation
 
+**Version actuellement sélectionnée par les installateurs de `main` : QA63.1** (sur Pegasus : 3/3 LOCK et 2/2 S3 en une pose ; les autres scénarios restent à certifier). La release rel71.74 est historique ; conserver l'accès par mot de passe.
+
 **Pilote d’empreintes seul :** `./fingerprint/install.sh` ([archive autonome](fingerprint/DRIVER_ONLY.md)). **Configuration complète (empreintes + MX250) :** `./install.sh`. **Vérification du matériel sans modification :** `./install.sh --doctor-only`.
 
-Lancez ces commandes comme **utilisateur normal**, pas en root. Pour enregistrer ou supprimer une empreinte, utilisez **les paramètres graphiques natifs de KDE/GNOME**, jamais un outil d’enrôlement personnalisé.
+Lancez les installateurs comme **utilisateur normal**, pas en root. KDE/GNOME gère les empreintes existantes ; l'[assistant guidé GXFP51A0](fingerprint/README.FR.md#enrôlement-guidé-facultatif-toutes-distributions-linux) (`gxfp51a0-enroll`) enregistre un nouveau doigt via fprintd. Cette application est indépendante : elle **ne s'ouvre pas** depuis les paramètres d'empreintes KDE.
 
 ## Une seule commande
 
@@ -71,7 +73,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **rel71.69 EXPÉRIMENTALE · échec intermittent au retour S4** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
+| **Fingerprint** | **QA63.1 actuelle · fiabilité S4 non certifiée** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -80,7 +82,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-**Installation par défaut : rel71.69.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
+**Historique — rel71.69, désormais remplacée par QA63.1.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;

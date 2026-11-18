@@ -17,7 +17,7 @@ famille Huawei MateBook 13 2021.
 
 Pilote libfprint natif avec temporisation SPI CS de 50 µs vérifiée par traçage noyau. Trois succès matériels à la première pose sur le MateBook 13 (LOCK, hibernation S4, veille profonde S3). S3 : réveil→succès 8,218 s, doigt→succès 2,054 s, score 15/7. L'intégration KDE/Polkit utilise fprintd et préserve le mot de passe. Le seuil 7 et TLS-GCM sont intacts. Voir [preuve rel71.69](docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](docs/HALL_OF_FAME.md). Certification multi-appareils et démarrages froids non réalisée. Les notes rel71.30/71.24 ci-dessous sont historiques.
 
-## État actuel — 8 octobre 2026
+## État historique — 8 octobre 2026
 
 ### Préversion recommandée rel71.30
 
@@ -108,7 +108,7 @@ Depuis la racine du dépôt :
 
 L'installateur vérifie la présence du `GXFP51A0`, compile le patch libfprint, installe `libfprint-goodix51a0` et `fprintd`, ajoute uniquement l'accès gpiochip nécessaire et installe un prime boot one-shot. Il n'installe ni keepalive périodique ni hook externe de reprise S3. Sur Plasma 6.7.5 uniquement, il applique aussi les intégrations KDE/Plasma Login Manager package-managed, idempotentes et réversibles ; les autres bureaux gardent leur intégration fprintd/PAM native.
 
-Ensuite utilise uniquement l'interface graphique native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**). Le programme d'installation n'exécute pas de commande d'enrôlement ou de vérification biométrique.
+Ensuite, l'interface native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**) reste le choix par défaut ; l'assistant guidé optionnel est une application **distincte**. L'installateur n'enrôle et ne vérifie jamais d'empreintes automatiquement.
 
 Le pilote demande 20 poses. Déplace légèrement le doigt entre les poses afin de
 couvrir plusieurs zones du doigt.
@@ -225,8 +225,11 @@ Le sous-arbre de production du pilote est `LGPL-2.1-or-later`.
 
 ### Enrôlement guidé facultatif (toutes distributions Linux)
 
-Le package intègre gxfp51a0-enroll, interface GTK3/PyGObject qui utilise
-directement le D-Bus standard de fprintd. Elle guide les 20 captures :
+Le package intègre `gxfp51a0-enroll`, interface GTK3/PyGObject utilisant
+le D-Bus standard de fprintd. Ouvrir l'application **Empreintes guidées GXFP51A0**
+dans le menu KDE (ou lancer `gxfp51a0-enroll`). **Paramètres système KDE →
+Utilisateurs → Empreintes** ouvre toujours l'interface KDE native,
+**pas** cet assistant indépendant. Elle guide les 20 captures :
 centre, haut/bas, gauche/droite, petites rotations et position naturelle.
 La progression avance uniquement sur les captures acceptées par le pilote ;
 les positions proposées ne sont pas mesurées par le capteur.
@@ -234,4 +237,8 @@ les positions proposées ne sont pas mesurées par le capteur.
 Aucune empreinte existante n'est supprimée. Pour refaire l'index droit,
 vérifier d'abord le déverrouillage par mot de passe puis supprimer uniquement
 cet index dans les paramètres système. Python3, GTK3 et PyGObject sont requis.
-Aucun service, correctif KDE ou affaiblissement du seuil biométrique.
+L'assistant ne propose que les doigts non enregistrés. Pour identifier un doigt,
+le pilote compare **toutes les empreintes enregistrées**, pas seulement la
+première, et conserve le meilleur score au-dessus du seuil fixe de 7.
+Après inscription, vérifier le déverrouillage par plusieurs tentatives réelles.
+Aucun service supplémentaire, correctif KDE ou affaiblissement du seuil biométrique.

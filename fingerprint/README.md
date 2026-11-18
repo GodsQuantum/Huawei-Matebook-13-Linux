@@ -232,8 +232,9 @@ presses so the small 80×64 sensor sees different parts of the fingertip.
 ### Optional guided enrollment on any Linux desktop
 
 The driver package includes the optional GTK3/PyGObject graphical application
-gxfp51a0-enroll. It uses only the native fprintd D-Bus interface, not patched
-KDE or GNOME. It suggests 20 gently varied positions (center, upper/lower,
+`gxfp51a0-enroll` (menu entry **GXFP51A0 Guided Fingerprint Enrollment** or launch
+`gxfp51a0-enroll`). It uses only native fprintd D-Bus. **KDE System Settings →
+Users → Fingerprints still opens KDE's own GUI, never this separate wizard.** It suggests 20 gently varied positions (center, upper/lower,
 left/right, small rotations, normal unlocking), advancing solely after accepted
 driver stages. Suggested poses are not verified measurements of finger coverage.
 
@@ -245,6 +246,11 @@ Runtime UI packages: Python3, PyGObject, GTK3 (Arch: python, python-gobject,
 gtk3; Debian/Ubuntu: python3, python3-gi, gir1.2-gtk-3.0).
 No custom daemon, sleep hook, sensor image dump, or biometric threshold change.
 Successful completion is not a hardware/security certification.
+
+**Multiple fingers:** fprintd Identify compares a scan against **all enrolled
+prints**; the driver scores every candidate and selects the best one above the
+fixed threshold of 7, not merely the first enrolled finger. After adding a
+finger, verify it with several independent lock/unlock attempts.
 
 ### Existing development templates
 

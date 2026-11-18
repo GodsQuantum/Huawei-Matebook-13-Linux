@@ -12,7 +12,7 @@ No extra daemon or sleep hook; enrollment and password fallback remain untouched
 
 # GXFP51A0 / GF3658 ST411 — standalone fingerprint driver
 
-This is the **driver-only** distribution. It does not install Huawei GPU Manager, a custom GUI, or the HUAWEI control center.
+This is the **driver-only** distribution. It does not install Huawei GPU Manager or the HUAWEI control center. It includes an **optional standalone GTK3 guided-enrollment wizard**, which is not integrated into KDE/GNOME System Settings.
 
 **Historical default rel71.69 (2026-10-27), now superseded.** The reference MateBook 13/GXFP51A0 has demonstrated three operator-attested first-touch authentications across LOCK, S4 hibernation resume and genuine S3. Real S3 wake-to-positive was 8.218 s with score 15/7. The Linux SPI CS→first-clock timing fix is confirmed by kernel SPI tracepoints. The native fprintd/PAM integration preserves password access, biometric threshold 7, encrypted TLS records and existing enrollment. More cycles and multi-machine validation remain open. See [hardware evidence](docs/rel71.69-hardware-final-20261027.md) and [Hall of Fame](docs/HALL_OF_FAME.md).
 
@@ -77,7 +77,7 @@ See [rel71.69 hardware proof](docs/rel71.69-hardware-final-20261027.md), the [Ha
 
 ## Français — installation rapide
 
-Cette archive contient **uniquement le pilote et son installateur**, pas le gestionnaire HUAWEI ni les outils GPU. Depuis la racine de l'archive extraite, lancer `./fingerprint/install.sh`. Ensuite, enregistrer et supprimer les empreintes **uniquement dans les paramètres graphiques natifs** (KDE → Utilisateurs ; GNOME → Utilisateurs). Aucun enrôlement n'est lancé automatiquement en ligne de commande.
+Cette archive contient le pilote, son installateur et l'assistant graphique **facultatif** `gxfp51a0-enroll`, mais pas les outils GPU ni le gestionnaire HUAWEI. Depuis la racine extraite, lancer `./fingerprint/install.sh`. KDE/GNOME gère les empreintes existantes ; l'assistant guidé, lancé **séparément** depuis le menu des applications, peut enregistrer un nouveau doigt via fprintd. Il ne remplace pas l'interface KDE et ne démarre jamais automatiquement.
 
 rel71.69 est la version de référence : LOCK, S4 et S3 réels ont réussi dès la première pose sur Pegasus (seuil 7 inchangé). Le S3 naturel a permis une authentification en 8,218 s depuis le réveil. Vérifier séparément les autres machines, les boots à froid, les cycles répétés et les doigts inconnus. Conserver les paquets de retour arrière vérifiés. Publier les retours avec configuration et statistiques agrégées, jamais avec des empreintes ou secrets.
 
