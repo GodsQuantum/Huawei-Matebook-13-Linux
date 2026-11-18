@@ -87,8 +87,7 @@ majeur droits enregistrés. L'assistant indépendant `gxfp51a0-enroll` a
 réenregistré l'index. Plusieurs déverrouillages sans souris ont réussi
 sous KDE Plasma 6.8.3 grâce au correctif **facultatif et propre à Pegasus**
 v12. Cinq captures récentes sur six ont atteint le seuil inchangé de 7 ;
-une a nécessité un repositionnement. Le démarrage à froid, la veille S3
-**avec ce correctif** et les cycles S4 restent non certifiés. Le mot de
+une a nécessité un repositionnement. Deux cycles **S3 profonds réels** avec v12 ont également permis une authentification après repositionnement. Le démarrage à froid, la première pose après S3, la consommation en veille et les cycles S4 ne sont **pas certifiés**. Le mot de
 passe demeure disponible. Voir les
 [critères matériels](fingerprint/docs/real-hardware-certification.md)
 et [l'assistant guidé](fingerprint/README.FR.md#enrôlement-guidé-facultatif-toutes-distributions-linux).

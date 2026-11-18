@@ -81,6 +81,18 @@ class CurrentRelease(unittest.TestCase):
   en=(ROOT/'fingerprint/README.md').read_text()
   self.assertNotIn('rel71.30 is the default install.',en)
 
+ def test_v12_deep_s3_evidence_not_confused_with_full_certification(self):
+  cert=(ROOT/'fingerprint/docs/real-hardware-certification.md').read_text()
+  for value in ('12:05:55', '12:27:01', '13:02:25', '13:22:42',
+                '11/7', '13/7', 'neither was a first-placement success',
+                'Still open'):
+   self.assertIn(value,cert)
+  for file in ('README.md','README.FR.md','README.ZH-CN.md',
+               'fingerprint/README.md','fingerprint/README.FR.md',
+               'fingerprint/README.ZH-CN.md'):
+   with self.subTest(file=file):
+    self.assertIn('S3',(ROOT/file).read_text())
+
  def test_active_markdown_relative_links_exist(self):
   import urllib.parse
   for file in ('README.md','README.FR.md','README.ZH-CN.md',

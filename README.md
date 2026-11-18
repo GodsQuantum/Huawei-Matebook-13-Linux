@@ -88,8 +88,7 @@ fingers. The independently launched `gxfp51a0-enroll` app re-enrolled the
 right index. Several direct fingerprint unlocks under KDE Plasma 6.8.3
 succeeded without mouse movement after an **opt-in, Pegasus-specific** KDE
 v12 lockscreen workaround. Five of six recent scored index placements met
-the unchanged threshold 7; one needed repositioning. This is **not**
-certification of cold boot, S3 *with this workaround*, or repeatable S4.
+the unchanged threshold 7; one needed repositioning. Two real **deep-S3** sleep/resume cycles after the v12 workaround also recovered fingerprint login, but both needed repositioning. Cold boot, first-touch S3 reliability, battery use and repeatable S4 are **not certified**.
 The password fallback remains available. See
 [hardware certification gates](fingerprint/docs/real-hardware-certification.md)
 and [guided enrollment](fingerprint/README.md#optional-guided-enrollment-on-any-linux-desktop).

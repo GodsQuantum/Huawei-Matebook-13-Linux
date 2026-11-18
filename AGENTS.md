@@ -11,7 +11,7 @@ A record is not a reliability certification; compare the same end-to-end
 metric under real user-attested LOCK, S3 and S4 trials.
 
 
-This is the public source repository. Read README.md, docs/PROJECT_MAP.md, and the private canonical workspace handoff before modifying driver or installers. The current installer driver is QA63.1, while the latest *published* reference release is rel71.74 (matebook13-rel71.74); repeated S4 and the KDE v12 workaround after deep S3 are NOT certified. Historical rel71.69 and older branches, trial documents and old README sections are NOT current installation instructions.
+This is the public source repository. Read README.md, docs/PROJECT_MAP.md, and the private canonical workspace handoff before modifying driver or installers. The current installer driver is QA63.1, while the latest *published* reference release is rel71.74 (matebook13-rel71.74); two deep-S3 v12 recoveries have evidence, but repeated first-touch deep-S3, S4, cold boot and battery usage are NOT certified. Historical rel71.69 and older branches, trial documents and old README sections are NOT current installation instructions.
 
 ## Changes
 - Preserve native fprintd/PAM/password fallback, enrolled templates, matcher threshold 7 and authenticated TLS-GCM. No speculative firmware erase/UPFW, GPIO112 manipulation or bypassing PAM/global sudo policy.

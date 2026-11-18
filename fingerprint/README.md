@@ -3,8 +3,7 @@
 v12 lockscreen workaround starts biometric authentication without pointer
 movement and keeps the prompt visually hidden. A new right-index enrollment
 succeeded and several real unlocks passed, with one below-threshold placement.
-Other desktops use their native fprintd/PAM integration. Genuine S3, battery,
-cold boot and S4 **after this workaround** are not certified.
+Other desktops use their native fprintd/PAM integration. Two kernel-confirmed real **deep-S3** cycles after v12 did recover biometric login (with retries); the three-cycle gate, first-placement S3 reliability, battery consumption, cold boot and S4 remain unverified.
  The Arch package and portable installers select QA63, matching the installed driver on Pegasus. Three LOCK and two genuine deep-S3 trials succeeded on the first physical placement; the ±18° unknown-finger, repeated S4, BOOT and REBOOT gates remain unverified. Keep the password fallback. The rel71.74 tag below remains the previous public release, not the current mainline installer.
 
 **Historical tagged reference release: rel71.74 (28 October 2026).** The driver retains a proven clean ImageBase for an already-held finger after sleep, and preserves a TLS-GCM-authenticated positive score if later sensor cleanup fails while invalidating that transport for next use. LOCK succeeded at first physical touch; the operator reported S3 first-touch success. A more recent S3/S4 test was aborted *before suspend* because KDE and the Cloud9 NFS automount blocked the freezer. **Repeatable S4 and cross-device reliability are not established.** Keep password fallback. See [release evidence](docs/rel71.74-production-20261028.md).

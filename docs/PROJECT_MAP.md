@@ -1,6 +1,6 @@
 # Maintainer navigation — Huawei MateBook 13 Linux
 
-**Current source installer: QA63.1** (18 November 2026; Pegasus runs package QA63-1). Latest separately **published** release: rel71.74 (28 October). The new KDE v12 lockscreen workaround lacks true deep-S3/boot certification; repeated genuine S4 and other hardware remain unverified. Password fallback stays available.
+**Current source installer: QA63.1** (18 November 2026; Pegasus runs package QA63-1). Latest separately **published** release: rel71.74 (28 October). KDE v12 has two kernel-confirmed deep-S3 recovery/biometric successes, both after repositioning; the full three-cycle/first-touch/battery gate, cold boot, repeated S4 and other hardware remain unverified. Password fallback stays available.
 
 ## Entry points
 | Location | What to read or change |

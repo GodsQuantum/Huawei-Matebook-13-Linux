@@ -3,8 +3,7 @@
 facultatif, lance la biométrie sans déplacement de souris et masque
 l'invite. L'index réenregistré a déverrouillé plusieurs fois ; une pose
 a été refusée sous le seuil 7. Les autres bureaux gardent fprintd/PAM
-natif. La veille S3 réelle, la batterie, le démarrage à froid et S4
-avec ce nouveau correctif restent à certifier.
+natif. Deux veilles **S3 profondes réelles** depuis v12 ont permis la biométrie après repositionnement. La certification sur trois cycles, la première pose après veille, la consommation, le démarrage à froid et S4 restent ouverts.
  Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
 
 **Version historique publiée sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).

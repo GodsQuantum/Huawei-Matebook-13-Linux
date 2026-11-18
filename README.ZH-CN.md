@@ -86,7 +86,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 通过独立的 `gxfp51a0-enroll` 向导重新录入食指后，KDE Plasma 6.8.3
 使用**仅限 Pegasus 的可选 v12 补丁**，可在不移动鼠标时直接触摸解锁。
 最近六次评分五次达到不变的阈值 7，一次需重新放置手指。
-新补丁尚未完成冷启动、真正 deep-S3、重复 S4 验证；保留密码登录。
+安装 v12 后已有两次**真正 deep-S3** 休眠/恢复及随后的指纹认证成功（均需重新放置手指）；冷启动、S3 首次触摸成功率、待机耗电和多次 S4 仍未认证。保留密码登录。
 参见[硬件认证标准](fingerprint/docs/real-hardware-certification.md)和
 [引导式录入](fingerprint/README.ZH-CN.md#可选的图形化指纹录入向导)。
 
