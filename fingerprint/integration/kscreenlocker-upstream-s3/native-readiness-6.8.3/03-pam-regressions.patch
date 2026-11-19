@@ -1,6 +1,14 @@
 --- a/autotests/CMakeLists.txt
 +++ b/autotests/CMakeLists.txt
-@@ -34,3 +34,27 @@
+@@ -19,6 +19,7 @@
+ # PamTest
+ #######################################
+ 
++find_package(PkgConfig REQUIRED)
+ pkg_search_module(PamWrapper REQUIRED pam_wrapper>=1.1.6)
+ pkg_get_variable(PamWrapperModuleDir pam_wrapper "modules")
+ # We use a different target dir so we can QFINDTESTDATA the two dirs separately
+@@ -34,3 +35,27 @@
  )
  set_tests_properties(ksmserver-pamTest PROPERTIES ENVIRONMENT "${ksmserver-pamTest-environment}")
  ecm_mark_as_test(pamTest)
