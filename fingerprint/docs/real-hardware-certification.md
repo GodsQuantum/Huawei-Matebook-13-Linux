@@ -4,62 +4,73 @@ The driver is NOT certified until the **same installed package** passes
 cold BOOT, reboot, true deep S3, repeated first-placement KDE LOCK, wrong-finger
 rejection, and password fallback on actual hardware under human supervision.
 
-## Critical lockout incident and emergency rollback — 19 November 2026
+## Critical lockout incident and rollback — 19 November 2026
 
-**Do not use optional KDE Plasma 6.8.3 QML v12 for production lockscreen.**
-After a kernel-confirmed deep S3 wake at 01:00:59 CET, the user reported
-both fingerprint and password unusable, requiring a forced power-button reboot.
-The surviving journal (01:01–01:02) records repeated low similarity scores,
-FDT_DOWN_PROOF incomplete, SPI/TLS session recovery and kscreenlocker
-Worker not ready messages. It does not establish why the password failed.
+The operator reported both fingerprint and password unusable after a
+kernel-confirmed deep-S3 wake at 01:00:59 CET while the optional KDE Plasma
+6.8.3 QML v12 was active. The operator forced a power-button reboot. The
+surviving journal records low similarity scores, incomplete FDT down proof,
+SPI/TLS recovery and kscreenlocker `Worker not ready` messages. The cause of
+the lockout and the reason the password failed remain unproven.
 
-Related upstream KDE lockscreen problems include bugs #528356 (dropped
-password submissions/pamTimeout property), #528681 (orphaned greeter
-after grace-period unlock), and #528285 (crash if the last-used fingerprint
-authenticator remains selected after fingerprint is disabled). These are
-credible, **not proven root causes** of the incident.
+Pegasus returned to stock Plasma 6.8.3 QML at 01:44 CET. Its verified SHA256
+is `7a52a32c7dafe52c95f9e03042c4e34fdb539ebb6e997dfe2f7f773462b4416d`.
+The rollback set `Fingerprint=false` and `LockGrace=0` and disabled the
+pacman hook that reapplied v12. The integration helper keeps ordinary
+`--apply` as a no-op. `--apply-experimental` is for supervised QA only.
+`--remove` is reversible. The installed binary packages, native driver,
+fprintd service, both templates, threshold 7, authenticated TLS and password
+PAM configuration were preserved.
 
-**Second, independently verified configuration hazard (19 November):**
-although KDE fingerprint was disabled in user config, Pegasus still had
-`~/.local/state/kscreenlockerrc` with `[Greeter] Authenticator=Fingerprint`.
-Bug #528285 reproduces a greeter crash with precisely that mismatch.
-Without starting a lock or suspending the machine, the remembered
-authenticator was safely changed to `Regular` (password) after creating
-a root-only backup of the original state. The installed state now has
-`Authenticator=Regular`, `Fingerprint=false`, `LockGrace=0`, and the
-official QML SHA remains unchanged. The disabled method must never
-remain in the last-used authenticator slot during an emergency rollback.
+### Confirmed KDE behavior
 
-This prevents that known disabled-authenticator crash scenario. It does
-**not** prove that every password attempt works after deep-S3: KDE
-bug #528356 can still drop premature submissions, and a supervised
-password-only lock/unlock + genuine resume test remains mandatory.
+The last-used authenticator still read `Authenticator=Fingerprint` after
+the selectable fingerprint method had been hidden. The operator's
+remembered state was backed up and changed to `Authenticator=Regular`
+while Pegasus was unlocked. Keep `Regular` to avoid the known crash when
+KDE tries to restore a remembered method that is now absent from the
+selector. KDE marked the crash fixed for 6.8.4 in stable commit
+[`8e02b5832aa9bb7da09f18cac40fecc7cf8c3c72`](https://invent.kde.org/plasma/kscreenlocker/-/commit/8e02b5832aa9bb7da09f18cac40fecc7cf8c3c72)
+on 18 November. The installed 6.8.3 predates that fix.
+[KDE bug #528042 and duplicate #528285](https://bugs.kde.org/show_bug.cgi?id=528042).
 
-At 01:44 CET the operator's unlocked Pegasus was changed conservatively:
-stock KDE Plasma 6.8.3 QML restored with verified SHA256
-7a52a32c7dafe52c95f9e03042c4e34fdb539ebb6e997dfe2f7f773462b4416d;
-KDE-only Fingerprint=false and LockGrace=0; the pacman hook that would
-reapply experimental QML disabled. Native fprintd service, both templates,
-and the standard password PAM service stayed untouched. Protected local
-rollback copies retained; no forced reboot or sleep.
+In 6.8.3, `Fingerprint=false` filters the explicit fingerprint descriptor
+from the greeter's method selector. The `Regular` authenticator still
+constructs an implicit fingerprint worker and starts it alongside the
+password worker.
+[Selector filter](https://invent.kde.org/plasma/kscreenlocker/-/blob/v6.8.3/greeter/pamauthenticatormodel.cpp#L62-68) ·
+[Implicit worker](https://invent.kde.org/plasma/kscreenlocker/-/blob/v6.8.3/greeter/pamauthenticators.cpp#L133-142) ·
+[Parallel start](https://invent.kde.org/plasma/kscreenlocker/-/blob/v6.8.3/greeter/pamauthenticators.cpp#L84-98).
 
-The source integration helper **quarantines normal --apply as a no-op**
-so installers and package upgrade hooks cannot silently reinstall v12.
-Only --apply-experimental activates it, for supervised QA, not production.
---remove remains reversible. A new KDE password-first lock/unlock test
-and actual resume test are still required before claiming the incident
-is resolved; the fix is not a guarantee against future bugs.
+The separate early password submission bug remains open. The 6.8.4
+remembered-method fix addresses the crash described above.
+[KDE bug #528356](https://bugs.kde.org/show_bug.cgi?id=528356) ·
+[Plasma desktop merge request !4182](https://invent.kde.org/plasma/plasma-desktop/-/merge_requests/4182).
+The grace-period greeter issue was also reviewed. Its role in the incident
+remains unproven. [KDE bug #528681](https://bugs.kde.org/show_bug.cgi?id=528681).
 
-Upstream details:
-https://bugs.kde.org/show_bug.cgi?id=528356
-https://bugs.kde.org/show_bug.cgi?id=528681
-https://bugs.kde.org/show_bug.cgi?id=528285
+### Observed password fallback after rollback
 
-## Observed, not fully certified — Pegasus, 18 November 2026
+At 10:45:55 CET on 19 November, the kernel confirmed a deep-S3 resume.
+The operator confirmed one successful password unlock on stock QML with
+`Regular` selected. The exact password acceptance time was not recorded.
 
-These checks are **after deployment of the opt-in KDE Plasma 6.8.3 v12
-lockscreen workaround** on the reference Pegasus laptop. They do not
-change the fixed biometric acceptance threshold of 7.
+- At 10:45:56, the greeter emitted two `Worker not ready` messages. The
+  password still worked in this cycle, so those messages alone cannot
+  establish the cause of the earlier lockout.
+- fprintd became ready at 10:45:59.401 after a reported total of 3,612 ms.
+  At 10:46:28, one valid press was captured and rejected at score 6 with
+  threshold 7. The journal recorded `cleanup_ms=547 ok=1`. The requester was
+  not identified. The sample establishes one below-threshold rejection.
+
+Repeatable password fallback and first-touch fingerprint unlock after
+deep S3 remain unverified.
+
+## Historical v12 trials — Pegasus, 18 November 2026
+
+The following checks used the opt-in KDE Plasma 6.8.3 v12 lockscreen
+workaround before its quarantine. The fixed biometric acceptance threshold
+was 7.
 
 | Kernel-confirmed deep S3 entry → exit (Europe/Paris) | fprintd recovery | First scored placement | Eventual verified match |
 |---|---|---|---|
@@ -79,9 +90,8 @@ independent right-index test placements scored at least 7 (one scored
 **Still open:** the required third deep-S3 cycle with in-progress
 verification, five consecutive first-touch LOCK successes, real cold
 boot/reboot gates, repeated S4 hibernation, unknown-finger controls,
-and measured suspend power/battery impact. Password fallback stays
-available. Do not mark the current driver + KDE v12 combination as
-hardware-certified or merge an experimental fix solely based on CI.
+and measured suspend power/battery impact. These historical v12 trials
+do not certify the current stock-QML configuration.
 
 ## Passive evidence collection
 

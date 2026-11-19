@@ -1,9 +1,4 @@
-**安全公告（2026-11-19）：** 一次真正的深度休眠恢复后，在使用可选
-KDE QML v12 补丁时，指纹与密码都无法解锁。Pegasus 已恢复 KDE 原版 QML，
-仅暂时关闭锁屏指纹并优先使用密码；驱动及两枚指纹均保留。
-已将 KDE 记住的旧 Fingerprint 认证方式恢复为 Regular（密码），以避免已知崩溃问题 #528285。
-现已禁止自动重新启用 v12，详见
-[事故说明](fingerprint/docs/real-hardware-certification.md)。
+**安全公告（2026-11-19）**：一次深度 S3 睡眠恢复后，指纹与密码均无法解锁。可选的 KDE QML v12 已隔离，Pegasus 已恢复 Plasma 6.8.3 原版 QML。锁屏记住的认证方式已设为 `Regular`（密码），以避开 KDE 崩溃问题 #528285。`Fingerprint=false` 会在选择器中隐藏指纹方式，并行指纹认证仍可运行。用户确认在一次经内核证实的深度 S3 恢复后成功使用密码解锁。重复验证仍待完成。[事故报告](fingerprint/docs/real-hardware-certification.md)。
 
 <div align="center">
 
@@ -89,11 +84,10 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 ## 指纹
 
-**参考机状态（2026-11-18）：** Pegasus 使用 QA63.1 驱动，已录入右手食指和中指。
-通过独立的 `gxfp51a0-enroll` 向导重新录入食指后，KDE Plasma 6.8.3
-使用**仅限 Pegasus 的可选 v12 补丁**，可在不移动鼠标时直接触摸解锁。
-最近六次评分五次达到不变的阈值 7，一次需重新放置手指。
-安装 v12 后已有两次**真正 deep-S3** 休眠/恢复及随后的指纹认证成功（均需重新放置手指）；冷启动、S3 首次触摸成功率、待机耗电和多次 S4 仍未认证。保留密码登录。
+**v12 历史试验（2026-11-18）**。独立的 `gxfp51a0-enroll` 向导重新录入了右手食指。
+当时启用的可选 v12 补丁无需移动鼠标即可通过指纹解锁，六次食指采样中有五次达到固定阈值 7。
+两次经内核证实的深度 S3 恢复后，均在重新放置手指后成功解锁。
+S3 恢复后的首次触摸成功率、冷启动、待机耗电和多次 S4 仍待验证。
 参见[硬件认证标准](fingerprint/docs/real-hardware-certification.md)和
 [引导式录入](fingerprint/README.ZH-CN.md#可选的图形化指纹录入向导)。
 

@@ -1,19 +1,14 @@
-**Critical safety update — 19 November 2026:** The optional KDE QML v12
-lockscreen integration is **quarantined** after a deep-S3 incident affecting
-both biometric and password unlock. Pegasus runs stock KDE QML, password-first
-lockscreen and KDE-only fingerprint disabled; native driver and templates
-remain. Normal --apply is now safe/no-op; --apply-experimental is for
-supervised non-production QA only. The separate last-used KDE authenticator
-was reset from disabled Fingerprint to Regular to avoid crash bug #528285.
-[Incident report](docs/real-hardware-certification.md).
+**Safety update — 19 November 2026.** After a deep-S3 lockout affecting both fingerprint and password, the optional KDE QML v12 is quarantined and Pegasus runs stock Plasma 6.8.3 QML. The greeter remembers `Regular` (password) to avoid KDE crash #528285. `Fingerprint=false` hides the selectable fingerprint method while the parallel fingerprint worker can still run. The operator confirmed one password unlock after a kernel-confirmed deep-S3 resume. Repeatability remains unverified. [Incident report](docs/real-hardware-certification.md).
 
 **Current source installer: QA63.1 (18 November 2026); Pegasus currently runs QA63-1.**
-**Pegasus-specific KDE status (18 November):** The opt-in Plasma 6.8.3
-v12 lockscreen workaround starts biometric authentication without pointer
-movement and keeps the prompt visually hidden. A new right-index enrollment
-succeeded and several real unlocks passed, with one below-threshold placement.
-Other desktops use their native fprintd/PAM integration. Two kernel-confirmed real **deep-S3** cycles after v12 did recover biometric login (with retries); the three-cycle gate, first-placement S3 reliability, battery consumption, cold boot and S4 remain unverified.
- The Arch package and portable installers select QA63, matching the installed driver on Pegasus. Three LOCK and two genuine deep-S3 trials succeeded on the first physical placement; the ±18° unknown-finger, repeated S4, BOOT and REBOOT gates remain unverified. Keep the password fallback. The rel71.74 tag below remains the previous public release, not the current mainline installer.
+**Historical v12 trials (18 November).** The then-active opt-in workaround
+started fingerprint authentication without pointer movement and hid the
+prompt. Several unlocks passed after right-index re-enrollment. One placement
+scored below 7. Two kernel-confirmed deep-S3 cycles recovered fingerprint
+unlock after repositioning. The three-cycle gate, first-touch S3 reliability,
+suspend power use, cold boot and S4 remain unverified.
+
+Earlier QA63 trials recorded three LOCK and two genuine deep-S3 first-placement successes. The ±18° unknown-finger, repeated S4, BOOT and REBOOT gates remain unverified. Keep the password fallback. The rel71.74 tag below remains the previous public release, not the current mainline installer.
 
 **Historical tagged reference release: rel71.74 (28 October 2026).** The driver retains a proven clean ImageBase for an already-held finger after sleep, and preserves a TLS-GCM-authenticated positive score if later sensor cleanup fails while invalidating that transport for next use. LOCK succeeded at first physical touch; the operator reported S3 first-touch success. A more recent S3/S4 test was aborted *before suspend* because KDE and the Cloud9 NFS automount blocked the freezer. **Repeatable S4 and cross-device reliability are not established.** Keep password fallback. See [release evidence](docs/rel71.74-production-20261028.md).
 

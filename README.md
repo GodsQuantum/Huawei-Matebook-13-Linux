@@ -1,10 +1,4 @@
-**Safety update — 19 November 2026:** After deep S3, the optional KDE QML
-v12 patch was associated with a lockout affecting **fingerprint and password**.
-Pegasus has been restored to stock KDE QML, and KDE-only fingerprint unlocking
-is temporarily disabled in favor of password-first operation; the driver,
-guided app and both fingerprints are preserved. Automatic reactivation of v12 is quarantined. The remembered KDE
-authenticator was also reset from Fingerprint to Regular (password) to avoid
-known crash bug #528285. See [the incident report](fingerprint/docs/real-hardware-certification.md).
+**Safety update — 19 November 2026.** After a deep-S3 lockout affecting both fingerprint and password, the optional KDE QML v12 is quarantined and Pegasus runs stock Plasma 6.8.3 QML. The greeter remembers `Regular` (password) to avoid KDE crash #528285. `Fingerprint=false` hides the selectable fingerprint method while the parallel fingerprint worker can still run. The operator confirmed one password unlock after a kernel-confirmed deep-S3 resume. Repeatability remains unverified. [Incident report](fingerprint/docs/real-hardware-certification.md).
 
 **Current GitHub `main` installer: GXFP51A0 QA63.1, installed on the reference Pegasus laptop.**
 The Arch and portable installers select QA63.1; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
@@ -91,13 +85,13 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 ## Fingerprint
 
-**Reference status (18 November 2026):** Pegasus runs QA63.1 with two enrolled
-fingers. The independently launched `gxfp51a0-enroll` app re-enrolled the
-right index. Several direct fingerprint unlocks under KDE Plasma 6.8.3
-succeeded without mouse movement after an **opt-in, Pegasus-specific** KDE
-v12 lockscreen workaround. Five of six recent scored index placements met
-the unchanged threshold 7; one needed repositioning. Two real **deep-S3** sleep/resume cycles after the v12 workaround also recovered fingerprint login, but both needed repositioning. Cold boot, first-touch S3 reliability, battery use and repeatable S4 are **not certified**.
-The password fallback remains available. See
+**Historical v12 trials (18 November 2026).** The guided
+`gxfp51a0-enroll` app re-enrolled the right index. Several fingerprint
+unlocks succeeded without mouse movement under the then-active opt-in
+v12 workaround. Five of six scored index placements met the fixed
+threshold of 7. Two kernel-confirmed deep-S3 cycles recovered fingerprint
+unlock after repositioning. First-touch S3 reliability, cold boot,
+suspend power use and repeatable S4 remain unverified. See the
 [hardware certification gates](fingerprint/docs/real-hardware-certification.md)
 and [guided enrollment](fingerprint/README.md#optional-guided-enrollment-on-any-linux-desktop).
 

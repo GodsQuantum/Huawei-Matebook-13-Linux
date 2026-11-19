@@ -1,19 +1,16 @@
-**Sécurité — 19 novembre 2026 :** la modification KDE QML v12 est
-**mise en quarantaine** après un blocage post-S3 de l'empreinte et du mot de
-passe. Retour au QML KDE officiel sur Pegasus, empreinte désactivée uniquement
-au verrouillage ; le pilote, les empreintes et le mot de passe restent en place.
---apply ne réinstalle plus v12 ; --apply-experimental est réservé aux tests.
-Le dernier authentificateur KDE mémorisé a été remis sur Regular (mot de passe),
-évitant le plantage connu #528285 lorsque Fingerprint est désactivé.
-[Rapport d'incident](docs/real-hardware-certification.md).
+**Sécurité — 19 novembre 2026.** Après un blocage du déverrouillage par empreinte et par mot de passe au réveil d’une veille S3 profonde, le QML KDE v12 facultatif est en quarantaine et Pegasus utilise le QML officiel de Plasma 6.8.3. KDE mémorise `Regular` (mot de passe) pour éviter le plantage #528285. `Fingerprint=false` masque la méthode par empreinte dans le sélecteur. L’authentification par empreinte peut encore tourner en parallèle. L’utilisateur a confirmé un déverrouillage par mot de passe après un réveil S3 profond confirmé par le noyau. La répétabilité reste à vérifier. [Rapport d’incident](docs/real-hardware-certification.md).
 
 **Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**
-**KDE sur Pegasus (18 novembre) :** le correctif Plasma 6.8.3 v12,
-facultatif, lance la biométrie sans déplacement de souris et masque
-l'invite. L'index réenregistré a déverrouillé plusieurs fois ; une pose
-a été refusée sous le seuil 7. Les autres bureaux gardent fprintd/PAM
-natif. Deux veilles **S3 profondes réelles** depuis v12 ont permis la biométrie après repositionnement. La certification sur trois cycles, la première pose après veille, la consommation, le démarrage à froid et S4 restent ouverts.
- Les installateurs Arch et portables sélectionnent QA63. Trois essais LOCK et deux S3 profonds réels ont réussi en une seule pose. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
+**Essais historiques avec v12 (18 novembre).** Le correctif facultatif,
+actif à l’époque, lançait l’authentification par empreinte sans déplacement
+de la souris et masquait l’invite. Après réenregistrement de l’index droit,
+plusieurs déverrouillages ont réussi. Une pose a obtenu un score inférieur
+à 7. Après deux réveils S3 profonds confirmés par le noyau, le déverrouillage
+par empreinte a réussi après repositionnement. La validation sur trois cycles,
+la première pose après S3, la consommation en veille, le démarrage à froid
+et S4 restent à vérifier.
+
+Les essais QA63 antérieurs ont réussi à la première pose sur trois LOCK et deux S3 profonds réels. Les contrôles doigt inconnu avec ±18°, S4 répété, BOOT et REBOOT ne sont pas encore certifiés. Conserver le mot de passe. rel71.74 reste la release historique étiquetée.
 
 **Version historique publiée sur la machine de référence : rel71.74 (28/10/2026).** LOCK à la première pose, S3 à la première pose rapporté par l'utilisateur. Le dernier S3/S4 a été annulé avant la veille à cause de KDE et du montage NFS Cloud9. Les hibernations répétées et les autres machines ne sont pas certifiées. Le pilote conserve la référence propre pour le doigt déjà posé, TLS-GCM, seuil 7 et mot de passe. [Preuves et limites](docs/rel71.74-production-20261028.md).
 

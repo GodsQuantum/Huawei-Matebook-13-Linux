@@ -1,11 +1,4 @@
-**Sécurité — 19 novembre 2026 :** après une veille profonde, le correctif
-facultatif KDE QML v12 était présent lors d'un blocage du déverrouillage
-**par empreinte et par mot de passe**. Pegasus est revenu au QML KDE officiel.
-Empreinte temporairement désactivée **sur l'écran verrouillé uniquement** ;
-pilote et deux empreintes préservés, accès par mot de passe prioritaire.
-Méthode mémorisée par KDE réinitialisée de Fingerprint à Regular (mot de
-passe), évitant le plantage connu KDE #528285. Réactivation de v12 interdite.
-[Rapport](fingerprint/docs/real-hardware-certification.md).
+**Sécurité — 19 novembre 2026.** Après un blocage du déverrouillage par empreinte et par mot de passe au réveil d’une veille S3 profonde, le QML KDE v12 facultatif est en quarantaine et Pegasus utilise le QML officiel de Plasma 6.8.3. KDE mémorise `Regular` (mot de passe) pour éviter le plantage #528285. `Fingerprint=false` masque la méthode par empreinte dans le sélecteur. L’authentification par empreinte peut encore tourner en parallèle. L’utilisateur a confirmé un déverrouillage par mot de passe après un réveil S3 profond confirmé par le noyau. La répétabilité reste à vérifier. [Rapport d’incident](fingerprint/docs/real-hardware-certification.md).
 
 <div align="center">
 
@@ -91,15 +84,16 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 ## Fingerprint
 
-**État du 18 novembre 2026 :** Pegasus utilise QA63.1, avec l'index et le
-majeur droits enregistrés. L'assistant indépendant `gxfp51a0-enroll` a
-réenregistré l'index. Plusieurs déverrouillages sans souris ont réussi
-sous KDE Plasma 6.8.3 grâce au correctif **facultatif et propre à Pegasus**
-v12. Cinq captures récentes sur six ont atteint le seuil inchangé de 7 ;
-une a nécessité un repositionnement. Deux cycles **S3 profonds réels** avec v12 ont également permis une authentification après repositionnement. Le démarrage à froid, la première pose après S3, la consommation en veille et les cycles S4 ne sont **pas certifiés**. Le mot de
-passe demeure disponible. Voir les
+**Essais historiques avec v12 (18 novembre 2026).** L’assistant
+`gxfp51a0-enroll` a réenregistré l’index droit. Plusieurs déverrouillages
+par empreinte sans déplacement de la souris ont réussi avec le correctif
+facultatif v12, actif à l’époque. Cinq poses de l’index sur six ont atteint
+le seuil fixe de 7. Après deux réveils S3 profonds confirmés par le noyau,
+le déverrouillage par empreinte a réussi après repositionnement. La première
+pose après S3, le démarrage à froid, la consommation en veille et les cycles
+S4 répétés restent à vérifier. Voir les
 [critères matériels](fingerprint/docs/real-hardware-certification.md)
-et [l'assistant guidé](fingerprint/README.FR.md#enrôlement-guidé-facultatif-toutes-distributions-linux).
+et [l’assistant guidé](fingerprint/README.FR.md#enrôlement-guidé-facultatif-toutes-distributions-linux).
 
 **Historique — rel71.69, désormais remplacée par QA63.1.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 

@@ -1,6 +1,8 @@
 # Maintainer navigation — Huawei MateBook 13 Linux
 
-**Current source installer: QA63.1** (18 November 2026; Pegasus runs package QA63-1). Latest separately **published** release: rel71.74 (28 October). KDE v12 has two kernel-confirmed deep-S3 recovery/biometric successes, both after repositioning; the full three-cycle/first-touch/battery gate, cold boot, repeated S4 and other hardware remain unverified. Password fallback stays available.
+**Current source installer: QA63.1** (18 November 2026, package QA63-1 on Pegasus). Latest published release: rel71.74 (28 October).
+
+**Pegasus KDE status (19 November 2026).** The optional v12 QML is quarantined following a post-resume lockout. Pegasus runs stock Plasma 6.8.3 QML and remembers `Regular`. `Fingerprint=false` hides the explicit fingerprint method while the parallel worker can still run. The operator confirmed one password unlock after kernel-confirmed deep S3. The two v12 biometric recoveries from 18 November are historical and required repositioning. Repeatable password fallback, first-touch S3, suspend power, cold boot, repeated S4 and other hardware remain unverified. [Incident and hardware evidence](../fingerprint/docs/real-hardware-certification.md).
 
 ## Entry points
 | Location | What to read or change |
@@ -14,7 +16,7 @@
 | fingerprint/driver/goodix51a0/ | Actual GXFP51A0 native libfprint code and SPI/TLS/FDT implementation |
 | fingerprint/packaging/arch/ | Current QA63.1 Arch/CachyOS source package and fprintd runtime |
 | fingerprint/install.sh, install-arch.sh, install-linux.sh | Driver-only installers for supported distributions |
-| fingerprint/integration/ | Native desktop/PAM or other integration files; password remains available |
+| fingerprint/integration/ | Native desktop/PAM and lockscreen integration files |
 | fingerprint/research/ and fingerprint/scripts/ | Offline tests, compatibility tooling and HOF generation |
 | fingerprint/docs/rel71.69-hardware-final-20261027.md | Operator-confirmed first-touch LOCK, S4 and deep-S3 metrics |
 | fingerprint/docs/HALL_OF_FAME.md | Actual historical trial table; rejected candidates remain visible |
