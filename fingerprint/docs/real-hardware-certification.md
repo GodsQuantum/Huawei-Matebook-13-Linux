@@ -4,6 +4,38 @@ The driver is NOT certified until the **same installed package** passes
 cold BOOT, reboot, true deep S3, repeated first-placement KDE LOCK, wrong-finger
 rejection, and password fallback on actual hardware under human supervision.
 
+## Critical lockout incident and emergency rollback — 19 November 2026
+
+**Do not use optional KDE Plasma 6.8.3 QML v12 for production lockscreen.**
+After a kernel-confirmed deep S3 wake at 01:00:59 CET, the user reported
+both fingerprint and password unusable, requiring a forced power-button reboot.
+The surviving journal (01:01–01:02) records repeated low similarity scores,
+FDT_DOWN_PROOF incomplete, SPI/TLS session recovery and kscreenlocker
+Worker not ready messages. It does not establish why the password failed.
+
+Related upstream KDE lockscreen problems include bugs #528356 (dropped
+password submissions/pamTimeout property) and #528681 (orphaned greeter
+after grace-period unlock). These are credible, **not proven root causes**.
+
+At 01:44 CET the operator's unlocked Pegasus was changed conservatively:
+stock KDE Plasma 6.8.3 QML restored with verified SHA256
+7a52a32c7dafe52c95f9e03042c4e34fdb539ebb6e997dfe2f7f773462b4416d;
+KDE-only Fingerprint=false and LockGrace=0; the pacman hook that would
+reapply experimental QML disabled. Native fprintd service, both templates,
+and the standard password PAM service stayed untouched. Protected local
+rollback copies retained; no forced reboot or sleep.
+
+The source integration helper **quarantines normal --apply as a no-op**
+so installers and package upgrade hooks cannot silently reinstall v12.
+Only --apply-experimental activates it, for supervised QA, not production.
+--remove remains reversible. A new KDE password-first lock/unlock test
+and actual resume test are still required before claiming the incident
+is resolved; the fix is not a guarantee against future bugs.
+
+Upstream details:
+https://bugs.kde.org/show_bug.cgi?id=528356
+https://bugs.kde.org/show_bug.cgi?id=528681
+
 ## Observed, not fully certified — Pegasus, 18 November 2026
 
 These checks are **after deployment of the opt-in KDE Plasma 6.8.3 v12

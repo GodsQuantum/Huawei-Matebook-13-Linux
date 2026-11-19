@@ -702,6 +702,13 @@ apply_v12() {
 
 case "$mode" in
   --apply)
+    # APPLY_QUARANTINED_AFTER_SLEEP_LOCKOUT (2026-11-19):
+    # No normal installer or pacman hook may re-enable v12 after a real
+    # deep-S3 lockout with unavailable fingerprint AND password input.
+    echo "GXFP51A0: KDE v12 QML integration quarantined; --apply is a safe no-op." >&2
+    echo "GXFP51A0: --remove restores stock; --apply-experimental requires supervised QA." >&2
+    ;;
+  --apply-experimental)
     apply_v12
     ;;
   --remove)
@@ -735,7 +742,7 @@ case "$mode" in
     ! grep -Fq 'GXFP51A0 upstream fingerprint heartbeat backport BEGIN' "$TARGET"
     ;;
   *)
-    echo "usage: $0 [--apply|--remove|--check]" >&2
+    echo "usage: $0 [--apply (safe no-op)|--remove|--check|--apply-experimental (unsafe)]" >&2
     exit 2
     ;;
 esac

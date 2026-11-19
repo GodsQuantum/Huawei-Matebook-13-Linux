@@ -5,6 +5,6 @@ Type = Package
 Target = plasma-desktop
 
 [Action]
-Description = Reapplying GXFP51A0 KDE lockscreen fingerprint integration...
+Description = GXFP51A0 KDE v12 integration quarantined (no automatic patch)...
 When = PostTransaction
 Exec = /usr/libexec/gxfp51a0-kde-lockscreen-integrate --apply
