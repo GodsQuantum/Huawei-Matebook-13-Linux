@@ -1,5 +1,7 @@
 **Sécurité — 19 novembre 2026.** Après un blocage du déverrouillage par empreinte et par mot de passe au réveil d’une veille S3 profonde, le QML KDE v12 facultatif est en quarantaine et Pegasus utilise le QML officiel de Plasma 6.8.3. KDE mémorise `Regular` (mot de passe) pour éviter le plantage #528285. `Fingerprint=false` masque la méthode par empreinte dans le sélecteur. L’authentification par empreinte peut encore tourner en parallèle. L’utilisateur a confirmé un déverrouillage par mot de passe après un réveil S3 profond confirmé par le noyau. La répétabilité reste à vérifier. [Rapport d’incident](fingerprint/docs/real-hardware-certification.md).
 
+**Corrections de fiabilité — 19 novembre 2026.** QA63.2 protège la calibration en cas de contact partiel et attend un retrait confirmé avant de poursuivre une tentative déjà scorée. Un [candidat KDE 6.8.3 natif distinct](fingerprint/integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate) conserve les demandes d’authentification arrivées trop tôt et peut reprendre la conversation d’empreinte implicite après expiration. L’installateur du pilote ne remplace pas KDE. De nouveaux essais physiques LOCK/S3 restent nécessaires ; les résultats historiques QA63 ne certifient pas cette révision.
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux
@@ -18,13 +20,13 @@ Pilote d’empreintes Goodix **GXFP51A0 / GF3658 ST411** · **MX250** à la dema
 
 </div>
 
-**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/docs/rel71.74-production-20261028.md). QA63.1 est le pilote actuel des installateurs ; rel71.74 est la dernière release publiée. Les essais répétés S4 restent ouverts.
+**Maintenance et agents IA :** [plan du dépôt](docs/PROJECT_MAP.md) · [règles du projet](AGENTS.md) · [état du pilote biométrique](fingerprint/docs/rel71.74-production-20261028.md). QA63.2 est le pilote actuel des installateurs ; rel71.74 est la dernière release publiée. Les essais répétés S4 restent ouverts.
 
 **Avertissement biométrie (27/10/2026) :** rel71.69 est une **préversion expérimentale**. Après une hibernation S4 réelle, le capteur a mis 38,69 s à se préparer et le déverrouillage biométrique a échoué. Les réussites ponctuelles en LOCK/S3/S4 ne démontrent pas la fiabilité. Voir [incident confirmé #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Conserver le mot de passe.
 
 ## Choisir son installation
 
-**Version actuellement sélectionnée par les installateurs de `main` : QA63.1** (sur Pegasus : 3/3 LOCK et 2/2 S3 en une pose ; les autres scénarios restent à certifier). La release rel71.74 est historique ; conserver l'accès par mot de passe.
+**Version sélectionnée par les installateurs de `main` : QA63.2 (19 novembre 2026).** Les 3/3 LOCK et 2/2 S3 en une pose ont été mesurés avec l'ancienne QA63 et ne certifient pas cette révision. La release rel71.74 est historique ; conserver l'accès par mot de passe.
 
 **Pilote d’empreintes seul :** `./fingerprint/install.sh` ([archive autonome](fingerprint/DRIVER_ONLY.md)). **Configuration complète (empreintes + MX250) :** `./install.sh`. **Vérification du matériel sans modification :** `./install.sh --doctor-only`.
 
@@ -75,7 +77,7 @@ Les autres révisions Huawei ne sont jamais supposées identiques.
 
 | Domaine | État | Politique |
 | --- | --- | --- |
-| **Fingerprint** | **QA63.1 actuelle · fiabilité S4 non certifiée** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
+| **Fingerprint** | **QA63.2 actuelle · fiabilité S4 non certifiée** | libfprint/fprintd natif ; seuil 7 ; rel71.30 ajoute un enrôlement à captures cohérentes et une récupération prudente des correspondances limites |
 | **Énergie MX250** | **GPU Manager v3.2** | Session Intel par défaut ; MX250 retirée du PCI au repos ; R580 + PRIME pour les applis dGPU |
 | **Hotkeys / Fn-lock / batterie Huawei** | **Linux mainline** | Utiliser `huawei_wmi`, ne pas le dupliquer |
 | **Intel GPU / Wi-Fi / Bluetooth / caméra / touch / stylet / audio** | **Natifs** | Vérifier uniquement |
@@ -95,7 +97,7 @@ S4 répétés restent à vérifier. Voir les
 [critères matériels](fingerprint/docs/real-hardware-certification.md)
 et [l’assistant guidé](fingerprint/README.FR.md#enrôlement-guidé-facultatif-toutes-distributions-linux).
 
-**Historique — rel71.69, désormais remplacée par QA63.1.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
+**Historique — rel71.69, désormais remplacée par QA63.2.** Sur le MateBook 13 de référence, trois authentifications ont réussi à la première pose (LOCK, retour d’hibernation S4, sortie de veille S3 naturelle du 27 octobre 2026). Le vrai S3 a préchauffé le capteur en 5,153 s et déverrouillé en 8,218 s depuis le réveil, score 15/7. La temporisation SPI Chip Select de 50 µs est vérifiée par traçage noyau ; TLS/FDT, mot de passe et seuil 7 restent intacts. D'autres tests S3, démarrage à froid, reboot et doigt inconnu restent nécessaires pour une certification étendue. Voir [mesures rel71.69](fingerprint/docs/rel71.69-hardware-final-20261027.md) et [Hall of Fame](fingerprint/docs/HALL_OF_FAME.md).
 
 - FAST_READY warm ~**82–83 ms** sur la machine de référence ;
 - recovery GPIO264 par pulse court actif-HIGH ;

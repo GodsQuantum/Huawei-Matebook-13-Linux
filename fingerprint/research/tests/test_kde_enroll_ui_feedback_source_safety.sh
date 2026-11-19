@@ -16,8 +16,14 @@ s=Path(sys.argv[1]).read_text()
 a=s.index("case GX_ST_WAIT_ON:")
 b=s.index("case GX_ST_CAPTURE:", a)
 f=s[a:b]
-assert "fpi_device_report_finger_status" in f
-assert "FP_FINGER_STATUS_NEEDED" in f
+assert "if (self->needs_release)" in f
+assert "fpi_device_report_finger_status (dev, FP_FINGER_STATUS_PRESENT)" in f
+assert "gx_report_ready (dev, t)" in f
+
+a = s.index("\ngx_report_ready (")
+b = s.index("\n}", a)
+f = s[a:b]
+assert "fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NEEDED)" in f
 
 a=s.index("gx_poll_on (")
 b=s.index("gx_poll_off (", a)

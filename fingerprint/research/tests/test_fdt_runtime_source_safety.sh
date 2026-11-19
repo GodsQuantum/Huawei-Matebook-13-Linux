@@ -14,7 +14,9 @@ grep -Fq 'gx_fdt_touch_count' "$driver"
 grep -Fq 'gx_fdt_touch_is_finger' "$driver"
 grep -Fq 'touchflag & 0x3fu' "$driver"
 grep -Fq 'gx_fdt_touch_is_finger (touchflag) ||' "$driver"
-grep -Fq '!gx_fdt_touch_is_finger (touchflag)' "$driver"
+# Finger detection and proof of release have distinct FDT gates.
+grep -Fq 'return (touchflag & 0x3fu) == 0 &&' "$driver"
+grep -Fq 'gx_fdt_release_confirmed (self, cur, touchflag)' "$driver"
 grep -Fq 'return d / (int) GXFP_FDT_ZONE_COUNT;' "$driver"
 if grep -q '0x36,0x23' "$driver"; then
   echo 'safety violation: legacy 34-byte FDT command remains in runtime' >&2

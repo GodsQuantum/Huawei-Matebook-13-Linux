@@ -1,12 +1,13 @@
-**Current GitHub `main` installable driver: QA63.1 (2026-11-03).**
-The Arch package uses `libfprint-goodix51a0 1.94.100.goodix51a0.qa63-1`;
-the portable installer uses `rel71.74-qa63.1`. They reproduce the
-driver and native fprintd feature flags tested on Pegasus (3/3 LOCK and 2/2
-true deep S3, first physical placement). This is not full hardware/safety
-certification: unknown-finger tests with ±18°, S4, BOOT and REBOOT remain open.
-No extra daemon or sleep hook; enrollment and password fallback remain untouched.
+**Current GitHub `main` installable driver: QA63.2 (2026-11-19).**
+The Arch package uses `libfprint-goodix51a0 1.94.100.goodix51a0.qa63-3`;
+the portable installer uses `rel71.74-qa63.2`. This revision protects warm
+calibration against partial contact and preserves the active attempt while
+waiting for a confirmed lift. The earlier QA63's 3/3 LOCK and 2/2 true deep-S3
+first-placement successes do not certify this changed source. Fresh physical
+checks remain required, including unknown fingers, S4, BOOT and REBOOT.
+No extra daemon or sleep hook; enrollment and password fallback remain intact.
 
-**Latest published reference release rel71.74 (2026-10-28)** supersedes rel71.69. The repository source installer QA63.1 is newer than this tagged release. Repeatable S4 is not yet certified; retain passwords and rollback packages. [Release evidence](docs/rel71.74-production-20261028.md).
+**Latest published reference release rel71.74 (2026-10-28)** supersedes rel71.69. The repository source installer QA63.2 is newer than this tagged release. Repeatable S4 is not yet certified; retain passwords and rollback packages. [Release evidence](docs/rel71.74-production-20261028.md).
 
 **Historical rel71.69 fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 
@@ -43,7 +44,7 @@ You can alternatively clone the full repo and execute `./fingerprint/install.sh`
 
 ## Option B — Arch/CachyOS precompiled driver
 
-Download the [rel71.74 Arch package](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/download/matebook13-rel71.74/libfprint-goodix51a0-1.94.100.goodix51a0-71.74-x86_64.pkg.tar.zst). This is NOT the newer QA63.1 package. Compare its SHA-256 with the release notes and install via `sudo pacman -U` after reviewing package contents and conflicts. This replaces the distro `libfprint` package with the reviewed driver package; do not force package conflicts. The package includes native libfprint/fprintd resident configuration; no extra prewarm helper or sleep service.
+Download the [rel71.74 Arch package](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/releases/download/matebook13-rel71.74/libfprint-goodix51a0-1.94.100.goodix51a0-71.74-x86_64.pkg.tar.zst). This is NOT the newer QA63.2 package. Compare its SHA-256 with the release notes and install via `sudo pacman -U` after reviewing package contents and conflicts. This replaces the distro `libfprint` package with the reviewed driver package; do not force package conflicts. The package includes native libfprint/fprintd resident configuration; no extra prewarm helper or sleep service.
 
 ## Fingerprints — native GUI or optional guided wizard
 
@@ -77,7 +78,7 @@ See [rel71.69 hardware proof](docs/rel71.69-hardware-final-20261027.md), the [Ha
 
 ## Français — installation rapide
 
-Le **dépôt actuel** contient le pilote, son installateur et l'assistant graphique **facultatif** `gxfp51a0-enroll`, mais pas les outils GPU ni le gestionnaire HUAWEI. L'archive historique rel71.74 ne contient pas cet assistant. Depuis la racine extraite, lancer `./fingerprint/install.sh`. KDE/GNOME gère les empreintes existantes ; l'assistant guidé, lancé **séparément** depuis le menu des applications, peut enregistrer un nouveau doigt via fprintd. Il ne remplace pas l'interface KDE et ne démarre jamais automatiquement.
+Le sous-ensemble **`fingerprint/` du dépôt actuel** contient le pilote, son installateur et l'assistant graphique **facultatif** `gxfp51a0-enroll`, mais pas les outils GPU ni le gestionnaire HUAWEI. L'archive historique rel71.74 ne contient pas cet assistant. Depuis la racine extraite, lancer `./fingerprint/install.sh`. KDE/GNOME gère les empreintes existantes ; l'assistant guidé, lancé **séparément** depuis le menu des applications, peut enregistrer un nouveau doigt via fprintd. Il ne remplace pas l'interface KDE et ne démarre jamais automatiquement.
 
 Historique : rel71.69 a connu des réussites isolées LOCK, S4 et S3 sur Pegasus (seuil 7 inchangé). Le S3 naturel a permis une authentification en 8,218 s depuis le réveil. Vérifier séparément les autres machines, les boots à froid, les cycles répétés et les doigts inconnus. Conserver les paquets de retour arrière vérifiés. Publier les retours avec configuration et statistiques agrégées, jamais avec des empreintes ou secrets.
 

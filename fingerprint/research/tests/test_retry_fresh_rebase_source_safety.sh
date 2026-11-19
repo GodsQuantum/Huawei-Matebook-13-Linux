@@ -30,7 +30,9 @@ def block(name):
                 return s[m.start():i + 1]
     raise AssertionError(name)
 
+poll_on = block("gx_poll_on")
 poll_off = block("gx_poll_off")
+rebase = block("gx_retry_rebase_after_release")
 session = block("gx_session_thread")
 fast = block("gx_warm_fast_ready")
 
@@ -43,14 +45,15 @@ assert "gx_warm_validate" not in fast
 # A usable below-threshold press already sets rearm_mcu_before_retry elsewhere.
 # Once release is confirmed, consume that signal by scheduling SESSION work,
 # never by performing a blocking background capture in the GLib main loop.
-assert "t->rebase_before_retry = TRUE" in poll_off
-assert "fpi_ssm_jump_to_state (ssm, GX_ST_SESSION)" in poll_off
-assert "gx_warm_validate" not in poll_off
-rebase_pos = poll_off.index("t->rebase_before_retry = TRUE")
-retry_session_pos = poll_off.index(
-    "fpi_ssm_jump_to_state (ssm, GX_ST_SESSION)", rebase_pos
+for poll in (poll_off, poll_on):
+    assert poll.index("gx_fdt_release_confirmed (self, cur, touchflag)") < poll.index(
+        "gx_retry_rebase_after_release (ssm, t)"
+    )
+    assert "gx_warm_validate" not in poll
+assert "gx_warm_validate" not in rebase
+assert rebase.index("t->rebase_before_retry = TRUE") < rebase.index(
+    "fpi_ssm_jump_to_state (ssm, GX_ST_SESSION)"
 )
-assert rebase_pos < retry_session_pos
 
 # The SESSION worker clears the one-shot retry flag. A still-fresh ImageBase
 # rearms immediately; only an actually stale reference pays WARM_REBASE.

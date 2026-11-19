@@ -53,7 +53,7 @@ class CurrentRelease(unittest.TestCase):
                'fingerprint/README.md','fingerprint/README.FR.md','fingerprint/README.ZH-CN.md'):
    with self.subTest(file=file):
     text=(ROOT/file).read_text()
-    self.assertIn('QA63.1',text)
+    self.assertIn('QA63.2',text)
     self.assertIn('rel71.74',text)
     self.assertIn('gxfp51a0-enroll',text)
     self.assertIn('fprintd',text)
@@ -61,7 +61,7 @@ class CurrentRelease(unittest.TestCase):
   for file in ('AGENTS.md','docs/PROJECT_MAP.md'):
    with self.subTest(file=file):
     text=(ROOT/file).read_text()
-    self.assertIn('QA63.1',text)
+    self.assertIn('QA63.2',text)
     self.assertIn('rel71.74',text)
   for file in ('README.md','README.FR.md','README.ZH-CN.md'):
    with self.subTest(file=file):

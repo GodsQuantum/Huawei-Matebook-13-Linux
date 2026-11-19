@@ -1,5 +1,7 @@
 **安全公告（2026-11-19）**：一次深度 S3 睡眠恢复后，指纹与密码均无法解锁。可选的 KDE QML v12 已隔离，Pegasus 已恢复 Plasma 6.8.3 原版 QML。锁屏记住的认证方式已设为 `Regular`（密码），以避开 KDE 崩溃问题 #528285。`Fingerprint=false` 会在选择器中隐藏指纹方式，并行指纹认证仍可运行。用户确认在一次经内核证实的深度 S3 恢复后成功使用密码解锁。重复验证仍待完成。[事故报告](fingerprint/docs/real-hardware-certification.md)。
 
+**可靠性修订（2026-11-19）**：QA63.2 防止部分触摸污染校准，并在已评分的尝试继续前等待确认手指离开。另有独立的 [KDE 6.8.3 原生候选补丁](fingerprint/integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate)，保留过早发出的认证请求，并可在超时后重启隐式指纹会话。驱动安装器不会替换 KDE。仍须重新进行真机 LOCK/S3 测试；旧 QA63 的结果不能认证本次修订。
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux
@@ -18,13 +20,13 @@ Goodix **GXFP51A0 / GF3658 ST411** 指纹驱动 · NVIDIA **MX250** 按需电源
 
 </div>
 
-**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/docs/rel71.74-production-20261028.md)。QA63.1 为当前安装器驱动；rel71.74 为最近的已发布参考版。多次 S4 可靠性仍未认证。
+**维护人员与 AI 代理：** [项目结构](docs/PROJECT_MAP.md) · [维护规范](AGENTS.md) · [指纹驱动当前状态](fingerprint/docs/rel71.74-production-20261028.md)。QA63.2 为当前安装器驱动；rel71.74 为最近的已发布参考版。多次 S4 可靠性仍未认证。
 
 **指纹可靠性警告（2026-10-27）：** rel71.69 现在标记为**实验性预览版本**。一次真实 S4 休眠恢复需要 38.69 秒才能完成传感器准备，且指纹登录未成功。之前个别 LOCK、S3、S4 成功案例不能证明可靠性。参见 [问题 #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32)，务必保留密码登录。
 
 ## 选择安装方式
 
-**当前 `main` 安装器默认：QA63.1**（参考机 Pegasus 已有 3/3 次 LOCK 和 2/2 次 deep S3 首次触摸成功；其他场景仍需验证）。rel71.74 为历史发布版本，请始终保留密码登录。
+**当前 `main` 安装器默认：QA63.2（2026-11-19）。** 3/3 次 LOCK 和 2/2 次 deep S3 首次触摸成功来自旧 QA63 的测试，不能认证本次修订。rel71.74 为历史发布版本，请始终保留密码登录。
 
 **仅安装指纹驱动：** `./fingerprint/install.sh`（[独立源码包](fingerprint/DRIVER_ONLY.md)）。**完整 MateBook 13 配置（指纹 + MX250）：** `./install.sh`。**只读硬件检查：** `./install.sh --doctor-only`。
 
@@ -75,7 +77,7 @@ Huawei MateBook 13 `WRTB-WXX9`：
 
 | 模块 | 状态 | 策略 |
 | --- | --- | --- |
-| **指纹** | **QA63.1 当前版本 · S4 尚未认证** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
+| **指纹** | **QA63.2 当前版本 · S4 尚未认证** | 仓库原生 libfprint/fprintd；阈值 7；rel71.30 增加连通式录入与保守的单视图 near-miss rescue |
 | **MX250 电源** | **GPU Manager v3.2** | Intel 默认；空闲时 MX250 从 PCI 移除；需要时使用 R580 + PRIME |
 | **Huawei hotkeys / Fn-lock / 电池接口** | **Linux mainline** | 使用 `huawei_wmi`，不重复安装驱动 |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **原生支持** | 只验证 |

@@ -1,0 +1,518 @@
+--- a/greeter/greeterapp.cpp
++++ b/greeter/greeterapp.cpp
+@@ -156,6 +156,8 @@
+ // App
+ UnlockApp::UnlockApp(int &argc, char **argv)
+     : QGuiApplication(argc, argv)
++    , m_authenticators(new PamAuthenticators(KUser().loginName(), this))
++    , m_views(*m_authenticators)
+     , m_delayedLockTimer(nullptr)
+     , m_testing(false)
+     , m_immediateLock(false)
+@@ -167,8 +169,6 @@
+ {
+     KLocalization::setupLocalizedContext(m_engine.get());
+ 
+-    m_authenticators = new PamAuthenticators(KUser().loginName(), this);
+-
+     auto state = m_engine->singletonInstance<LockscreenState *>("org.kde.kscreenlocker", "LockscreenState");
+     state->init(this);
+ 
+@@ -179,12 +179,12 @@
+ {
+     // workaround QTBUG-55460
+     // will be fixed when themes port to QQC2
+-    for (auto view : std::as_const(m_views)) {
++    for (auto view : m_views.items()) {
+         if (QQuickItem *focusItem = view->activeFocusItem()) {
+             focusItem->setFocus(false);
+         }
+     }
+-    qDeleteAll(m_views);
++    qDeleteAll(m_views.items());
+ }
+ 
+ void UnlockApp::initialize()
+@@ -218,18 +218,18 @@
+ {
+     QWindow *activeScreen = nullptr;
+ 
+-    if (m_views.isEmpty()) {
++    if (m_views.items().isEmpty()) {
+         return activeScreen;
+     }
+ 
+-    for (QQuickView *view : std::as_const(m_views)) {
++    for (QQuickView *view : m_views.items()) {
+         if (view->geometry().contains(QCursor::pos())) {
+             activeScreen = view;
+             break;
+         }
+     }
+     if (!activeScreen) {
+-        activeScreen = m_views.first();
++        activeScreen = m_views.items().first();
+     }
+ 
+     return activeScreen;
+@@ -265,8 +265,15 @@
+     return qobject_cast<QQuickItem *>(obj);
+ }
+ 
++bool UnlockApp::isLocked() const
++{
++    return m_immediateLock || (!m_noLock && !m_delayedLockTimer);
++}
++
+ void UnlockApp::initialViewSetup()
+ {
++    m_views.setLocked(isLocked());
++
+     for (QScreen *screen : screens()) {
+         handleScreen(screen);
+     }
+@@ -275,16 +282,18 @@
+ 
+ void UnlockApp::handleScreen(QScreen *screen)
+ {
+-    if (screen->geometry().isNull()) {
++    if (screen->geometry().isEmpty()) {
++        // A placeholder screen can acquire valid geometry without another screenAdded.
++        connect(screen, &QScreen::geometryChanged, this, [this, screen] { handleScreen(screen); }, Qt::SingleShotConnection);
+         return;
+     }
+     auto *view = createViewForScreen(screen);
+-    m_views << view;
++    m_views.add(view);
+     connect(this, &QGuiApplication::screenRemoved, view, [this, view, screen](QScreen *removedScreen) {
+         if (removedScreen != screen) {
+             return;
+         }
+-        m_views.removeOne(view);
++        m_views.remove(view);
+         delete view;
+     });
+ }
+@@ -298,8 +307,9 @@
+     view->setScreen(screen);
+     view->setGeometry(screen->geometry());
+ 
+-    connect(screen, &QScreen::geometryChanged, view, [view](const QRect &geo) {
++    connect(screen, &QScreen::geometryChanged, view, [this, view](const QRect &geo) {
+         view->setGeometry(geo);
++        m_views.update();
+     });
+ 
+     auto oldFactory = view->engine()->networkAccessManagerFactory();
+@@ -396,7 +406,7 @@
+     }
+ 
+     QQmlProperty lockProperty(view->rootObject(), QStringLiteral("locked"));
+-    lockProperty.write(m_immediateLock || (!m_noLock && !m_delayedLockTimer));
++    lockProperty.write(isLocked());
+ 
+     // verify that the engine's controller didn't change
+     Q_ASSERT(dynamic_cast<NoAccessNetworkAccessManagerFactory *>(view->engine()->networkAccessManagerFactory()));
+@@ -453,7 +463,7 @@
+     }
+     // this loop is required to make the qml/graphicsscene properly handle the shared keyboard input
+     // ie. "type something into the box of every greeter"
+-    for (QQuickView *view : std::as_const(m_views)) {
++    for (QQuickView *view : m_views.items()) {
+         if (!m_testing) {
+             view->setKeyboardGrabEnabled(true); // TODO - check whether this still works in master!
+         }
+@@ -468,15 +478,14 @@
+ 
+ void UnlockApp::graceLockEnded()
+ {
+-    m_authenticators->setGraceLocked(false);
+-
+     delete m_delayedLockTimer;
+     m_delayedLockTimer = nullptr;
+ 
+-    for (QQuickView *view : std::as_const(m_views)) {
++    for (QQuickView *view : m_views.items()) {
+         QQmlProperty lockProperty(view->rootObject(), QStringLiteral("locked"));
+         lockProperty.write(true);
+     }
++    m_views.setLocked(isLocked());
+ }
+ 
+ void UnlockApp::setTesting(bool enable)
+@@ -484,16 +493,16 @@
+     qCDebug(KSCREENLOCKER_GREET) << "Testing mode enabled:" << enable;
+ 
+     m_testing = enable;
+-    if (m_views.isEmpty()) {
++    if (m_views.items().isEmpty()) {
+         return;
+     }
+     if (enable) {
+         // remove bypass window manager hint
+-        for (QQuickView *view : std::as_const(m_views)) {
++        for (QQuickView *view : m_views.items()) {
+             view->setFlags(view->flags() & ~Qt::X11BypassWindowManagerHint);
+         }
+     } else {
+-        for (QQuickView *view : std::as_const(m_views)) {
++        for (QQuickView *view : m_views.items()) {
+             view->setFlags(view->flags() | Qt::X11BypassWindowManagerHint);
+         }
+     }
+@@ -534,7 +543,7 @@
+ bool UnlockApp::eventFilter(QObject *obj, QEvent *event)
+ {
+     if (event->type() == QEvent::Enter) {
+-        if (m_views.contains(obj)) {
++        if (m_views.items().contains(obj)) {
+             Q_EMIT viewEntered(qobject_cast<QQuickView *>(obj));
+         }
+         return false;
+@@ -569,7 +578,7 @@
+     if (milliseconds < 0 || m_delayedLockTimer || m_noLock || m_immediateLock) {
+         return;
+     }
+-    m_authenticators->setGraceLocked(true);
++    m_views.setLocked(false);
+     m_delayedLockTimer = new QTimer(this);
+     m_delayedLockTimer->setSingleShot(true);
+     connect(m_delayedLockTimer, &QTimer::timeout, this, &UnlockApp::graceLockEnded);
+@@ -583,7 +592,7 @@
+ 
+ void UnlockApp::osdProgress(const QString &icon, int percent, int maximumPercent, const QString &additionalText)
+ {
+-    for (auto v : std::as_const(m_views)) {
++    for (auto v : m_views.items()) {
+         auto osd = v->rootObject()->findChild<QQuickItem *>(QStringLiteral("onScreenDisplay"));
+         if (!osd) {
+             continue;
+@@ -600,7 +609,7 @@
+ 
+ void UnlockApp::osdText(const QString &icon, const QString &additionalText)
+ {
+-    for (auto v : std::as_const(m_views)) {
++    for (auto v : m_views.items()) {
+         auto osd = v->rootObject()->findChild<QQuickItem *>(QStringLiteral("onScreenDisplay"));
+         if (!osd) {
+             continue;
+--- a/greeter/greeterapp.h
++++ b/greeter/greeterapp.h
+@@ -4,6 +4,8 @@
+ SPDX-License-Identifier: GPL-2.0-or-later
+ */
+ #pragma once
++
++#include "lockviews.h"
+ 
+ #include <KPackage/PackageStructure>
+ #include <QGuiApplication>
+@@ -70,17 +72,18 @@
+ 
+ private:
+     void initialize();
++    bool isLocked() const;
+     QQuickItem *loadWallpaperPlugin(QObject *parent, int width, int height, KConfigPropertyMap *config);
+     void screenGeometryChanged(QScreen *screen, const QRect &geo);
+     QWindow *getActiveScreen();
+ 
+     QString m_packageName;
+     QUrl m_mainQmlPath;
+-    QList<QQuickView *> m_views;
++    PamAuthenticators *m_authenticators;
++    LockViews m_views;
+     QTimer *m_delayedLockTimer;
+     bool m_testing;
+     bool m_immediateLock;
+-    PamAuthenticators *m_authenticators;
+     int m_graceTime;
+     bool m_noLock;
+ 
+--- /dev/null
++++ b/greeter/lockviews.h
+@@ -0,0 +1,63 @@
++// SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
++#pragma once
++
++#include "pamauthenticators.h"
++
++#include <QQuickView>
++#include <QScreen>
++#include <algorithm>
++
++// A success is delivered to the theme's Connections. Only a completed view can consume it.
++class LockViews
++{
++public:
++    explicit LockViews(PamAuthenticators &auth)
++        : m_auth(auth)
++    {
++        m_auth.setGraceLocked(true);
++    }
++
++    const QList<QQuickView *> &items() const
++    {
++        return m_views;
++    }
++
++    void add(QQuickView *view)
++    {
++        m_views.append(view);
++        update();
++    }
++
++    void remove(QQuickView *view)
++    {
++        m_views.removeOne(view);
++        update();
++    }
++
++    void setLocked(bool locked)
++    {
++        m_locked = locked;
++        update();
++    }
++
++    void update()
++    {
++        const bool allowed = m_locked && std::ranges::any_of(m_views, [](const QQuickView *view) {
++            return view->screen() && !view->screen()->geometry().isEmpty();
++        });
++        if (m_allowed == allowed) {
++            return;
++        }
++        m_allowed = allowed;
++        m_auth.setGraceLocked(!allowed);
++        if (allowed) {
++            m_auth.startAuthenticating();
++        }
++    }
++
++private:
++    QList<QQuickView *> m_views;
++    PamAuthenticators &m_auth;
++    bool m_locked = false;
++    bool m_allowed = false;
++};
+--- a/greeter/pamauthenticator.cpp
++++ b/greeter/pamauthenticator.cpp
+@@ -75,14 +75,17 @@
+ 
+ void PamAuthenticator::tryUnlock()
+ {
+-    m_unlocked = false;
+-
+-    if (m_busy) {
+-        return;
++    if (m_unlocked || m_unavailable || m_busy || m_authenticateWatcher) {
++        return;
++    }
++
++    // cancel() stops the worker, start a new one
++    if (!m_workerProcess) {
++        startWorker();
+     }
+ 
+     if (!m_ready) {
+-        qCWarning(KSCREENLOCKER_GREET) << "Worker not ready yet, cannot authenticate.";
++        m_startPending = true;
+         return;
+     }
+ 
+@@ -91,16 +94,16 @@
+         return;
+     }
+ 
+-    if (m_unavailable) {
+-        qCDebug(KSCREENLOCKER_GREET) << "PAM service is not available. Cannot authenticate.";
+-        return;
+-    }
+-
+-    setBusy(true);
++    m_startPending = false;
+     auto watcher = new QDBusPendingCallWatcher(m_dbusWorker->Authenticate(), this);
++    m_authenticateWatcher = watcher;
+     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher]() {
+         watcher->deleteLater();
+         setBusy(false);
++        if (m_authenticateWatcher != watcher) {
++            return; // A busyChanged handler cancelled this conversation.
++        }
++        m_authenticateWatcher = nullptr;
+ 
+         if (watcher->error().isValid()) {
+             qCWarning(KSCREENLOCKER_GREET) << "PAM worker failed to authenticate:" << watcher->error().message();
+@@ -142,6 +145,7 @@
+ 
+         qWarning() << "Unexpected authentication result" << reply.value();
+     });
++    setBusy(true);
+ }
+ 
+ void PamAuthenticator::respond(const QByteArray &response)
+@@ -157,6 +161,9 @@
+ 
+ void PamAuthenticator::cancel()
+ {
++    m_startPending = false;
++    m_unlocked = false;
++    m_pendingPrompt = {};
+     m_prompt.clear();
+     m_promptForSecret.clear();
+     m_infoMessage.clear();
+@@ -164,6 +171,13 @@
+ 
+     if (!m_dbusWorker) {
+         return;
++    }
++
++    // The worker is going away, its reply to the pending authentication is an error that must not be reported as a failure
++    if (m_authenticateWatcher) {
++        m_authenticateWatcher->disconnect(this);
++        m_authenticateWatcher->deleteLater();
++        m_authenticateWatcher = nullptr;
+     }
+ 
+     // Timings here are tight because we may need to cancel two workers, we don't want to get stuck on this for too long.
+@@ -173,6 +187,10 @@
+         m_workerProcess->waitForFinished((5ms).count());
+     }
+     quitWorkerProcess();
++    setBusy(false);
++    // The next worker becomes ready when it pings
++    m_ready = false;
++    Q_EMIT readyChanged();
+ }
+ 
+ QString PamAuthenticator::getPrompt() const
+@@ -222,6 +240,9 @@
+     Q_ASSERT(!m_ready); // only one ping ever. thank you!
+     m_ready = true;
+     Q_EMIT readyChanged();
++    if (m_startPending && m_ready) {
++        tryUnlock();
++    }
+ }
+ 
+ QString PamAuthenticator::Prompt(const QString &msg)
+@@ -287,9 +308,18 @@
+             qWarning() << "Worker did not terminate in time, killing it.";
+             m_workerProcess->kill();
+         }
+-    }
+-    m_dbusWorker.reset();
+-    m_workerProcess = nullptr;
++        m_workerProcess->deleteLater();
++        m_workerProcess = nullptr;
++    }
++    if (m_server) {
++        m_server->disconnect(this);
++        m_server->deleteLater();
++        m_server = nullptr;
++    }
++    if (m_dbusWorker) {
++        m_dbusWorker->connection().unregisterObject(u"/org/kde/plasma/screenlocker"_s);
++        m_dbusWorker.reset();
++    }
+ }
+ 
+ void PamAuthenticator::startWorker()
+--- a/greeter/pamauthenticator.h
++++ b/greeter/pamauthenticator.h
+@@ -15,6 +15,7 @@
+ #include <memory>
+ #include <qqmlregistration.h>
+ 
++class QDBusPendingCallWatcher;
+ class QDBusServer;
+ class QProcess;
+ class OrgKdePlasmaScreenlockerWorkerInterface;
+@@ -131,6 +132,7 @@
+     QString m_infoMessage;
+     QString m_service;
+     bool m_ready = false;
++    bool m_startPending = false;
+     bool m_busy = false;
+     bool m_unlocked = false;
+     bool m_unavailable = false;
+@@ -140,6 +142,7 @@
+     NoninteractiveAuthenticatorTypes m_authenticatorType;
+     QDBusMessage m_pendingPrompt;
+     QDBusServer *m_server = nullptr;
++    QDBusPendingCallWatcher *m_authenticateWatcher = nullptr;
+     std::unique_ptr<OrgKdePlasmaScreenlockerWorkerInterface> m_dbusWorker;
+     QProcess *m_workerProcess = nullptr;
+     QString m_user;
+--- a/greeter/pamauthenticators.cpp
++++ b/greeter/pamauthenticators.cpp
+@@ -83,7 +83,7 @@
+ 
+ void PamAuthenticators::startAuthenticating()
+ {
+-    if (d->graceLocked) {
++    if (d->graceLocked || !d->locked) {
+         return;
+     }
+ 
+@@ -141,6 +141,9 @@
+             qCDebug(KSCREENLOCKER_GREET) << "PamAuthenticators: Success from non-interactive authenticator" << qUtf8Printable(d->m_fingerprintAuthenticator->service());
+             saveAuthenticatorType(m_authenticator);
+             d->locked = false;
++            if (d->m_activeAuthenticator) {
++                d->m_activeAuthenticator->cancel();
++            }
+             Q_EMIT succeeded();
+         });
+         connect(d->m_fingerprintAuthenticator.get(), &PamAuthenticator::availableChanged, this, [this] {
+@@ -200,6 +203,9 @@
+         qCDebug(KSCREENLOCKER_GREET) << "PamAuthenticators: Success from interactive authenticator" << qUtf8Printable(authenticator->service());
+         saveAuthenticatorType(m_authenticator);
+         d->locked = false;
++        if (d->m_fingerprintAuthenticator) {
++            d->m_fingerprintAuthenticator->cancel();
++        }
+         Q_EMIT succeeded();
+     });
+     connect(authenticator, &PamAuthenticator::availableChanged, this, [this, authenticator] {
+@@ -250,12 +256,8 @@
+         Q_EMIT errorMessageChanged();
+     });
+ 
+-    d->graceLocked = false;
+-    // graceLock has no signal
+     d->hadPrompt = false;
+     Q_EMIT hadPromptChanged();
+-    d->state = AuthenticatorsState::Idle;
+-    Q_EMIT stateChanged();
+ 
+     Q_EMIT promptChanged();
+     Q_EMIT promptForSecretChanged();
+@@ -263,7 +265,10 @@
+     Q_EMIT errorMessageChanged();
+     Q_EMIT busyChanged();
+ 
+-    startAuthenticating();
++    // Worker creation is queued. Only resume a request that is still current.
++    if (d->state == AuthenticatorsState::Authenticating) {
++        startAuthenticating();
++    }
+ }
+ 
+ // these properties are delegated to interactive authenticator
+@@ -317,7 +322,16 @@
+ 
+ void PamAuthenticators::setGraceLocked(bool b)
+ {
++    if (d->graceLocked == b) {
++        return;
++    }
+     d->graceLocked = b;
++    if (b) {
++        // An implicit reader can still be active after an interactive failure set the aggregate idle.
++        d->locked = true;
++
++        stopAuthenticating();
++    }
+ }
+ 
+ bool PamAuthenticators::hadPrompt() const

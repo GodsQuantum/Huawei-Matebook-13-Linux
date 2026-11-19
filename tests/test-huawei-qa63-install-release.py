@@ -8,9 +8,9 @@ FLAGS=("GXFP_S3_FRESH_BG_QA", "GXFP_FDT_DOWN_PROOF_QA",
        "GXFP_SPI_CS_SETUP_QA", "GXFP_ROTATION_RESCUE_QA",
        "GXFP_DECOUPLE_ACK_PACING_QA", "GXFP_WIDE_ROTATION_QA")
 class HuaweiQA63Install(unittest.TestCase):
- def test_arch_package_proven_and_huawei_exact_version(self):
+ def test_arch_package_and_huawei_exact_version(self):
   pkg=(FP/"packaging/arch/PKGBUILD").read_text()
-  self.assertIn("pkgver=1.94.100.goodix51a0.qa63\npkgrel=1",pkg)
+  self.assertIn("pkgver=1.94.100.goodix51a0.qa63\npkgrel=3",pkg)
   root=(ROOT/"install.sh").read_text()
   self.assertIn("fingerprint_expected_version()",root)
   self.assertIn("--fingerprint-only) DO_PLATFORM=0; DO_GPU=0; DO_FINGERPRINT=1",root)
@@ -18,7 +18,7 @@ class HuaweiQA63Install(unittest.TestCase):
   self.assertIn('"$ROOT/fingerprint/install.sh"',root)
   standalone=(FP/"install-linux.sh").read_text()
   self.assertIn('exec "$ROOT/install-arch.sh"',standalone)
-  self.assertIn('PORTABLE_RELEASE="rel71.74-qa63.1"',standalone)
+  self.assertIn('PORTABLE_RELEASE="rel71.74-qa63.2"',standalone)
  def test_all_qa_gates_in_one_native_service_and_portable(self):
   arch=(FP/"packaging/arch/fprintd-goodix51a0.conf").read_text()
   portable=(FP/"install-linux.sh").read_text()

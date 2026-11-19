@@ -1,7 +1,9 @@
 **Safety update — 19 November 2026.** After a deep-S3 lockout affecting both fingerprint and password, the optional KDE QML v12 is quarantined and Pegasus runs stock Plasma 6.8.3 QML. The greeter remembers `Regular` (password) to avoid KDE crash #528285. `Fingerprint=false` hides the selectable fingerprint method while the parallel fingerprint worker can still run. The operator confirmed one password unlock after a kernel-confirmed deep-S3 resume. Repeatability remains unverified. [Incident report](fingerprint/docs/real-hardware-certification.md).
 
-**Current GitHub `main` installer: GXFP51A0 QA63.1, installed on the reference Pegasus laptop.**
-The Arch and portable installers select QA63.1; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
+**Reliability changes — 19 November 2026.** QA63.2 protects calibration when the sensor is partly touched and waits for a confirmed lift before continuing a scored attempt. A separate [native KDE 6.8.3 candidate](fingerprint/integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate) retains early authentication requests and can restart the implicit fingerprint conversation after a timeout. The driver installer does not replace KDE. Fresh physical LOCK/S3 checks remain required; historical QA63 results do not certify this revision.
+
+**Current GitHub `main` installer: GXFP51A0 QA63.2 (19 November 2026).**
+The Arch and portable installers select QA63.2; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
 
 <div align="center">
 
@@ -21,7 +23,7 @@ Goodix **GXFP51A0 / GF3658 ST411** fingerprint · NVIDIA **MX250** on-demand pow
 
 </div>
 
-**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/docs/rel71.74-production-20261028.md). QA63.1 is the current installer driver; rel71.74 is the latest **published** reference release. Full hardware certification, especially repeated S4, remains open (issue #32). Older rel71.69 data are historical.
+**Maintainers and AI agents:** [project map](docs/PROJECT_MAP.md) · [repository rules](AGENTS.md) · [fingerprint current state](fingerprint/docs/rel71.74-production-20261028.md). QA63.2 is the current installer driver; rel71.74 is the latest **published** reference release. Full hardware certification, especially repeated S4, remains open (issue #32). Older rel71.69 data are historical.
 
 **Fingerprint reliability warning (2026-10-27):** rel71.69 is now an **experimental prerelease**. An S4 hibernation resume on the reference machine required 38.69 s to prepare the sensor, and biometric login was unavailable. Previous isolated successful LOCK/S3/S4 trials do not certify reliable sleep, boot or first-touch login. See [confirmed issue #32](https://github.com/GodsQuantum/Huawei-Matebook-13-Linux/issues/32). Preserve password fallback; avoid depending on fingerprint alone.
 
@@ -76,7 +78,7 @@ Other Huawei revisions are not assumed compatible; hardware-specific modules val
 
 | Area | Status | Policy |
 | --- | --- | --- |
-| **Fingerprint** | **QA63.1 current installer · genuine S4 and cold boot not certified** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
+| **Fingerprint** | **QA63.2 current installer · genuine S4 and cold boot not certified** | Repository-native libfprint/fprintd; threshold 7; rel71.30 adds connected enrollment + conservative per-view near-miss rescue |
 | **MX250 power** | **GPU Manager v3.2** | Intel-first session; MX250 PCI-off while idle; R580 + PRIME only for managed dGPU apps |
 | **Huawei hotkeys / Fn-lock / battery interfaces** | **Mainline Linux** | Use `huawei_wmi`; do not duplicate it |
 | **Intel GPU / Wi-Fi / Bluetooth / camera / touch / stylus / audio** | **Native Linux** | Verify only |

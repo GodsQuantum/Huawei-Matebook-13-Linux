@@ -16,7 +16,7 @@ if [[ -f "$ROOT/EXPERIMENTAL_BUILD_ONLY" ]]; then
 fi
 
 STATE_DIR="/var/lib/gxfp51a0-local-install"
-PORTABLE_RELEASE="rel71.74-qa63.1"
+PORTABLE_RELEASE="rel71.74-qa63.2"
 PREFIX="/usr/local"
 LIBEXEC_DIR="$PREFIX/libexec"
 UDEV_RULE_FILE="/etc/udev/rules.d/70-libfprint-goodix51a0-local.rules"
@@ -78,8 +78,8 @@ Other distributions are supported with --no-install-deps when they provide:
   gobject-2.0, gmodule-2.0, gusb, cairo, gudev-1.0, openssl, udev, pixman-1.
 
 systemd is optional for the library itself. On systemd systems the installer
-primes the sensor exactly once before graphical login; no periodic keepalive or
-external suspend/resume hook is installed. On non-systemd systems fprintd is
+starts the existing native fprintd service for graphical login; no extra prewarm
+service, periodic keepalive or external suspend/resume hook is installed. On non-systemd systems fprintd is
 isolated through a higher-priority D-Bus activation wrapper
 under /etc/dbus-1/system-services; no global dynamic-linker override is needed.
 The distribution's native PAM/desktop integration remains in charge.
@@ -602,7 +602,7 @@ echo "GXFP51A0 portable installation complete."
 echo "  distribution: $distro"
 echo "  libfprint:     $LIBDIR/libfprint-2.so.2.0.0"
 echo "  udev rule:     $UDEV_RULE_FILE"
-echo "  runtime:       standard fprintd + one-shot boot prime; no periodic keepalive or external sleep hook"
+echo "  runtime:       native resident fprintd; no extra prewarm service, periodic keepalive or external sleep hook"
 if (( SYSTEMD_AVAILABLE )); then
   echo "  library scope: fprintd only (LD_LIBRARY_PATH service override)"
 else

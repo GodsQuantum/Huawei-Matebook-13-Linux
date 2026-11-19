@@ -1,0 +1,68 @@
+--- a/greeter/pamauthenticator.cpp
++++ b/greeter/pamauthenticator.cpp
+@@ -113,6 +113,7 @@
+ 
+         decltype(m_dbusWorker->Authenticate()) reply = watcher->reply();
+         switch (reply.value()) {
++        case WorkerResult::Type::FingerprintTimeout:
+         case WorkerResult::Type::Failure: {
+             // Guard against particularly broken PAM services. For example when pam-u2f doesn't find a token because it is
+             // not plugged in it will fail the authentication, but it will do it so slowly that the timing checks in the
+@@ -130,6 +131,11 @@
+             }
+             m_lastFailed = now;
+ 
++            if (reply.value() == WorkerResult::Type::FingerprintTimeout && !m_unavailable) {
++                // Deliver after failed handlers, which may stop the session or select another method.
++                QMetaObject::invokeMethod(this, &PamAuthenticator::fingerprintTimedOut, Qt::QueuedConnection);
++            }
++
+             Q_EMIT failed();
+             return;
+         }
+--- a/greeter/pamauthenticator.h
++++ b/greeter/pamauthenticator.h
+@@ -102,6 +102,7 @@
+     void errorMessage(const QString &msg);
+     void succeeded();
+     void failed();
++    void fingerprintTimedOut();
+     void availableChanged();
+     void loginFailedDelayStarted(const uint uSecDelay);
+     void inPasswordDelayChanged();
+--- a/greeter/pamauthenticators.cpp
++++ b/greeter/pamauthenticators.cpp
+@@ -137,6 +137,13 @@
+         d->m_fingerprintAuthenticator.reset();
+     } else if (m_authenticator != Authenticator::Fingerprint && !d->m_fingerprintAuthenticator) {
+         d->m_fingerprintAuthenticator = std::make_unique<PamAuthenticator>(KSCREENLOCKER_PAM_FINGERPRINT_SERVICE, m_loginName, PamAuthenticator::Fingerprint);
++        connect(d->m_fingerprintAuthenticator.get(), &PamAuthenticator::fingerprintTimedOut, this, [this] {
++            // Continue only the implicit reader. Password and explicit methods keep their normal retry policy.
++            if (m_authenticator == Authenticator::Regular && d->locked && !d->graceLocked && d->state == AuthenticatorsState::Authenticating
++                && d->m_fingerprintAuthenticator->isAvailable()) {
++                d->m_fingerprintAuthenticator->tryUnlock();
++            }
++        });
+         connect(d->m_fingerprintAuthenticator.get(), &PamAuthenticator::succeeded, this, [this] {
+             qCDebug(KSCREENLOCKER_GREET) << "PamAuthenticators: Success from non-interactive authenticator" << qUtf8Printable(d->m_fingerprintAuthenticator->service());
+             saveAuthenticatorType(m_authenticator);
+--- a/greeter/worker/main.cpp
++++ b/greeter/worker/main.cpp
+@@ -329,7 +329,7 @@
+             m_available = false;
+             return WorkerResult::Type::Unavailable;
+         }
+-        return WorkerResult::Type::Failure;
++        return WorkerResult::Type::FingerprintTimeout;
+     }
+ 
+     if (rc == PAM_AUTHINFO_UNAVAIL || rc == PAM_MODULE_UNKNOWN) {
+--- a/greeter/worker/result.h
++++ b/greeter/worker/result.h
+@@ -10,5 +10,6 @@
+     Failure = 0,
+     Success = 1,
+     Unavailable = 2,
++    FingerprintTimeout = 3,
+ };
+ } // namespace WorkerResult

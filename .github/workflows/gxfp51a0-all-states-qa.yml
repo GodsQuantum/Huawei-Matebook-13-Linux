@@ -94,3 +94,42 @@ jobs:
               test -f /work/stage/usr/lib/plasmalogin-helper
               echo PLM_681_NATIVE_CI_BUILD_PASS
             '
+
+  kscreenlocker-readiness:
+    name: KScreenLocker 6.8.3 native build and PAM readiness tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify the signed release, build the package and run its private PAM suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          recipe="$GITHUB_WORKSPACE/fingerprint/integration/kscreenlocker-upstream-s3/native-readiness-6.8.3"
+          docker run --rm -i --mount "type=bind,source=$recipe,target=/input,readonly" \
+            archlinux:base-devel bash -euo pipefail <<'CONTAINER'
+          useradd --create-home --user-group builder
+          install -d -o builder -g builder /work
+          cd /work || exit 1
+          runuser -u builder -- cp /input/PKGBUILD /input/*.patch .
+          runuser -u builder -- makepkg --printsrcinfo > /tmp/kscreenlocker.srcinfo
+          mapfile -t deps < <(awk '$1 ~ /^(depends|makedepends|checkdepends)$/ {print $3}' /tmp/kscreenlocker.srcinfo | sort -u)
+          pacman -Syu --needed --noconfirm -- cmake ninja curl gnupg "${deps[@]}"
+
+          runuser -u builder -- bash -euo pipefail <<'BUILD'
+          export CMAKE_GENERATOR=Ninja CMAKE_BUILD_PARALLEL_LEVEL=2
+          export GNUPGHOME="$PWD/gnupg" XDG_RUNTIME_DIR="$PWD/runtime"
+          install -dm700 "$GNUPGHOME" "$XDG_RUNTIME_DIR"
+          primary=58743C0A93487794BC44ECE873C3D7758E7A544A
+          signing=FCAB0BE4409158D0DA74C07B9F027EB21F7D0A18
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$signing" -o plasma-release.asc
+          fingerprint=$(gpg --batch --with-colons --show-keys plasma-release.asc |
+            awk -F: '$1 == "pub" {primary=1} $1 == "fpr" && primary {print $10; primary=0}')
+          test "$fingerprint" = "$primary"
+          gpg --batch --import plasma-release.asc
+          makepkg --check --noconfirm
+          BUILD
+          CONTAINER
