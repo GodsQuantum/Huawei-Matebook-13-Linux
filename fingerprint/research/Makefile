@@ -609,3 +609,8 @@ test_guided_enroll_cross_distro:
 	./tests/test_guided_enroll_cross_distro.sh
 
 test: test_guided_enroll_cross_distro
+
+.PHONY: test_contact_lifecycle_behavior
+test: test_contact_lifecycle_behavior
+test_contact_lifecycle_behavior:
+	python3 ./tests/test_contact_lifecycle_behavior.py

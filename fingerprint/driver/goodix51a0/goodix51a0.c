@@ -108,6 +108,7 @@ struct _FpiDeviceGoodix51A0
 
   guint         poll_id;     /* finger-detection timeout source */
   gboolean      fast_first_poll_armed; /* proved full touch at warm Claim */
+  gboolean      needs_release; /* block capture until FDT confirms a pending lift */
   int           poll_count;  /* poll iterations, bounded to avoid hanging */
   GPtrArray    *enroll_feats;/* descriptor sets accumulated during enrolment */
   int           fdt_base[GXFP_FDT_ZONE_COUNT]; /* FDT baseline (finger absent) */
@@ -3904,6 +3905,49 @@ gx_active_sleep_recovery (FpDevice *dev, FpiSsm *ssm)
   return TRUE;
 }
 
+static gboolean
+gx_fdt_release_confirmed (FpiDeviceGoodix51A0 *self, const int *cur,
+                          guint8 touchflag)
+{
+  return (touchflag & 0x3fu) == 0 &&
+         gx_fdt_drop (self->fdt_base, cur) < GOODIX_FDT_DROP / 2 &&
+         gx_fdt_mean (cur) >= self->fdt_abs;
+}
+
+static void
+gx_report_ready (FpDevice *dev, GxTask *t)
+{
+  gboolean changed = fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NEEDED);
+
+  if (t->verifying)
+    fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d READY",
+             t->identifying ? "IDENTIFY" : "VERIFY",
+             t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+  fp_info ("finger status: needed=1 present=0 changed=%d", changed ? 1 : 0);
+}
+
+static void
+gx_report_release (FpDevice *dev, GxTask *t)
+{
+  fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NONE);
+  if (t->verifying)
+    fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d RELEASED",
+             t->identifying ? "IDENTIFY" : "VERIFY",
+             MAX (t->tries, 1), GX_VERIFY_MAX_ATTEMPTS);
+}
+
+static void
+gx_retry_rebase_after_release (FpiSsm *ssm, GxTask *t)
+{
+  /* Refresh a potentially stale warm background on the SESSION worker. */
+  t->rearm_mcu_before_retry = FALSE;
+  t->rebase_before_retry = TRUE;
+  fp_warn ("GXFP51A0 AUTH_TRACE scheduling fresh background after "
+           "failed usable press before retry %d/%d",
+           t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+  fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
+}
+
 /* Non-blocking poll, re-armed by timeout until the finger is detected. */
 static gboolean
 gx_poll_on (gpointer user_data)
@@ -3925,6 +3969,26 @@ gx_poll_on (gpointer user_data)
     {
       fp_dbg ("wait-on: detection probe failed");
       goto again;
+    }
+
+  /* A timeout or recovery can defer release proof to this state. Keep
+   * the previous contact active until the same FDT sample proves a lift. */
+  if (self->needs_release)
+    {
+      if (!gx_fdt_release_confirmed (self, cur, touchflag))
+        goto again;
+      self->needs_release = FALSE;
+      gx_report_release (dev, t);
+      if (t->verifying && t->rearm_mcu_before_retry)
+        {
+          self->poll_id = 0;
+          gx_retry_rebase_after_release (ssm, t);
+          return G_SOURCE_REMOVE;
+        }
+      /* A confirmed lift starts a fresh, bounded wait for the next pose. */
+      t->polls = 0;
+      gx_report_ready (dev, t);
+      return G_SOURCE_CONTINUE;
     }
 
   /* Reuse the values just read; probing twice per poll perturbs the sensor. */
@@ -3969,7 +4033,12 @@ again:
   if (++t->polls > GX_POLL_MAX)
     {
       self->poll_id = 0;
-      fpi_ssm_mark_failed (ssm, fpi_device_retry_new (FP_DEVICE_RETRY_GENERAL));
+      /* Finish a prolonged release wait without an automatic fprintd retry. */
+      if (self->needs_release)
+        fpi_ssm_mark_failed (ssm, g_error_new_literal (
+          G_IO_ERROR, G_IO_ERROR_TIMED_OUT, "finger release was not confirmed"));
+      else
+        fpi_ssm_mark_failed (ssm, fpi_device_retry_new (FP_DEVICE_RETRY_GENERAL));
       return G_SOURCE_REMOVE;
     }
   return G_SOURCE_CONTINUE;
@@ -4001,6 +4070,8 @@ gx_poll_off (gpointer user_data)
   int cur[GXFP_FDT_ZONE_COUNT];
   guint8 touchflag = 0;
   gboolean off = FALSE;
+  gboolean retry_verification;
+  gboolean complete;
 
   if (gx_cancelled (dev, ssm))
     { self->poll_id = 0; return G_SOURCE_REMOVE; }
@@ -4009,60 +4080,49 @@ gx_poll_off (gpointer user_data)
     return G_SOURCE_REMOVE;
 
   if (gx_fdt_probe_ex (self, cur, &touchflag) == 0 &&
-      !gx_fdt_touch_is_finger (touchflag) &&
-      gx_fdt_drop (self->fdt_base, cur) < GOODIX_FDT_DROP / 2 &&
-      gx_fdt_mean (cur) >= self->fdt_abs)
+      gx_fdt_release_confirmed (self, cur, touchflag))
     off = TRUE;
 
-  if (off || ++t->polls >
-             (self->capture_recovery_pending ? GX_RECOVERY_OFF_POLLS
-                                             : GX_POLL_OFF))
+  if (!off && ++t->polls <= (self->capture_recovery_pending
+                            ? GX_RECOVERY_OFF_POLLS : GX_POLL_OFF))
+    return G_SOURCE_CONTINUE;
+
+  /* A synchronous WAIT_ON transition can install the next poll source. */
+  self->poll_id = 0;
+  retry_verification = t->verifying && !t->match_reported &&
+                       t->tries < GX_VERIFY_MAX_ATTEMPTS;
+  complete = t->verifying ? !retry_verification : t->stage >= GX_ENROLL_STAGES;
+
+  if (off)
+    gx_report_release (dev, t);
+  else
     {
-      fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NONE);
-      if (t->verifying)
-        fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d RELEASED",
-                 t->identifying ? "IDENTIFY" : "VERIFY",
-                 MAX (t->tries, 1), GX_VERIFY_MAX_ATTEMPTS);
-
-      if (self->capture_recovery_pending)
-        {
-          fp_info ("GXFP51A0 finger released/timeout after transport desync; "
-                   "rebuilding session before another biometric press");
-          fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
-        }
-      /* Next enrollment view, fixed-budget verify retry, or finish. */
-      else if (t->verifying && !t->match_reported &&
-               t->tries < GX_VERIFY_MAX_ATTEMPTS)
-        {
-          if (t->rearm_mcu_before_retry)
-            {
-              /* A low-scoring but otherwise valid press can mean the retained
-               * warm background/imaging state drifted.  Historical reference MateBook 13
-               * runs show fresh WARM_REBASE frames restoring scores from 2-4
-               * to 7-20+.  Refresh only now, after release, and do it on the
-               * existing SESSION worker so the fprintd main loop stays live. */
-              t->rearm_mcu_before_retry = FALSE;
-              t->rebase_before_retry = TRUE;
-              fp_warn ("GXFP51A0 AUTH_TRACE scheduling fresh background after "
-                       "failed usable press before retry %d/%d",
-                       t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
-              self->poll_id = 0;
-              fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
-              return G_SOURCE_REMOVE;
-            }
-
-          fp_info ("verify: finger released; waiting for retry press %d/%d",
-                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
-          fpi_ssm_jump_to_state (ssm, GX_ST_WAIT_ON);
-        }
-      else if (t->verifying || t->stage >= GX_ENROLL_STAGES)
-        fpi_ssm_jump_to_state (ssm, GX_ST_DONE);
-      else
-        fpi_ssm_jump_to_state (ssm, GX_ST_WAIT_ON);
-      self->poll_id = 0;
-      return G_SOURCE_REMOVE;
+      fp_info ("GXFP51A0 finger release unconfirmed at timeout");
+      if (self->capture_recovery_pending || !complete)
+        self->needs_release = TRUE;
     }
-  return G_SOURCE_CONTINUE;
+  if (self->capture_recovery_pending)
+    {
+      fp_info ("GXFP51A0 rebuilding session after transport desync");
+      fpi_ssm_jump_to_state (ssm, GX_ST_SESSION);
+    }
+  else if (complete)
+    fpi_ssm_jump_to_state (ssm, GX_ST_DONE);
+  else if (off && retry_verification && t->rearm_mcu_before_retry)
+    gx_retry_rebase_after_release (ssm, t);
+  else
+    {
+      /* Keep the same operation and its attempts or enrollment views while
+       * WAIT_ON gates the next pose on a confirmed lift. */
+      if (!off && !t->verifying)
+        fpi_device_enroll_progress (dev, t->stage, NULL,
+          fpi_device_retry_new (FP_DEVICE_RETRY_REMOVE_FINGER));
+      if (off && retry_verification)
+        fp_info ("verify: finger released; waiting for retry press %d/%d",
+                 t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
+      fpi_ssm_jump_to_state (ssm, GX_ST_WAIT_ON);
+    }
+  return G_SOURCE_REMOVE;
 }
 
 static gboolean
@@ -4841,20 +4901,15 @@ gx_run_state (FpiSsm *ssm, FpDevice *dev)
 
     case GX_ST_WAIT_ON:
       {
-        gboolean changed;
-
         t->polls = 0;
         t->contact_since_us = 0;
-        changed = fpi_device_report_finger_status (dev, FP_FINGER_STATUS_NEEDED);
-        if (t->verifying)
-          fp_warn ("GXFP51A0 %s_TRACE physical press %d/%d READY",
-                   t->identifying ? "IDENTIFY" : "VERIFY",
-                   t->tries + 1, GX_VERIFY_MAX_ATTEMPTS);
-        fp_info ("finger status: needed=1 present=0 changed=%d",
-                 changed ? 1 : 0);
+        if (self->needs_release)
+          fpi_device_report_finger_status (dev, FP_FINGER_STATUS_PRESENT);
+        else
+          gx_report_ready (dev, t);
         /* Only pre-held six-zone contacts skip the first wait. */
         gboolean fast = t->verifying && t->tries == 0 &&
-          self->fast_first_poll_armed &&
+          !self->needs_release && self->fast_first_poll_armed &&
           g_strcmp0 (g_getenv ("GXFP_FIRST_POLL_HELD_QA"), "1") == 0;
         self->fast_first_poll_armed = FALSE;
         if (fast)
@@ -5115,7 +5170,7 @@ gx_warm_fast_ready (FpiDeviceGoodix51A0 *self)
   self->fast_first_poll_armed =
     (touchflag & 0x3fu) == 0x3fu && mean < self->fdt_abs;
 
-  if (!gx_fdt_touch_is_finger (touchflag) && mean >= GOODIX_FDT_ABS)
+  if ((touchflag & 0x3fu) == 0 && mean >= GOODIX_FDT_ABS)
     {
       memcpy (self->fdt_base, cur, sizeof self->fdt_base);
       self->fdt_abs = mean - GOODIX_FDT_ABS_MARGIN;
@@ -5157,7 +5212,7 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
    * boundaries were handled before this function, so an otherwise warm
    * context with a responsive FDT may proceed and let the real Verify capture
    * exercise TLS.  The previous clean background is retained for this press. */
-  if (gx_fdt_touch_is_finger (before_touchflag) ||
+  if ((before_touchflag & 0x3fu) != 0 ||
       before_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();
@@ -5184,7 +5239,7 @@ gx_warm_validate (FpiDeviceGoodix51A0 *self)
     goto out;
 
   after_mean = gx_fdt_mean (after);
-  if (gx_fdt_touch_is_finger (after_touchflag) ||
+  if ((after_touchflag & 0x3fu) != 0 ||
       after_mean < GOODIX_FDT_ABS)
     {
       self->warm_last_activity_us = g_get_monotonic_time ();

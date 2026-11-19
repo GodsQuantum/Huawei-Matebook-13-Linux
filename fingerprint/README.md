@@ -1,6 +1,8 @@
 **Safety update — 19 November 2026.** After a deep-S3 lockout affecting both fingerprint and password, the optional KDE QML v12 is quarantined and Pegasus runs stock Plasma 6.8.3 QML. The greeter remembers `Regular` (password) to avoid KDE crash #528285. `Fingerprint=false` hides the selectable fingerprint method while the parallel fingerprint worker can still run. The operator confirmed one password unlock after a kernel-confirmed deep-S3 resume. Repeatability remains unverified. [Incident report](docs/real-hardware-certification.md).
 
-**Current source installer: QA63.1 (18 November 2026); Pegasus currently runs QA63-1.**
+**Reliability changes — 19 November 2026.** QA63.2 protects calibration when the sensor is partly touched and waits for a confirmed lift before continuing a scored attempt. A separate [native KDE 6.8.3 candidate](integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate) retains early authentication requests and can restart the implicit fingerprint conversation after a timeout. The driver installer does not replace KDE. Fresh physical LOCK/S3 checks remain required; historical QA63 results do not certify this revision.
+
+**Current source installer: QA63.2 (19 November 2026), Arch package QA63-3.**
 **Historical v12 trials (18 November).** The then-active opt-in workaround
 started fingerprint authentication without pointer movement and hid the
 prompt. Several unlocks passed after right-index re-enrollment. One placement
@@ -34,7 +36,7 @@ Earlier rel71.30 and rel71.24 reference notes below are historical, not the curr
 
 ### Recommended preview: rel71.30 (reference-machine field test)
 
-At that historical time rel71.30 was the default (superseded by QA63.1). Native KDE enrollment followed by eight successful scored verification captures on the reference MateBook 13 at threshold 7 (7, 10, 7, 13, 9, 11, 11, 19). No post-enrollment ACK/TLS errors were logged during that series. This is not a population-level false-acceptance estimate. rel71.24 is still the last fully cold-boot/deep-S3 validated rollback (rel71.18 older immutable reference).
+At that historical time rel71.30 was the default (superseded by QA63.2). Native KDE enrollment followed by eight successful scored verification captures on the reference MateBook 13 at threshold 7 (7, 10, 7, 13, 9, 11, 11, 19). No post-enrollment ACK/TLS errors were logged during that series. This is not a population-level false-acceptance estimate. rel71.24 is still the last fully cold-boot/deep-S3 validated rollback (rel71.18 older immutable reference).
 
 ### Changes in rel71.30
 
@@ -79,7 +81,7 @@ A reader already stuck in repeated TLS digest failures recovered without reboot 
 
 ImageBase freshness is separate from the long-lived TLS context: stale background state is refreshed before biometric READY while healthy warm Claims keep the fast FDT-only path.
 
-The active biometric decision is conservative: fixed threshold 7, best single enrolled view, no score addition or fusion, and no score-conditioned same-placement retry. A usable image receives one score; a score below 7 requires lift/reposition. Up to three independent physical placements are allowed.
+The active biometric decision is conservative: fixed threshold 7, best single enrolled view, no score addition or fusion, and no score-conditioned same-placement retry. A usable image receives one score; a score below 7 requires lift/reposition. Up to three independent physical placements are allowed per driver action.
 
 Full rationale and package hashes: [`docs/validated-checkpoint-71.24.md`](docs/validated-checkpoint-71.24.md).
 
@@ -106,7 +108,7 @@ The installer:
 3. builds the reviewed driver reproducibly;
 4. validates the distribution `fprintd` ABI **before** system installation;
 5. installs native udev/spidev integration and the fprintd runtime path;
-6. installs one bounded boot prime and removes periodic keepalive/external sleep glue;
+6. uses the existing resident fprintd service and removes obsolete keepalive/external sleep glue;
 7. uses the desktop's native fprintd/PAM integration by default; optional legacy Plasma integrations are never applied silently;
 8. preserves password authentication in parallel;
 9. preserves existing fingerprint templates and the validated PMK cache;
@@ -174,22 +176,24 @@ processes/stacks. The production installer therefore:
 - never silently inserts `pam_fprintd` into a global password stack;
 - always leaves password authentication available.
 
-For Plasma 6.7.5, the repository carries package-managed KScreenLocker and
-Plasma Login Manager integrations used by the validated reference setup.
+Historical Plasma 6.7.5 compatibility packages require the explicit
+`--legacy-plasma-patches` option. The separate native KDE 6.8.3 candidate
+is documented in [the native integration guide](integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate).
+Neither path silently replaces the current desktop packages.
 
-## Production package invariants
+## Current package invariants
 
-The Arch/CachyOS production package contains the recommended rel71.30 driver and only
-one GXFP-specific lifecycle helper: a **one-shot boot prime** before graphical
-login. It deliberately does **not** package:
+The Arch/CachyOS package contains the QA63.2 driver and a drop-in for the
+existing native fprintd service. It does **not** package:
 
+- a separate boot-prime helper or service;
 - periodic warm-keepalive timers/services;
 - external fprintd suspend services;
 - resume-prewarm hooks.
 
 Normal idle readiness is retained inside the resident fprintd/libfprint process
-without polling. S3 recovery is handled by the native driver lifecycle plus
-KScreenLocker PAM resume handling.
+without an external polling service. S3 recovery stays inside the native
+libfprint/fprintd lifecycle; desktop authentication is a separate boundary.
 
 ### Optional privacy-preserving matcher validation
 
@@ -201,7 +205,7 @@ no biometric capture dump writer.
 
 ## Installation by distribution
 
-Research from rel24–rel61 is retained in [historical research](docs/history/), the [research log](docs/research-log.md) and Git history. These notes are **not current installation instructions**. Install the rel71.30 preview; keep rel71.24 for cold-boot/deep-S3-validated rollback.
+Research from rel24–rel61 is retained in [historical research](docs/history/), the [research log](docs/research-log.md) and Git history. These notes are **not current installation instructions**. The current source installer selects QA63.2; rel71.30 and rel71.24 are historical preview and rollback references.
 
 ### Arch / CachyOS
 
@@ -218,20 +222,19 @@ The installer:
 3. installs `libfprint-goodix51a0` and `fprintd`;
 4. grants fprintd only the additional gpiochip device access needed by this
    driver;
-5. installs an early cold-boot prewarm ordered before the display manager;
+5. starts the existing native fprintd service through graphical.target;
 6. keeps deep-resume recovery inside libfprint itself, with no external
    system-sleep hook or worker;
 7. deliberately installs no periodic synthetic Claim keepalive;
-8. when KDE Plasma 6.7.5 is present, installs the reversible window-ready
-   lock-screen integration and its pacman reapply hook;
-9. when Plasma Login Manager 6.7.5 is installed, builds/installs the
-   package-managed concurrent password/fingerprint compatibility package;
+8. leaves the current KDE QML and desktop packages unchanged by default;
+9. exposes historical Plasma 6.7.5 packages only through the explicit
+   `--legacy-plasma-patches` option;
 10. removes obsolete development timing state, reloads udev and restarts
     fprintd without touching enrollments or the PMK cache.
 
-Non-KDE desktops are left unchanged. On KDE, one package-owned
-LockScreenUi.qml file is intentionally patched by the integration helper and
-restored on driver removal.
+Native desktop integration is preserved. The historical QML helper's ordinary
+`--apply` is quarantined after the sleep lockout; it does not patch
+`LockScreenUi.qml`. Its explicit experimental path is not a default install.
 
 By default, enroll, remove and verify fingerprints through your desktop's native graphical settings (KDE Plasma **System Settings → Users**, GNOME **Settings → Users**). The installer never starts command-line biometric enrollment or verification.
 

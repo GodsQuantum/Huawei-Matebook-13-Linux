@@ -65,7 +65,8 @@ assert "self->warm_sleep_clock_valid = FALSE" in abandon
 # boundaries were rejected before this function, so defer the rebase and let
 # the real Verify frame exercise TLS.
 assert "gx_fdt_probe_ex (self, cur, &before_touchflag)" in warm
-assert "gx_fdt_touch_is_finger (before_touchflag)" in warm
+assert "(before_touchflag & 0x3fu) != 0" in warm
+assert "(after_touchflag & 0x3fu) != 0" in warm
 assert "before_mean < GOODIX_FDT_ABS" in warm
 assert warm.index("before_mean < GOODIX_FDT_ABS") < warm.index("gx_capture_warm_background_frame (self, fresh_bg)")
 assert "gx_capture_warm_background_frame (self, fresh_bg)" in warm

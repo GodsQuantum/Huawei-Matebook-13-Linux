@@ -1,0 +1,64 @@
+# Based on the Arch Linux kscreenlocker 6.8.3-1 recipe.
+pkgname=kscreenlocker
+pkgver=6.8.3
+pkgrel=1.2
+pkgdesc='Library and components for secure lock screen architecture'
+arch=(x86_64)
+url='https://kde.org/plasma-desktop/'
+license=(LGPL-2.0-or-later)
+depends=(glibc kcmutils kconfig kcoreaddons kcrash kdeclarative kglobalaccel
+         ki18n kidletime kio kirigami knotifications kpackage ksvg kwindowsystem
+         kxmlgui layer-shell-qt libkscreen libstdc++ pam libplasma qt6-base qt6-declarative)
+makedepends=(extra-cmake-modules kdoctools)
+checkdepends=(dbus pam_wrapper)
+groups=(plasma)
+_arch_source='https://gitlab.archlinux.org/archlinux/packaging/packages/kscreenlocker/-/raw/6.8.3-1'
+source=("https://download.kde.org/stable/plasma/$pkgver/$pkgname-$pkgver.tar.xz"{,.sig}
+        "$_arch_source/kde.pam"
+        "$_arch_source/kde-fingerprint.pam"
+        "$_arch_source/kde-smartcard.pam"
+        01-worker-readiness.patch
+        02-fingerprint-timeout.patch
+        03-pam-regressions.patch)
+sha256sums=('03c61481bb8934c6beaf8f8dd986d2679c0f59f8336e548d85f0872b767edf01'
+            'SKIP'
+            'adba7bb7c27eb3a572e5e9d3cea0dbeebe59d3634472d1863d14fe892cb13b2b'
+            '32734b4e1ec8b7f7e32b6cb2d68285c5c4f15f53736bba085096e76095181241'
+            '5d9c31cbf66e8e455b9559c929f184efd598f714743d5a1e6ce20adb44dc4b2d'
+            '4620bcb1224ccfb5fd0844914423e252681b4d5295399459d35ed0f0b050a9a3'
+            '70bc52ef632fcbb717b249d58b2cbf355c23eb2e92e8aff3feb167039e1fa4a0'
+            'b76efd7dbbe33aed908f3f30b230fb7c67f66784495cef78b4f593776a1477cd')
+validpgpkeys=('E0A3EB202F8E57528E13E72FD7574483BB57B18D'
+              '58743C0A93487794BC44ECE873C3D7758E7A544A'
+              'D07BD8662C56CB291B316EB2F5675605C74E02CF'
+              '1FA881591C26B276D7A5518EEAAF29B42A678C20')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    for change in 01-worker-readiness 02-fingerprint-timeout 03-pam-regressions; do
+        patch --batch --fuzz=0 -Np1 -i "$srcdir/$change.patch"
+    done
+}
+
+build() {
+    cmake -S "$pkgname-$pkgver" -B build \
+        -DCMAKE_INSTALL_PREFIX=/usr -DKDE_INSTALL_LIBEXECDIR=/usr/lib -DBUILD_TESTING=OFF
+    cmake --build build
+}
+
+check() {
+    # Separate build: the packaged greeter retains its native PAM service names.
+    cmake -S "$pkgname-$pkgver" -B check-build -DBUILD_TESTING=ON \
+        -DKSCREENLOCKER_PAM_PASSWORD_SERVICE=test_password \
+        -DKSCREENLOCKER_PAM_FINGERPRINT_SERVICE=test_fingerprint \
+        -DKSCREENLOCKER_PAM_SMARTCARD_SERVICE=test_smartcard
+    cmake --build check-build --target pamReadinessTest pamTest logindTest
+    QT_QPA_PLATFORM=offscreen dbus-run-session -- ctest --test-dir check-build --output-on-failure
+}
+
+package() {
+    DESTDIR="$pkgdir" cmake --install build
+    for service in kde kde-fingerprint kde-smartcard; do
+        install -Dm644 "$srcdir/$service.pam" "$pkgdir/usr/lib/pam.d/$service"
+    done
+}

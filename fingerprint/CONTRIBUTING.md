@@ -82,4 +82,4 @@ bounded writes, explicit stop conditions and final GPIO264 LOW restoration.
 
 ## Documentation
 
-Keep all root and fingerprint `README.md`, `README.FR.md` and `README.ZH-CN.md` translations synchronized. Distinguish QA63.1 installer source from separately published rel71.74 release assets. Update [public certification requirements](docs/real-hardware-certification.md) when relevant and the private canonical workspace handoff (never publish) when the current boundary changes.
+Keep all root and fingerprint `README.md`, `README.FR.md` and `README.ZH-CN.md` translations synchronized. Distinguish QA63.2 installer source from separately published rel71.74 release assets. Update [public certification requirements](docs/real-hardware-certification.md) when relevant and the private canonical workspace handoff (never publish) when the current boundary changes.

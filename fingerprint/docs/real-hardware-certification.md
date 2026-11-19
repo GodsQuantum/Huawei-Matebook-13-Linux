@@ -66,6 +66,79 @@ The operator confirmed one successful password unlock on stock QML with
 Repeatable password fallback and first-touch fingerprint unlock after
 deep S3 remain unverified.
 
+## Update follow-up and native reliability work — 19 November 2026
+
+**CONFIRMED from the local journal and package database.** The 11:08–11:09
+update changed libffi and other user-space packages, but not KDE, Qt, the
+kernel, fprintd or the installed QA63 driver. The running fprintd still mapped
+the replaced libffi file. A controlled fprintd-only restart at 14:39:57–14:40:02
+loaded the current library; both enrolled fingers remained available. No
+reboot was performed. A deleted library mapping alone does not establish
+the cause of an authentication failure.
+
+At 14:31:23 the greeter logged two early-worker warnings. The first reader
+preparation began at 14:31:39.826 and reached READY at 14:31:40.771 after
+refreshing the stale background. It closed at 14:31:46.280 without a logged
+detected contact, image capture or score. No S3 transition occurred in this
+interval. **HYPOTHESIS:** an early authentication request was lost until
+the lockscreen UI became active. The surviving journal does not identify
+the D-Bus requester or the exact input event.
+
+**Software changes, separate from hardware certification.** QA63.2 requires
+a clear touch mask before replacing a warm calibration reference and keeps
+a release wait distinct from a new physical placement. A late lift preserves
+the active scored-attempt counter and partially completed enrollment.
+The matcher threshold, TLS-GCM, templates and gallery search are unchanged.
+The separate [KDE 6.8.3 native candidate](../integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate)
+addresses worker readiness, outstanding PAM calls and implicit-fingerprint
+timeouts without restoring the quarantined QML.
+
+Offline tests and native builds validate software paths, not a successful
+physical unlock. The earlier QA63 first-touch timings are comparison data;
+they do not certify this changed package. Fresh LOCK/S3 observations and
+negative controls remain necessary. The earlier password-after-resume
+success is retained as evidence for the stock configuration used then.
+
+### Installed candidate and software gates
+
+The reference machine was updated on 19 November, 15:33:42–15:33:59 CET:
+
+- Driver: `libfprint-goodix51a0 1.94.100.goodix51a0.qa63-3` (source QA63.2),
+  package SHA256 `2526cf53c353956e825de6aa9c9d73805c26976faa4059862ae26f5f1588879e`.
+- Native greeter: `kscreenlocker 6.8.3-1.2`,
+  package SHA256 `e840eb307901676fb6a96cab082216dd05541fd237187565118a6b392558e395`.
+
+Post-install verification found the new driver library loaded in the running
+fprintd process. Native Claim/Release passed without starting verification or
+enrollment. Both enrolled fingers remained listed. Package integrity checks
+reported 0 altered files; stock QML, the three vendor PAM files, the dedicated
+fingerprint/password configuration and remembered `Regular` state were unchanged.
+No reboot, forced lock or suspend occurred.
+
+`make -C fingerprint verify` passed, including the full offline suite, source
+manifest and reproducible libfprint build. The focused driver fixture has 24
+passing cases. Native KDE CTest passed 4/4 entries, including 14 Qt/PAM lifecycle
+scenarios and real offscreen Qt Quick views. Production and test PAM services
+are built separately. The added Arch CI job runs the same signed-source
+package build and private PAM tests.
+
+The previous driver archive was absent from the verified caches. A private
+native rollback package was reconstructed from the unchanged installed files
+and pacman metadata; every payload, mode, owner and link was checked against
+the original mtree. Its SHA256 is
+`04637d0db12a6ffaec4072883b8cefb9f4c4c492c090dcee63c65b379dbd16b6`.
+This is not the historical archive: its package metadata was regenerated and
+the original build manifest was unavailable. The official KDE rollback is
+also retained.
+
+**Not yet validated:** a physical fingerprint unlock or deep-S3 cycle with
+these newly installed packages. The successful earlier password-after-S3 test
+used the preceding stock greeter. Slow hardware failures can share the same
+PAM result as a normal fingerprint timeout, so sequential retries may continue
+while the lock requests authentication. The optional KDE recipe targets
+6.8.3 specifically; a later distro KDE upgrade may replace it and requires a
+fresh compatibility review.
+
 ## Historical v12 trials — Pegasus, 18 November 2026
 
 The following checks used the opt-in KDE Plasma 6.8.3 v12 lockscreen

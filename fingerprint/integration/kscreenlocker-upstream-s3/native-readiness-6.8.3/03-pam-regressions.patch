@@ -1,0 +1,425 @@
+--- a/autotests/CMakeLists.txt
++++ b/autotests/CMakeLists.txt
+@@ -19,6 +19,7 @@
+ # PamTest
+ #######################################
+ 
++find_package(PkgConfig REQUIRED)
+ pkg_search_module(PamWrapper REQUIRED pam_wrapper>=1.1.6)
+ pkg_get_variable(PamWrapperModuleDir pam_wrapper "modules")
+ # We use a different target dir so we can QFINDTESTDATA the two dirs separately
+@@ -34,3 +35,27 @@
+ )
+ set_tests_properties(ksmserver-pamTest PROPERTIES ENVIRONMENT "${ksmserver-pamTest-environment}")
+ ecm_mark_as_test(pamTest)
++
++
++# Exercise the real worker through private pam_wrapper services.
++configure_file(data/test_service.in services/${KSCREENLOCKER_PAM_PASSWORD_SERVICE})
++add_library(pam_attempt_probe MODULE pam_attempt_probe.c)
++target_link_libraries(pam_attempt_probe PRIVATE ${PAM_LIBRARIES})
++file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/services/${KSCREENLOCKER_PAM_FINGERPRINT_SERVICE}"
++    CONTENT "auth optional $<TARGET_FILE:pam_attempt_probe>\nauth required ${PamWrapperModuleDir}/pam_matrix.so\n")
++foreach(result timeout unavailable)
++    configure_file(data/test_service.in "${result}/${KSCREENLOCKER_PAM_PASSWORD_SERVICE}")
++    configure_file(data/test_service.in "${result}/${KSCREENLOCKER_PAM_SMARTCARD_SERVICE}")
++    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${result}/${KSCREENLOCKER_PAM_FINGERPRINT_SERVICE}"
++        CONTENT "auth required $<TARGET_FILE:pam_attempt_probe> ${result}\n")
++endforeach()
++add_executable(pamReadinessTest pamreadinesstest.cpp)
++add_dependencies(pamReadinessTest kscreenlocker_worker pam_attempt_probe)
++target_link_libraries(pamReadinessTest Qt::Test Qt::Quick kscreenlocker_authenticator)
++target_compile_definitions(pamReadinessTest PRIVATE
++    BUILT_WORKER="$<TARGET_FILE:kscreenlocker_worker>"
++    TEST_SERVICES="${CMAKE_CURRENT_BINARY_DIR}/services"
++    TEST_PASSWORD_DB="${CMAKE_CURRENT_SOURCE_DIR}/data/test_db")
++add_test(NAME ksmserver-pamReadinessTest COMMAND pamReadinessTest)
++set_tests_properties(ksmserver-pamReadinessTest PROPERTIES ENVIRONMENT "${ksmserver-pamTest-environment};QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
++ecm_mark_as_test(pamReadinessTest)
+--- /dev/null
++++ b/autotests/pam_attempt_probe.c
+@@ -0,0 +1,33 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++// Test-only module. It reports entry into a conversation and never authenticates anyone.
++#include <security/pam_ext.h>
++#include <security/pam_modules.h>
++#include <string.h>
++#include <time.h>
++
++#define EXPORTED __attribute__((visibility("default")))
++
++EXPORTED int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
++{
++    (void)flags;
++    if (pam_info(pamh, "readiness-test-attempt") != PAM_SUCCESS) {
++        return PAM_SYSTEM_ERR;
++    }
++    if (argc == 0) {
++        return PAM_IGNORE;
++    }
++    if (strcmp(argv[0], "timeout") == 0) {
++        const struct timespec verification = {0, 300 * 1000 * 1000};
++        nanosleep(&verification, NULL);
++    }
++    return PAM_AUTHINFO_UNAVAIL;
++}
++
++EXPORTED int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
++{
++    (void)pamh;
++    (void)flags;
++    (void)argc;
++    (void)argv;
++    return PAM_IGNORE;
++}
+--- /dev/null
++++ b/autotests/pamreadinesstest.cpp
+@@ -0,0 +1,348 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++#include <KLibexec>
++#include <QDir>
++#include <QQmlContext>
++#include <QQuickItem>
++#include <QFile>
++#include <QFileInfo>
++#include <QSignalSpy>
++#include <QTemporaryDir>
++#include <QTest>
++
++#include "../greeter/lockviews.h"
++
++using namespace Qt::StringLiterals;
++
++class PamReadinessTest : public QObject
++{
++    Q_OBJECT
++
++private Q_SLOTS:
++    void initTestCase()
++    {
++        QVERIFY(qgetenv("LD_PRELOAD").contains("libpam_wrapper.so"));
++        QVERIFY(m_home.isValid());
++        QVERIFY(QFileInfo(QStringLiteral(BUILT_WORKER)).isExecutable());
++        QCOMPARE(QFileInfo(KLibexec::path(u"kscreenlocker_worker"_s)).canonicalFilePath(), QFileInfo(QStringLiteral(BUILT_WORKER)).canonicalFilePath());
++        QVERIFY(QFileInfo(QStringLiteral(TEST_PASSWORD_DB)).isFile());
++        QVERIFY(QFileInfo(QStringLiteral(TEST_SERVICES) + u"/test_service").isFile());
++        qputenv("XDG_CONFIG_HOME", m_home.filePath(u"config"_s).toUtf8());
++        qputenv("XDG_CONFIG_DIRS", m_home.filePath(u"config"_s).toUtf8());
++        qputenv("XDG_STATE_HOME", m_home.filePath(u"state"_s).toUtf8());
++        const auto configDir = m_home.filePath(u"config"_s);
++        QVERIFY(QDir().mkpath(configDir));
++        QFile config(configDir + u"/kscreenlockerrc");
++        QVERIFY(config.open(QIODevice::WriteOnly));
++        QVERIFY(config.write("[Authenticators]\nSmartcard=true\n") > 0);
++        config.close();
++        qputenv("PAM_WRAPPER", "1");
++        qputenv("PAM_WRAPPER_SERVICE_DIR", TEST_SERVICES);
++        qputenv("PAM_MATRIX_PASSWD", TEST_PASSWORD_DB);
++    }
++
++    void init()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", TEST_SERVICES);
++    }
++
++    void earlyStartOnce()
++    {
++        PamAuthenticator auth(u"test_service"_s, u"test_user"_s);
++        QSignalSpy prompts(&auth, &PamAuthenticator::promptForSecret);
++        QSignalSpy success(&auth, &PamAuthenticator::succeeded);
++        QVERIFY(!auth.property("ready").toBool());
++        auth.tryUnlock();
++        QTRY_COMPARE_WITH_TIMEOUT(prompts.count(), 1, 1500);
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++        QCOMPARE(prompts.count(), 1);
++    }
++
++    void cancelBeforeReady()
++    {
++        PamAuthenticator auth(u"test_service"_s, u"test_user"_s);
++        QSignalSpy prompts(&auth, &PamAuthenticator::promptForSecret);
++        auth.tryUnlock();
++        auth.cancel();
++        QTRY_VERIFY(auth.property("ready").toBool());
++        QTest::qWait(200);
++        QCOMPARE(prompts.count(), 0);
++        auth.tryUnlock();
++        QTRY_COMPARE(prompts.count(), 1);
++    }
++
++    void duplicateStartDuringPrompt()
++    {
++        PamAuthenticator auth(u"test_service"_s, u"test_user"_s);
++        QSignalSpy prompts(&auth, &PamAuthenticator::promptForSecret);
++        QSignalSpy failure(&auth, &PamAuthenticator::failed);
++        QSignalSpy success(&auth, &PamAuthenticator::succeeded);
++        QTRY_VERIFY(auth.property("ready").toBool());
++        auth.tryUnlock();
++        QTRY_COMPARE(prompts.count(), 1);
++        QSignalSpy busy(&auth, &PamAuthenticator::busyChanged);
++        auth.tryUnlock();
++        QCOMPARE(busy.count(), 0);
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++        QTest::qWait(200);
++        QCOMPARE(prompts.count(), 1);
++        QCOMPARE(failure.count(), 0);
++    }
++
++    void stopWhilePrompting()
++    {
++        PamAuthenticator auth(u"test_service"_s, u"test_user"_s);
++        QSignalSpy prompts(&auth, &PamAuthenticator::promptForSecret);
++        QSignalSpy success(&auth, &PamAuthenticator::succeeded);
++        QSignalSpy failure(&auth, &PamAuthenticator::failed);
++        QTRY_VERIFY(auth.property("ready").toBool());
++        auth.tryUnlock();
++        QTRY_COMPARE(prompts.count(), 1);
++        auth.cancel();
++        QTest::qWait(200);
++        QCOMPARE(prompts.count(), 1);
++        QCOMPARE(failure.count(), 0);
++        QCOMPARE(success.count(), 0);
++        auth.tryUnlock();
++        QTRY_COMPARE_WITH_TIMEOUT(prompts.count(), 2, 1500);
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++    }
++
++    void passwordWhileFingerprintPending()
++    {
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy finger(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy success(&auth, &PamAuthenticators::succeeded);
++        QSignalSpy failures(&auth, &PamAuthenticators::failed);
++        auth.startAuthenticating();
++        QTRY_COMPARE_WITH_TIMEOUT(finger.count(), 1, 1500);
++        auto *reader = finger.first().at(1).value<PamAuthenticator *>();
++        QVERIFY(reader);
++        QTRY_VERIFY(!reader->getPromptForSecret().isEmpty());
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        QVERIFY(!auth.isUnlocked());
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++        QVERIFY(auth.isUnlocked());
++        auth.startAuthenticating(); // A late theme heartbeat.
++        QTest::qWait(200);
++        QCOMPARE(finger.count(), 1);
++        QCOMPARE(failures.count(), 0);
++        QCOMPARE(success.count(), 1);
++        QVERIFY(!reader->isBusy());
++        QVERIFY(reader->getPromptForSecret().isEmpty());
++    }
++
++    void deferredCreationAfterStop()
++    {
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy finger(&auth, &PamAuthenticators::noninteractiveInfo);
++        auth.startAuthenticating();
++        auth.stopAuthenticating();
++        QCoreApplication::sendPostedEvents(&auth, QEvent::MetaCall);
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        QTest::qWait(200);
++        QVERIFY(auth.promptForSecret().isEmpty());
++        QCOMPARE(finger.count(), 0);
++        auth.startAuthenticating();
++        QTRY_COMPARE(finger.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++    }
++
++    void graceBlocksDeferredStart()
++    {
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy finger(&auth, &PamAuthenticators::noninteractiveInfo);
++        auth.setGraceLocked(true);
++        auth.startAuthenticating();
++        QCoreApplication::sendPostedEvents(&auth, QEvent::MetaCall);
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        QTest::qWait(200);
++        QCOMPARE(finger.count(), 0);
++        QVERIFY(auth.promptForSecret().isEmpty());
++        auth.setGraceLocked(false);
++        auth.startAuthenticating();
++        QTRY_COMPARE(finger.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++    }
++
++    void fingerprintTimeoutRearms()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", QFileInfo(QStringLiteral(TEST_SERVICES)).dir().filePath(u"timeout"_s).toUtf8());
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        auth.startAuthenticating();
++        QTRY_VERIFY_WITH_TIMEOUT(attempts.count() >= 2, 2000);
++        auto *reader = attempts.first().at(1).value<PamAuthenticator *>();
++        QVERIFY(reader);
++        // Suspiciously fast repeated failures still trip the existing breaker.
++        QTRY_VERIFY_WITH_TIMEOUT(!reader->isAvailable(), 4500);
++        const auto stopped = attempts.count();
++        auth.startAuthenticating();
++        QTest::qWait(500);
++        QCOMPARE(attempts.count(), stopped);
++    }
++
++    void stopDuringFingerprintRetry()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", QFileInfo(QStringLiteral(TEST_SERVICES)).dir().filePath(u"timeout"_s).toUtf8());
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        auth.startAuthenticating();
++        QTRY_VERIFY_WITH_TIMEOUT(attempts.count() >= 2, 2000);
++        auth.stopAuthenticating();
++        const auto stopped = attempts.count();
++        QTest::qWait(500);
++        QCOMPARE(attempts.count(), stopped);
++        QVERIFY(!auth.isUnlocked());
++    }
++
++    void switchMethodDuringFingerprintTimeout()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", QFileInfo(QStringLiteral(TEST_SERVICES)).dir().filePath(u"timeout"_s).toUtf8());
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy failures(&auth, &PamAuthenticators::failed);
++        auth.startAuthenticating();
++        QTRY_COMPARE(attempts.count(), 1);
++        QVERIFY(auth.setProperty("authenticator", QVariant::fromValue(PamAuthenticators::Authenticator::Smartcard)));
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        QTRY_VERIFY(failures.count() >= 1);
++        QTest::qWait(400);
++        QCOMPARE(attempts.count(), 1);
++    }
++
++    void passwordSuccessDuringFingerprintTimeout()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", QFileInfo(QStringLiteral(TEST_SERVICES)).dir().filePath(u"timeout"_s).toUtf8());
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy success(&auth, &PamAuthenticators::succeeded);
++        auth.startAuthenticating();
++        QTRY_COMPARE(attempts.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++        QTest::qWait(500);
++        QCOMPARE(attempts.count(), 1);
++        QVERIFY(auth.isUnlocked());
++    }
++
++    void viewLifecycle()
++    {
++        QTemporaryDir dir;
++        QVERIFY(dir.isValid());
++        QFile theme(dir.filePath(u"Lock.qml"_s));
++        QVERIFY(theme.open(QIODevice::WriteOnly));
++        const auto size = theme.write(R"(
++            import QtQuick
++            Item {
++                property int accepted: 0
++                Connections {
++                    target: authenticator
++                    function onSucceeded() { accepted++ }
++                }
++            }
++        )");
++        QVERIFY(size > 0);
++        theme.close();
++
++        PamAuthenticators auth(u"test_user"_s);
++        LockViews views(auth);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        auto show = [&]() {
++            auto view = std::make_unique<QQuickView>();
++            view->rootContext()->setContextProperty(u"authenticator"_s, &auth);
++            view->setSource(QUrl::fromLocalFile(theme.fileName()));
++            if (view->status() == QQuickView::Ready) {
++                views.add(view.get());
++            }
++            return view;
++        };
++        views.setLocked(true);
++        auth.startAuthenticating(); // A theme request while no view can receive a success.
++        QCoreApplication::sendPostedEvents(&auth, QEvent::MetaCall);
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        QTest::qWait(150);
++        QCOMPARE(attempts.count(), 0);
++
++        auto first = show();
++        QCOMPARE(first->status(), QQuickView::Ready);
++        QTRY_COMPARE(attempts.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auto second = show();
++        QCOMPARE(second->status(), QQuickView::Ready);
++        views.remove(first.get());
++        first.reset();
++        QCOMPARE(auth.state(), PamAuthenticators::Authenticating);
++        QCOMPARE(attempts.count(), 1);
++        views.remove(second.get());
++        second.reset();
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        auth.startAuthenticating();
++        QTest::qWait(150);
++        QCOMPARE(attempts.count(), 1);
++        QVERIFY(!auth.isUnlocked());
++
++        auto restored = show();
++        QCOMPARE(restored->status(), QQuickView::Ready);
++        QTRY_COMPARE(attempts.count(), 2);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auth.respond("my_password");
++        QTRY_COMPARE(restored->rootObject()->property("accepted").toInt(), 1);
++        views.remove(restored.get());
++        restored.reset();
++        QVERIFY(!auth.isUnlocked()); // An unconfirmed success belonged to the removed view.
++        auto fresh = show();
++        QCOMPARE(fresh->status(), QQuickView::Ready);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        QCOMPARE(fresh->rootObject()->property("accepted").toInt(), 0);
++    }
++
++    void graceAfterPasswordFailure()
++    {
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy failed(&auth, &PamAuthenticators::failed);
++        auth.startAuthenticating();
++        QTRY_COMPARE(attempts.count(), 1);
++        auto *reader = attempts.first().at(1).value<PamAuthenticator *>();
++        QVERIFY(reader);
++        QTRY_VERIFY(!reader->getPromptForSecret().isEmpty());
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auth.respond("wrong");
++        QTRY_VERIFY(!failed.isEmpty());
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        auth.setGraceLocked(true);
++        QVERIFY(reader->getPromptForSecret().isEmpty());
++        QVERIFY(!auth.isUnlocked());
++    }
++
++    void unavailableFingerprintStaysIdle()
++    {
++        qputenv("PAM_WRAPPER_SERVICE_DIR", QFileInfo(QStringLiteral(TEST_SERVICES)).dir().filePath(u"unavailable"_s).toUtf8());
++        PamAuthenticators auth(u"test_user"_s);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy success(&auth, &PamAuthenticators::succeeded);
++        auth.startAuthenticating();
++        QTRY_COMPARE(attempts.count(), 1);
++        auto *reader = attempts.first().at(1).value<PamAuthenticator *>();
++        QVERIFY(reader);
++        QTRY_VERIFY(!reader->isAvailable());
++        auth.startAuthenticating();
++        QTest::qWait(400);
++        QCOMPARE(attempts.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++    }
++
++private:
++    QTemporaryDir m_home;
++};
++
++QTEST_MAIN(PamReadinessTest)
++#include "pamreadinesstest.moc"

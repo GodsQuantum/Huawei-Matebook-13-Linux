@@ -1,6 +1,8 @@
 **Sécurité — 19 novembre 2026.** Après un blocage du déverrouillage par empreinte et par mot de passe au réveil d’une veille S3 profonde, le QML KDE v12 facultatif est en quarantaine et Pegasus utilise le QML officiel de Plasma 6.8.3. KDE mémorise `Regular` (mot de passe) pour éviter le plantage #528285. `Fingerprint=false` masque la méthode par empreinte dans le sélecteur. L’authentification par empreinte peut encore tourner en parallèle. L’utilisateur a confirmé un déverrouillage par mot de passe après un réveil S3 profond confirmé par le noyau. La répétabilité reste à vérifier. [Rapport d’incident](docs/real-hardware-certification.md).
 
-**Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**
+**Corrections de fiabilité — 19 novembre 2026.** QA63.2 protège la calibration en cas de contact partiel et attend un retrait confirmé avant de poursuivre une tentative déjà scorée. Un [candidat KDE 6.8.3 natif distinct](integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate) conserve les demandes d’authentification arrivées trop tôt et peut reprendre la conversation d’empreinte implicite après expiration. L’installateur du pilote ne remplace pas KDE. De nouveaux essais physiques LOCK/S3 restent nécessaires ; les résultats historiques QA63 ne certifient pas cette révision.
+
+**Installateurs actuels : QA63.2 (19 novembre 2026), paquet Arch QA63-3.**
 **Essais historiques avec v12 (18 novembre).** Le correctif facultatif,
 actif à l’époque, lançait l’authentification par empreinte sans déplacement
 de la souris et masquait l’invite. Après réenregistrement de l’index droit,
@@ -33,7 +35,7 @@ Pilote libfprint natif avec temporisation SPI CS de 50 µs vérifiée par traça
 
 ### Préversion recommandée rel71.30
 
-À l'époque, rel71.30 était installée par défaut (aujourd'hui remplacée par QA63.1). Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
+À l'époque, rel71.30 était installée par défaut (aujourd'hui remplacée par QA63.2). Après réenrôlement dans KDE, les 8 captures de vérification relevées sur le MateBook 13 de référence ont toutes atteint le seuil 7. rel71.24 reste le dernier rollback validé en cold-boot et deep-S3 ; Un premier contrôle négatif a été effectué : majeur droit non enregistré refusé (scores 2/3/4), puis index droit accepté immédiatement (score 16, seuil 7). Cela ne constitue pas une mesure statistique du taux de fausses acceptations. Des essais sur d'autres machines restent nécessaires. rel71.18 reste le rollback historique.
 
 Le recovery décisif s'exécute avant l'énumération libfprint :
 
@@ -97,10 +99,10 @@ Arch/CachyOS peut appeler directement :
 L'installation ne supprime jamais les enrollments ni le cache PMK validé.
 L'upgrade rel42 ne retire que les anciens entiers de timing non secrets.
 
-Pour Plasma Login Manager 6.7.5, le dépôt contient aussi le paquet de
-compatibilité validé qui sépare l'authentification fingerprint et mot de passe :
-saisir le mot de passe n'attend plus l'expiration d'une tentative empreinte.
-Les autres bureaux conservent leur intégration fprintd/PAM native.
+Les paquets historiques Plasma 6.7.5 exigent l'option explicite
+`--legacy-plasma-patches`. Le candidat KDE 6.8.3 natif est distinct et
+n'est pas installé automatiquement avec le pilote. L'intégration fprintd/PAM
+du bureau reste native et le QML v12 reste en quarantaine.
 
 ### Validation matcher optionnelle et respectueuse des données biométriques
 
@@ -108,7 +110,7 @@ Benjamin Allègre (Sigfrodr) publie tools/eval/fp_eval.py dans Sigfrodr/libfprin
 
 ## Installation par distribution
 
-Les anciennes expériences (rel24–rel61) restent accessibles dans l’[historique technique](docs/history/), le [journal de recherche](docs/research-log.md) et Git. Elles ne constituent pas la procédure actuelle. rel71.30 est la préversion recommandée ; rel71.24 reste le dernier rollback entièrement testé après démarrage à froid et deep-S3.
+Les anciennes expériences (rel24–rel61) restent accessibles dans l’[historique technique](docs/history/), le [journal de recherche](docs/research-log.md) et Git. Elles ne constituent pas la procédure actuelle. Les installateurs source sélectionnent QA63.2 ; rel71.30 et rel71.24 sont des références historiques de préversion et de retour arrière.
 
 ### Arch / CachyOS
 
@@ -118,7 +120,7 @@ Depuis la racine du dépôt :
 ./fingerprint/install-arch.sh
 ```
 
-L'installateur vérifie la présence du `GXFP51A0`, compile le patch libfprint, installe `libfprint-goodix51a0` et `fprintd`, ajoute uniquement l'accès gpiochip nécessaire et installe un prime boot one-shot. Il n'installe ni keepalive périodique ni hook externe de reprise S3. Sur Plasma 6.7.5 uniquement, il applique aussi les intégrations KDE/Plasma Login Manager package-managed, idempotentes et réversibles ; les autres bureaux gardent leur intégration fprintd/PAM native.
+L'installateur vérifie la présence du `GXFP51A0`, compile le pilote QA63.2, installe `libfprint-goodix51a0` et utilise le service fprintd natif existant avec l'accès gpiochip nécessaire. Il n'ajoute aucun service de préchauffage, keepalive périodique ni hook de reprise S3. Les paquets et le QML du bureau restent inchangés par défaut ; les anciennes intégrations Plasma 6.7.5 exigent l'option explicite `--legacy-plasma-patches`.
 
 Ensuite, l'interface native (KDE **Configuration du système → Utilisateurs**, GNOME **Paramètres → Utilisateurs**) reste le choix par défaut ; l'assistant guidé optionnel est une application **distincte**. L'installateur n'enrôle et ne vérifie jamais d'empreintes automatiquement.
 

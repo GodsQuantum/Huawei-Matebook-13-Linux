@@ -1,6 +1,8 @@
 **安全公告（2026-11-19）**：一次深度 S3 睡眠恢复后，指纹与密码均无法解锁。可选的 KDE QML v12 已隔离，Pegasus 已恢复 Plasma 6.8.3 原版 QML。锁屏记住的认证方式已设为 `Regular`（密码），以避开 KDE 崩溃问题 #528285。`Fingerprint=false` 会在选择器中隐藏指纹方式，并行指纹认证仍可运行。用户确认在一次经内核证实的深度 S3 恢复后成功使用密码解锁。重复验证仍待完成。[事故报告](docs/real-hardware-certification.md)。
 
-**当前源码安装器：QA63.1（2026-11-18）；Pegasus 安装的包为 QA63-1。**
+**可靠性修订（2026-11-19）**：QA63.2 防止部分触摸污染校准，并在已评分的尝试继续前等待确认手指离开。另有独立的 [KDE 6.8.3 原生候选补丁](integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate)，保留过早发出的认证请求，并可在超时后重启隐式指纹会话。驱动安装器不会替换 KDE。仍须重新进行真机 LOCK/S3 测试；旧 QA63 的结果不能认证本次修订。
+
+**当前源码安装器：QA63.2（2026-11-19），Arch 包版本为 QA63-3。**
 **v12 历史试验（2026-11-18）**。当时启用的可选补丁可在不移动鼠标的情况下启动指纹认证，
 并隐藏提示。重新录入右手食指后多次成功解锁，一次采样得分低于 7。
 两次经内核证实的深度 S3 恢复后，均在重新放置手指后成功解锁。
@@ -22,7 +24,7 @@
 
 ### 推荐预览版 rel71.30；已完整验证的回退版本 rel71.24
 
-当时的默认版本为 rel71.30（现已被 QA63.1 取代）。在 MateBook 13 参考机通过 KDE 图形界面完成指纹录入后，8/8 次正确指纹验证达到阈值 7。之后的人工负面测试中，未注册手指连续获得 2/3/4 分并被拒绝，已注册右手食指获得 16 分并成功解锁。此结果并非对所有设备的安全性统计证明。独立机器、Ubuntu/GNOME、冷启动和 deep-S3 测试尚未完成。rel71.24 是最近完整验证过的 cold-boot/deep-S3 回退版本；rel71.18 保留为更早的不可变回退基线。
+当时的默认版本为 rel71.30（现已被 QA63.2 取代）。在 MateBook 13 参考机通过 KDE 图形界面完成指纹录入后，8/8 次正确指纹验证达到阈值 7。之后的人工负面测试中，未注册手指连续获得 2/3/4 分并被拒绝，已注册右手食指获得 16 分并成功解锁。此结果并非对所有设备的安全性统计证明。独立机器、Ubuntu/GNOME、冷启动和 deep-S3 测试尚未完成。rel71.24 是最近完整验证过的 cold-boot/deep-S3 回退版本；rel71.18 保留为更早的不可变回退基线。
 
 关键 recovery 在 libfprint 枚举之前执行：
 
@@ -84,9 +86,9 @@ Arch/CachyOS 也可以直接执行：
 安装器不会删除 enrollment，也不会删除已经验证的 PMK cache。rel42 升级
 只清理 rel24–rel40 遗留的非敏感 timing 整数。
 
-对于 Plasma Login Manager 6.7.5，本仓库还提供已验证的密码/指纹分离认证
-兼容包：输入密码不会再等待指纹 timeout。其他桌面继续使用各自原生
-fprintd/PAM 集成。
+历史 Plasma 6.7.5 兼容包需要显式选择 `--legacy-plasma-patches`。
+独立的 KDE 6.8.3 原生候选补丁不会随驱动自动安装。
+桌面继续使用原生 fprintd/PAM 集成，QML v12 仍处于隔离状态。
 
 ### 可选的隐私保护 matcher 验证
 
@@ -94,7 +96,7 @@ Benjamin Allègre（Sigfrodr）在 Sigfrodr/libfprint-goodixtls 中发布了 too
 
 ## 各发行版安装说明
 
-rel24–rel61 的旧测试记录保存在[技术历史](docs/history/)、[研究日志](docs/research-log.md)以及 Git 历史中，它们不是当前的安装步骤。当前安装器使用 QA63.1；rel71.30 曾是历史预览版，rel71.24 是更早的回退测试版本。
+rel24–rel61 的旧测试记录保存在[技术历史](docs/history/)、[研究日志](docs/research-log.md)以及 Git 历史中，它们不是当前的安装步骤。当前安装器使用 QA63.2；rel71.30 曾是历史预览版，rel71.24 是更早的回退测试版本。
 
 ### Arch / CachyOS
 
@@ -102,7 +104,7 @@ rel24–rel61 的旧测试记录保存在[技术历史](docs/history/)、[研究
 
     ./fingerprint/install-arch.sh
 
-安装器会检查 GXFP51A0、构建并安装审核过的 libfprint/fprintd、仅增加驱动所需的 gpiochip 权限，并安装一次性的 boot prime；不会安装周期 keepalive，也不会安装外部 S3 resume hook。仅在 Plasma 6.7.5 上，它还会应用 package-managed、幂等且可回滚的 KDE/Plasma Login Manager 兼容集成；其他桌面继续使用自己的原生 fprintd/PAM 集成。之后可使用桌面标准设置，或：
+安装器检查 GXFP51A0、构建 QA63.2 驱动、安装 libfprint-goodix51a0，并使用已有的原生 fprintd 服务及必要的 gpiochip 权限。不会新增预热服务、周期 keepalive 或外部 S3 恢复钩子。默认保留桌面包及 QML；历史 Plasma 6.7.5 集成需要显式选择 `--legacy-plasma-patches`。之后可使用桌面标准设置，或：
 
     # 请通过 KDE/GNOME 原生图形界面添加、删除和验证指纹。
     # 安装程序不启动命令行录入或验证。
