@@ -1,3 +1,10 @@
+**Safety update — 19 November 2026:** After deep S3, the optional KDE QML
+v12 patch was associated with a lockout affecting **fingerprint and password**.
+Pegasus has been restored to stock KDE QML, and KDE-only fingerprint unlocking
+is temporarily disabled in favor of password-first operation; the driver,
+guided app and both fingerprints are preserved. Automatic reactivation of v12
+is quarantined. See [the incident report](fingerprint/docs/real-hardware-certification.md).
+
 **Current GitHub `main` installer: GXFP51A0 QA63.1, installed on the reference Pegasus laptop.**
 The Arch and portable installers select QA63.1; `HUAWEI --fingerprint-only` preserves fingerprints, GPU and system settings. QA63 recorded 3/3 first-touch LOCK and 2/2 deep-S3 successes; ±18-degree unknown-finger rejection, genuine S4 and cold-boot reliability remain unverified. rel71.74 is a separate historical release.
 

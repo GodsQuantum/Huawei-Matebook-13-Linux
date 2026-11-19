@@ -1,3 +1,10 @@
+**Sécurité — 19 novembre 2026 :** la modification KDE QML v12 est
+**mise en quarantaine** après un blocage post-S3 de l'empreinte et du mot de
+passe. Retour au QML KDE officiel sur Pegasus, empreinte désactivée uniquement
+au verrouillage ; le pilote, les empreintes et le mot de passe restent en place.
+--apply ne réinstalle plus v12 ; --apply-experimental est réservé aux tests.
+[Rapport d'incident](docs/real-hardware-certification.md).
+
 **Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**
 **KDE sur Pegasus (18 novembre) :** le correctif Plasma 6.8.3 v12,
 facultatif, lance la biométrie sans déplacement de souris et masque

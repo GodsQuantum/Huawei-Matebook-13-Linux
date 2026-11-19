@@ -167,8 +167,10 @@ else
 fi
 
 if (( DESKTOP_INTEGRATION && LEGACY_PLASMA_PATCHES )) && [[ -x /usr/libexec/gxfp51a0-kde-lockscreen-integrate ]]; then
+  # 2026-11-19 quarantine: --apply is safe no-op on supported helpers.
+  # Never automatically call the unsafe --apply-experimental mode.
   sudo /usr/libexec/gxfp51a0-kde-lockscreen-integrate --apply || true
-  sudo /usr/libexec/gxfp51a0-kde-lockscreen-integrate --check || true
+  echo "INFO: experimental KDE v12 QML lockscreen patch quarantined; password-first stock KDE preferred."
 fi
 
 if [[ -x "$DOCTOR" ]]; then

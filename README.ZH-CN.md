@@ -1,3 +1,9 @@
+**安全公告（2026-11-19）：** 一次真正的深度休眠恢复后，在使用可选
+KDE QML v12 补丁时，指纹与密码都无法解锁。Pegasus 已恢复 KDE 原版 QML，
+仅暂时关闭锁屏指纹并优先使用密码；驱动及两枚指纹均保留。
+现已禁止自动重新启用 v12，详见
+[事故说明](fingerprint/docs/real-hardware-certification.md)。
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux

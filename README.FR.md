@@ -1,3 +1,11 @@
+**Sécurité — 19 novembre 2026 :** après une veille profonde, le correctif
+facultatif KDE QML v12 était présent lors d'un blocage du déverrouillage
+**par empreinte et par mot de passe**. Pegasus est revenu au QML KDE officiel.
+Empreinte temporairement désactivée **sur l'écran verrouillé uniquement** ;
+pilote et deux empreintes préservés, accès par mot de passe prioritaire.
+Réinstallation automatique de v12 interdite.
+[Rapport](fingerprint/docs/real-hardware-certification.md).
+
 <div align="center">
 
 # Huawei MateBook 13 · Linux

@@ -93,6 +93,22 @@ class CurrentRelease(unittest.TestCase):
    with self.subTest(file=file):
     self.assertIn('S3',(ROOT/file).read_text())
 
+ def test_v12_lockout_quarantine_and_password_fallback(self):
+  helper=(ROOT/'fingerprint/integration/kde-lockscreen/gxfp51a0-kde-lockscreen-integrate').read_text()
+  self.assertIn('APPLY_QUARANTINED_AFTER_SLEEP_LOCKOUT',helper)
+  self.assertIn('--apply-experimental',helper)
+  incident=(ROOT/'fingerprint/docs/real-hardware-certification.md').read_text()
+  self.assertIn('19 November 2026',incident)
+  self.assertIn('both fingerprint and password',incident)
+  self.assertIn('kde',incident.lower())
+  for file in ('README.md','README.FR.md','README.ZH-CN.md',
+               'fingerprint/README.md','fingerprint/README.FR.md',
+               'fingerprint/README.ZH-CN.md'):
+   content=(ROOT/file).read_text()
+   with self.subTest(file=file):
+    self.assertIn('v12',content[:1300])
+    self.assertIn('fingerprint/docs/real-hardware-certification.md' if file.startswith('README') else 'docs/real-hardware-certification.md', content[:1400])
+
  def test_active_markdown_relative_links_exist(self):
   import urllib.parse
   for file in ('README.md','README.FR.md','README.ZH-CN.md',

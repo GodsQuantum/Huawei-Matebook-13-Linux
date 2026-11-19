@@ -57,9 +57,15 @@ MouseArea {
 }
 QML
 cp "$stock" "$tmp"
-
-# Stock -> v12: bounded worker retry plus purely cosmetic hidden prompt.
+# Regression gate: the legacy hook / default installer can never reactivate v12.
 GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+cmp -s "$tmp" "$stock"
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h"
+cmp -s "$tmp" "$stock"
+grep -Fq "APPLY_QUARANTINED_AFTER_SLEEP_LOCKOUT" "$h"
+
+# Stock -> v12: experimental mode only, offline upgrade/reversion tests.
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --check
 grep -Fq 'GXFP51A0 quiet-lockscreen-prompt fingerprint integration v12' "$tmp"
 grep -Fq 'authenticator.unlocked || attempts >= 16' "$tmp"
@@ -86,7 +92,7 @@ cmp -s "$tmp" "$stock"
 
 # Existing v10 deployment -> v12 migration and idempotence.
 cp "$stock" "$tmp"
-GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 # Convert v12 to authentic v11 first using the same inverse function.
 source <(sed -n '/^rewrite_v12_to_v11() {/,/^}$/p' "$h")
 TARGET="$tmp" rewrite_v12_to_v11
@@ -124,17 +130,17 @@ old="""        // GXFP51A0 window-ready startup timer BEGIN
 s=s[:start]+old+s[end:]
 p.write_text(s)
 PYMOD
-GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --check
 migrated_sha=$(sha256sum "$tmp" | cut -d' ' -f1)
-GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 test "$migrated_sha" = "$(sha256sum "$tmp" | cut -d' ' -f1)"
 GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --remove
 cmp -s "$tmp" "$stock"
 
 # v9 -> v12: remove only the QML resume block after the automatic upgrade.
 cp "$stock" "$tmp"
-GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 TARGET="$tmp" rewrite_v12_to_v11
 python3 - "$tmp" <<'PY'
 from pathlib import Path
@@ -157,7 +163,7 @@ resume="""        // GXFP51A0 resume rearm BEGIN
 s=s.replace(needle, needle+resume, 1)
 p.write_text(s)
 PY
-GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply
+GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --apply-experimental
 GXFP51A0_KDE_LOCKSCREEN_QML="$tmp" bash "$h" --check
 ! grep -Fq 'GXFP51A0 resume rearm BEGIN' "$tmp"
 

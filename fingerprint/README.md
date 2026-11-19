@@ -1,3 +1,11 @@
+**Critical safety update — 19 November 2026:** The optional KDE QML v12
+lockscreen integration is **quarantined** after a deep-S3 incident affecting
+both biometric and password unlock. Pegasus runs stock KDE QML, password-first
+lockscreen and KDE-only fingerprint disabled; native driver and templates
+remain. Normal --apply is now safe/no-op; --apply-experimental is for
+supervised non-production QA only.
+[Incident report](docs/real-hardware-certification.md).
+
 **Current source installer: QA63.1 (18 November 2026); Pegasus currently runs QA63-1.**
 **Pegasus-specific KDE status (18 November):** The opt-in Plasma 6.8.3
 v12 lockscreen workaround starts biometric authentication without pointer
