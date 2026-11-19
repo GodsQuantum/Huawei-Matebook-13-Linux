@@ -3,6 +3,8 @@
 passe. Retour au QML KDE officiel sur Pegasus, empreinte désactivée uniquement
 au verrouillage ; le pilote, les empreintes et le mot de passe restent en place.
 --apply ne réinstalle plus v12 ; --apply-experimental est réservé aux tests.
+Le dernier authentificateur KDE mémorisé a été remis sur Regular (mot de passe),
+évitant le plantage connu #528285 lorsque Fingerprint est désactivé.
 [Rapport d'incident](docs/real-hardware-certification.md).
 
 **Installateurs actuels : QA63.1 (18 novembre 2026) ; paquet QA63-1 sur Pegasus.**

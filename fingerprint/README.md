@@ -3,7 +3,8 @@ lockscreen integration is **quarantined** after a deep-S3 incident affecting
 both biometric and password unlock. Pegasus runs stock KDE QML, password-first
 lockscreen and KDE-only fingerprint disabled; native driver and templates
 remain. Normal --apply is now safe/no-op; --apply-experimental is for
-supervised non-production QA only.
+supervised non-production QA only. The separate last-used KDE authenticator
+was reset from disabled Fingerprint to Regular to avoid crash bug #528285.
 [Incident report](docs/real-hardware-certification.md).
 
 **Current source installer: QA63.1 (18 November 2026); Pegasus currently runs QA63-1.**

@@ -14,8 +14,26 @@ FDT_DOWN_PROOF incomplete, SPI/TLS session recovery and kscreenlocker
 Worker not ready messages. It does not establish why the password failed.
 
 Related upstream KDE lockscreen problems include bugs #528356 (dropped
-password submissions/pamTimeout property) and #528681 (orphaned greeter
-after grace-period unlock). These are credible, **not proven root causes**.
+password submissions/pamTimeout property), #528681 (orphaned greeter
+after grace-period unlock), and #528285 (crash if the last-used fingerprint
+authenticator remains selected after fingerprint is disabled). These are
+credible, **not proven root causes** of the incident.
+
+**Second, independently verified configuration hazard (19 November):**
+although KDE fingerprint was disabled in user config, Pegasus still had
+`~/.local/state/kscreenlockerrc` with `[Greeter] Authenticator=Fingerprint`.
+Bug #528285 reproduces a greeter crash with precisely that mismatch.
+Without starting a lock or suspending the machine, the remembered
+authenticator was safely changed to `Regular` (password) after creating
+a root-only backup of the original state. The installed state now has
+`Authenticator=Regular`, `Fingerprint=false`, `LockGrace=0`, and the
+official QML SHA remains unchanged. The disabled method must never
+remain in the last-used authenticator slot during an emergency rollback.
+
+This prevents that known disabled-authenticator crash scenario. It does
+**not** prove that every password attempt works after deep-S3: KDE
+bug #528356 can still drop premature submissions, and a supervised
+password-only lock/unlock + genuine resume test remains mandatory.
 
 At 01:44 CET the operator's unlocked Pegasus was changed conservatively:
 stock KDE Plasma 6.8.3 QML restored with verified SHA256
@@ -35,6 +53,7 @@ is resolved; the fix is not a guarantee against future bugs.
 Upstream details:
 https://bugs.kde.org/show_bug.cgi?id=528356
 https://bugs.kde.org/show_bug.cgi?id=528681
+https://bugs.kde.org/show_bug.cgi?id=528285
 
 ## Observed, not fully certified — Pegasus, 18 November 2026
 

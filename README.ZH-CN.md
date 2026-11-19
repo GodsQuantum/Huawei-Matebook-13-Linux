@@ -1,6 +1,7 @@
 **安全公告（2026-11-19）：** 一次真正的深度休眠恢复后，在使用可选
 KDE QML v12 补丁时，指纹与密码都无法解锁。Pegasus 已恢复 KDE 原版 QML，
 仅暂时关闭锁屏指纹并优先使用密码；驱动及两枚指纹均保留。
+已将 KDE 记住的旧 Fingerprint 认证方式恢复为 Regular（密码），以避免已知崩溃问题 #528285。
 现已禁止自动重新启用 v12，详见
 [事故说明](fingerprint/docs/real-hardware-certification.md)。
 

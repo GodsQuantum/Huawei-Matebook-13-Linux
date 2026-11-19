@@ -100,6 +100,10 @@ class CurrentRelease(unittest.TestCase):
   incident=(ROOT/'fingerprint/docs/real-hardware-certification.md').read_text()
   self.assertIn('19 November 2026',incident)
   self.assertIn('both fingerprint and password',incident)
+  self.assertIn('#528285',incident)
+  self.assertIn('Authenticator=Regular',incident)
+  self.assertIn('Authenticator=Fingerprint',incident)
+  self.assertIn('last-used authenticator',incident)
   self.assertIn('kde',incident.lower())
   for file in ('README.md','README.FR.md','README.ZH-CN.md',
                'fingerprint/README.md','fingerprint/README.FR.md',

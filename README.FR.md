@@ -3,7 +3,8 @@ facultatif KDE QML v12 était présent lors d'un blocage du déverrouillage
 **par empreinte et par mot de passe**. Pegasus est revenu au QML KDE officiel.
 Empreinte temporairement désactivée **sur l'écran verrouillé uniquement** ;
 pilote et deux empreintes préservés, accès par mot de passe prioritaire.
-Réinstallation automatique de v12 interdite.
+Méthode mémorisée par KDE réinitialisée de Fingerprint à Regular (mot de
+passe), évitant le plantage connu KDE #528285. Réactivation de v12 interdite.
 [Rapport](fingerprint/docs/real-hardware-certification.md).
 
 <div align="center">

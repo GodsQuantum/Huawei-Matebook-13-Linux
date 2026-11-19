@@ -2,6 +2,7 @@
 与指纹/密码无法解锁的问题同时出现，现已**隔离**。Pegasus 恢复官方 KDE QML，
 仅临时停用锁屏指纹；仍保留驱动、两枚指纹及密码登录。
 普通 --apply 现在不会更改 QML；--apply-experimental 仅供受控 QA 测试。
+KDE 最后使用的认证方式从已禁用的 Fingerprint 改回 Regular（密码），避免已知崩溃 #528285。
 [事故报告](docs/real-hardware-certification.md)。
 
 **当前源码安装器：QA63.1（2026-11-18）；Pegasus 安装的包为 QA63-1。**
