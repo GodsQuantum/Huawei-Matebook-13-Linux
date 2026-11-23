@@ -1,0 +1,19 @@
+# fprintd 1.94.5, upstream MR !259 backport (QA)
+
+Upstream patch: https://gitlab.freedesktop.org/libfprint/fprintd/-/merge_requests/259
+
+Backported verbatim and checked against v1.94.5 commit b54a007: implementation ac6e9ad and its tests aa66ccf. SHA tracking through the commit IDs; patch adds deferred close when Release fails during libfprint suspension and unclaimed cleanup on resume/next Claim.
+
+The existing legacy 0001-goodix51a0-open-before-suspend.patch remains for historical reference but is NOT applied by this PKGBUILD. The current reference Pegasus device already completes its native S3 idle park with the stock fprintd service; changing that successful path would confound the QA. Current package is independent of libfprint QA57; it does not modify the driver, matcher, enrollment, TLS, PAM, suspend mode or the logind inhibitor.
+
+Build in isolated environment and run new fprintd mock tests. On Pegasus, capture the checksum of /var/cache/pacman/pkg/fprintd-1.94.5-2.1-x86_64_v3.pkg.tar.zst before replacement. Keep the rollback package and preserve QA57. Do not promote or merge without true active-Identify suspend/release hardware proof; the prior tested QA57 S3 occurred while idle=1 so it does not prove MR259 fixed a real Pegasus fault.
+
+CT700 on Ubuntu 26.04: true fprintd 1.94.5 sources patched; full 565/565 Meson/D-Bus/PAM regression tests PASS (2026-11-01). Three new MR test call sites were translated from newer self.verify_start() to the pre-existing v1.94.5 device.VerifyStart() without changing expectations. CT700-only sitecustomize shim fixes Python3.14/PyGObject GError bytes formatting in 24 pre-existing error-path assertions; no shim is shipped. Core patch is upstream MR259 code unchanged. No physical active-Identify suspend certification yet.
+
+## Exécution de validation 2026-11-01
+
+- Préparation CT700: fprintd upstream tag v1.94.5 appliqué sans conflit aux deux commits upstream MR259 ac6e9ad (implémentation) et aa66ccf (tests). Tests adaptés sur trois appels historiques de self.verify_start() à self.device.VerifyStart() sans modifier les assertions ni la logique de production.
+- CT700: compilation Meson du daemon et PAM, suite Python D-Bus/mock **565/565 PASS** après correction exclusive au banc Ubuntu 26.04/Python3.14 du formatage GLib.GError.__str__ pour 24 assertions de rejet préexistantes. Le shim de test reste uniquement dans private/experiments/qa-testsite, pas dans cette distribution ni le paquet.
+- Pegasus: makepkg --nodeps --nocheck --cleanbuild --force à partir du tag upstream **signature GPG vérifiée** et du patch b2sum **5e1fb10cda35c2c1ecc18bff03b5820406d31db0530182eb47aa831acbda21e321296f70a6490c6680b88209206fdf4bdcc165b7da0263003ced30c71a1b8dec** : archive fprintd-1.94.5-2.2-x86_64.pkg.tar.zst, SHA256 **9f3ff0e26da353b3aa5856d4e692f9bc95a304334fe0183c20140a16872239cf**. Source linked against libfprint-2 1.94.100 actually installed; binaire contient chemins close-unclaimed et deferred-release. Man pages/gtk-doc non générés pour éviter installation de documentation-only build dependencies (binaire et scripts PAM conservés). Le nouveau paquet créé localement n'a PAS de signature GPG propre ; le tag source signé et les SHA256 sont vérifiés.
+- Rollback stock CachyOS : /var/cache/pacman/pkg/fprintd-1.94.5-2.1-x86_64_v3.pkg.tar.zst, SHA256 **59701283ce2aeeb4b20be98dc08e4c5e5c39a117db49f676f7b491b8760c1bcf**, copie indépendante sous private/candidates/fprintd-mr259-20261101. Main repo et live driver QA57 non modifiés pendant préparation.
+- **Avant promotion** : déployer seulement si contrôle rollback, fprintd PAM, session SSH et enrollment disponibles. Vérifier le fonctionnement du lecteur sans doigt, ensuite un vrai S3 avec Identify actif et l’absence de ReleaseDevice BUSY, et ne pas attribuer à ce backport la réduction de latence FDT non visée.
