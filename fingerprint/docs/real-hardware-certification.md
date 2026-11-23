@@ -4,6 +4,57 @@ The driver is NOT certified until the **same installed package** passes
 cold BOOT, reboot, true deep S3, repeated first-placement KDE LOCK, wrong-finger
 rejection, and password fallback on actual hardware under human supervision.
 
+## Actual QA63.2 + KScreenLocker 6.8.3-1.3 hardware unlocks — 23 November 2026
+
+**Two positive operator-reported hardware results, corroborated by journal.**
+This is a real regression result for the installed package, not synthetic PAM
+or CI evidence. The same fprintd PID 644 used driver
+`libfprint-goodix51a0 1.94.100.goodix51a0.qa63-3` and KDE
+`kscreenlocker 6.8.3-1.3`.
+
+| Scenario | Operator count | Fingerprint capture and outcome | Time |
+| --- | --- | --- | --- |
+| Normal KDE lock | 1 physical placement | One captured image, score **8/7**, biometric success | Greeter 22:41:15, success 22:41:18 CET |
+| Natural deep S3 suspend/resume | 2 physical placements | One scored capture after prewarm, effective score **7/7**, biometric success | S3 resume 22:41:30, success 22:41:40 CET |
+
+For normal lock, fprintd reported `FAST_READY` in 83 ms and an
+`ImageBase` refresh of 889 ms, then
+`DETECTED_HOLD`, capture frame 593 ms, matcher 26 ms and successful
+terminal without release wait. No fingerprint failure preceded this
+one-placement result.
+
+The second test is independently confirmed as **true kernel deep S3**:
+`PM: suspend entry (deep)` at 22:41:26 and `PM: suspend exit` at 22:41:30.
+At 22:41:32, the finger was already touching the reader
+(`CALIBRATION_LIFT_REQUIRED`, touch=0x3f, mean=254), before the
+background was ready. The MCU did not learn that touched frame as a clean
+reference; at 22:41:38 it rejected another touched calibration sample and
+reused an already-validated, age-bounded clean RAM reference. Native
+`NATIVE_S3_RESUME_PREWARM_READY` took **7,318 ms**, compared with the
+prior 21:34 wake's **3,558 ms** prewarm with a different finger-arrival
+timing. A fresh fingerprint Claim began by 22:41:39, and the captured image
+returned effective score **7/7** at 22:41:40 (including the existing
+strict `PIXEL_RESCUE` path). The driver logged a positive terminal;
+the operator confirmed unlock after **two physical placements**. The
+software reports only one scored physical press after READY; it does not
+log the user's first pre-calibration placement as a scored attempt.
+
+**What this validates:** the previously missing KDE-to-PAM-to-fprintd
+request after resume is now present and functional on one real S3 wake;
+one normal lock also passed. **What it does not validate:** repeatability
+over many sleep cycles, cold boot/reboot, live wrong-finger rejection or
+password fallback *on this exact newly installed KDE build*. The older
+password-after-S3 success remains historical evidence for the earlier
+configuration. The current 7/7 result is at the matcher threshold, not
+a reason to lower it. The first-touch S3 delay is now a measurable
+**calibration/contact timing opportunity**, not evidence that KDE failed
+to rearm. Avoid untested matcher/TLS changes while this version is
+producing actual successful authentication.
+
+Private journal evidence is retained in the project's canonical
+release-artifact directory, not committed publicly. Neither raw
+fingerprint images nor templates are included.
+
 ## Critical lockout incident and rollback — 19 November 2026
 
 The operator reported both fingerprint and password unusable after a
