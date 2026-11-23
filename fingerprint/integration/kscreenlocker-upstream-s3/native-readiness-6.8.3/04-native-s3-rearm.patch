@@ -151,9 +151,9 @@
 +        QVERIFY(dir.isValid());
 +        QFile theme(dir.filePath(u"SleepLock.qml"_s));
 +        QVERIFY(theme.open(QIODevice::WriteOnly));
-+        QVERIFY(theme.write("import QtQuick
++        QVERIFY(theme.write(R"QML(import QtQuick
 +Item { property bool visibleResult: false }
-+") > 0);
++)QML") > 0);
 +        theme.close();
 +
 +        PamAuthenticators auth(u"test_user"_s);
@@ -193,9 +193,9 @@
 +        QVERIFY(dir.isValid());
 +        QFile theme(dir.filePath(u"MissedSleep.qml"_s));
 +        QVERIFY(theme.open(QIODevice::WriteOnly));
-+        QVERIFY(theme.write("import QtQuick
++        QVERIFY(theme.write(R"QML(import QtQuick
 +Item {}
-+") > 0);
++)QML") > 0);
 +        theme.close();
 +
 +        PamAuthenticators auth(u"test_user"_s);
