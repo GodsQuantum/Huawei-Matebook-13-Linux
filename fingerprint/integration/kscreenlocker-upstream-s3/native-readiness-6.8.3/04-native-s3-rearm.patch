@@ -129,14 +129,16 @@
      m_startPending = false;
 --- a/greeter/pamauthenticator.h
 +++ b/greeter/pamauthenticator.h
-@@ -111,6 +111,7 @@
-     void tryUnlock();
-     void respond(const QByteArray &response);
-     void cancel();
+@@ -93,6 +93,9 @@
+ 
+     void setInPasswordDelay(bool timeout);
+ 
++    // Internal C++ API; never expose the availability reset as a QML-invokable slot.
 +    void resetUnavailableAfterSleep();
-     void Ping(const QString &message);
-     [[nodiscard]] QString Prompt(const QString &msg);
-     [[nodiscard]] QString MaskedPrompt(const QString &msg);
++
+ Q_SIGNALS:
+     void readyChanged();
+     void busyChanged();
 --- a/autotests/pamreadinesstest.cpp
 +++ b/autotests/pamreadinesstest.cpp
 @@ -302,6 +302,86 @@
