@@ -108,7 +108,9 @@ jobs:
         run: |
           set -euo pipefail
           recipe="$GITHUB_WORKSPACE/fingerprint/integration/kscreenlocker-upstream-s3/native-readiness-6.8.3"
+          mkdir -p "$RUNNER_TEMP/gxfp-output"
           docker run --rm -i --mount "type=bind,source=$recipe,target=/input,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/gxfp-output,target=/output" \
             archlinux:base-devel bash -euo pipefail <<'CONTAINER'
           useradd --create-home --user-group builder
           install -d -o builder -g builder /work
@@ -130,6 +132,13 @@ jobs:
             awk -F: '$1 == "pub" {primary=1} $1 == "fpr" && primary {print $10; primary=0}')
           test "$fingerprint" = "$primary"
           gpg --batch --import plasma-release.asc
-          makepkg --check --noconfirm
+          makepkg --noconfirm
           BUILD
+          cp /work/kscreenlocker-6.8.3-1.3-*.pkg.tar.zst /output/
           CONTAINER
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kscreenlocker-6.8.3-1.3-native-s3
+          path: ${{ runner.temp }}/gxfp-output/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 2

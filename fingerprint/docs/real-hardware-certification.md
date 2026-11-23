@@ -139,6 +139,12 @@ while the lock requests authentication. The optional KDE recipe targets
 6.8.3 specifically; a later distro KDE upgrade may replace it and requires a
 fresh compatibility review.
 
+### 23 November 2026: deep S3 resume without fingerprint PAM activity
+
+Greeter PID 130337 started at 20:29:43 CET before deep S3 and remained until 21:35:48. Kernel resumed at 21:34:10, and fprintd PID 644 completed secure device prewarm by 21:34:14 in 3558 ms; a finger-contaminated calibration was correctly discarded. No post-resume Claim, Identify capture or score appears despite repeated finger placements reported by the operator. This supports a missing or stale KDE/PAM conversation, not a failed hardware initialization. At 19:26 the same driver scored 10/7 following FDT transport recovery and an earlier 3/7 sample.
+
+A 6.8.3-1.3 native KDE candidate adds login1 wake rearm and two PAM/Qt regression tests, preserving the password path. Hardware authentication after this change is not yet certified; threshold 7 and enrollments remain unchanged. Surveyed alternative OpenGoodixSPI remains without end-to-end libfprint capture support for GXFP51A0, and other Goodix GXFP5130/USB models use distinct transports. Sources: https://github.com/PeshalaDilshan/OpenGoodixSPI ; https://github.com/szlukabence/goodix-fingerprint-spi-linux ; https://github.com/matifema/gxfp51a0-linux .
+
 ## Historical v12 trials — Pegasus, 18 November 2026
 
 The following checks used the opt-in KDE Plasma 6.8.3 v12 lockscreen

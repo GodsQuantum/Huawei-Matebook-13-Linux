@@ -1,0 +1,230 @@
+--- a/greeter/lockviews.h
++++ b/greeter/lockviews.h
+@@ -40,9 +40,31 @@
+         update();
+     }
+ 
++    // Called by the native login1 PrepareForSleep event, not by a polling timer.
++    // Wake may arrive without its matching sleep event if the greeter started
++    // while the machine was already suspending.
++    void prepareForSleep(bool sleeping)
++    {
++        if (sleeping) {
++            m_sleeping = true;
++            update();
++            return;
++        }
++
++        const bool wasSleeping = m_sleeping;
++        m_sleeping = false;
++        if (!wasSleeping && m_allowed) {
++            // The same greeter may have spent an hour suspended with stale PAM workers.
++            // Recreate them only while a valid, locked view can consume success.
++            m_auth.resumeFingerprintAfterSleep();
++        } else {
++            update();
++        }
++    }
++
+     void update()
+     {
+-        const bool allowed = m_locked && std::ranges::any_of(m_views, [](const QQuickView *view) {
++        const bool allowed = m_locked && !m_sleeping && std::ranges::any_of(m_views, [](const QQuickView *view) {
+             return view->screen() && !view->screen()->geometry().isEmpty();
+         });
+         if (m_allowed == allowed) {
+@@ -60,4 +82,5 @@
+     PamAuthenticators &m_auth;
+     bool m_locked = false;
+     bool m_allowed = false;
++    bool m_sleeping = false;
+ };
+--- a/greeter/greeterapp.cpp
++++ b/greeter/greeterapp.cpp
+@@ -212,6 +212,21 @@
+                                           SLOT(osdProgress(QString, int, int, QString)));
+     QDBusConnection::sessionBus()
+         .connect(s_plasmaShellService, s_osdServicePath, s_osdServiceInterface, QStringLiteral("osdText"), this, SLOT(osdText(QString, QString)));
++    // A greeter created as suspend begins can live for the whole deep-S3 interval.
++    // Re-establish native PAM authentication on resume; no separate daemon or hook.
++    if (!QDBusConnection::systemBus().connect(QStringLiteral("org.freedesktop.login1"),
++                                              QStringLiteral("/org/freedesktop/login1"),
++                                              QStringLiteral("org.freedesktop.login1.Manager"),
++                                              QStringLiteral("PrepareForSleep"),
++                                              this,
++                                              SLOT(prepareForSleep(bool)))) {
++        qCWarning(KSCREENLOCKER_GREET) << "login1 PrepareForSleep subscription unavailable; suspend authentication recovery disabled";
++    }
++}
++
++void UnlockApp::prepareForSleep(bool sleeping)
++{
++    m_views.prepareForSleep(sleeping);
+ }
+ 
+ QWindow *UnlockApp::getActiveScreen()
+--- a/greeter/greeterapp.h
++++ b/greeter/greeterapp.h
+@@ -69,6 +69,7 @@
+     void getFocus();
+     void markViewsAsVisible(QQuickItem *view);
+     void graceLockEnded();
++    void prepareForSleep(bool sleeping);
+ 
+ private:
+     void initialize();
+--- a/greeter/pamauthenticators.cpp
++++ b/greeter/pamauthenticators.cpp
+@@ -96,6 +96,19 @@
+         d->m_fingerprintAuthenticator->tryUnlock();
+     }
+     setState(AuthenticatorsState::Authenticating);
++}
++
++void PamAuthenticators::resumeFingerprintAfterSleep()
++{
++    // A greeter can remain alive while the kernel is suspended; stale
++    // fingerprint PAM workers must not block the next placement.
++    if (!d->locked || d->graceLocked || m_authenticator != Authenticator::Regular || !d->m_fingerprintAuthenticator) {
++        return;
++    }
++    auto *reader = d->m_fingerprintAuthenticator.get();
++    reader->cancel();
++    reader->resetUnavailableAfterSleep();
++    reader->tryUnlock();
+ }
+ 
+ void PamAuthenticators::stopAuthenticating()
+--- a/greeter/pamauthenticators.h
++++ b/greeter/pamauthenticators.h
+@@ -69,6 +69,8 @@
+     Q_SIGNAL void stateChanged();
+     Q_INVOKABLE void startAuthenticating();
+     Q_INVOKABLE void stopAuthenticating();
++    // login1 wake event: restart only implicit fingerprint PAM; leave password alone.
++    void resumeFingerprintAfterSleep();
+ 
+     // these properties delegate to the interactive authenticator
+     bool isBusy() const;
+--- a/greeter/pamauthenticator.cpp
++++ b/greeter/pamauthenticator.cpp
+@@ -165,6 +165,18 @@
+     }
+ }
+ 
++void PamAuthenticator::resetUnavailableAfterSleep()
++{
++    // A true OS sleep/resume establishes a new device epoch. Do not weaken
++    // the matcher or clear throttling for ordinary password/fingerprint misses.
++    if (!m_unavailable) {
++        return;
++    }
++    m_unavailable = false;
++    m_failedCount = 0;
++    Q_EMIT availableChanged();
++}
++
+ void PamAuthenticator::cancel()
+ {
+     m_startPending = false;
+--- a/greeter/pamauthenticator.h
++++ b/greeter/pamauthenticator.h
+@@ -93,6 +93,9 @@
+ 
+     void setInPasswordDelay(bool timeout);
+ 
++    // Internal C++ API; never expose the availability reset as a QML-invokable slot.
++    void resetUnavailableAfterSleep();
++
+ Q_SIGNALS:
+     void readyChanged();
+     void busyChanged();
+--- a/autotests/pamreadinesstest.cpp
++++ b/autotests/pamreadinesstest.cpp
+@@ -302,6 +302,86 @@
+         QCOMPARE(fresh->rootObject()->property("accepted").toInt(), 0);
+     }
+ 
++    void deepSleepRearmsWithoutBypassingPassword()
++    {
++        QTemporaryDir dir;
++        QVERIFY(dir.isValid());
++        QFile theme(dir.filePath(u"SleepLock.qml"_s));
++        QVERIFY(theme.open(QIODevice::WriteOnly));
++        QVERIFY(theme.write(R"QML(import QtQuick
++Item { property bool visibleResult: false }
++)QML") > 0);
++        theme.close();
++
++        PamAuthenticators auth(u"test_user"_s);
++        LockViews views(auth);
++        auto screen = std::make_unique<QQuickView>();
++        screen->setSource(QUrl::fromLocalFile(theme.fileName()));
++        QCOMPARE(screen->status(), QQuickView::Ready);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        QSignalSpy success(&auth, &PamAuthenticators::succeeded);
++        views.setLocked(true);
++        views.add(screen.get());
++        QTRY_COMPARE(attempts.count(), 1);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++
++        // Sleep cancels BOTH methods before the kernel stops making progress.
++        views.prepareForSleep(true);
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        QCOMPARE(auth.promptForSecret(), QString());
++        QTest::qWait(100);
++        QCOMPARE(attempts.count(), 1);
++        // Awake re-arms a single new PAM worker; password remains usable.
++        views.prepareForSleep(false);
++        QTRY_COMPARE(attempts.count(), 2);
++        QTRY_VERIFY(!auth.promptForSecret().isEmpty());
++        auth.respond("my_password");
++        QTRY_COMPARE(success.count(), 1);
++        QVERIFY(auth.isUnlocked());
++        views.prepareForSleep(false);
++        QTest::qWait(150);
++        QCOMPARE(attempts.count(), 2);
++        views.remove(screen.get());
++    }
++
++    void resumeAfterMissedSleepSignal()
++    {
++        QTemporaryDir dir;
++        QVERIFY(dir.isValid());
++        QFile theme(dir.filePath(u"MissedSleep.qml"_s));
++        QVERIFY(theme.open(QIODevice::WriteOnly));
++        QVERIFY(theme.write(R"QML(import QtQuick
++Item {}
++)QML") > 0);
++        theme.close();
++
++        PamAuthenticators auth(u"test_user"_s);
++        LockViews views(auth);
++        QSignalSpy attempts(&auth, &PamAuthenticators::noninteractiveInfo);
++        views.prepareForSleep(false); // No usable lock view: do not start PAM.
++        QCOMPARE(attempts.count(), 0);
++        auto screen = std::make_unique<QQuickView>();
++        screen->setSource(QUrl::fromLocalFile(theme.fileName()));
++        QCOMPARE(screen->status(), QQuickView::Ready);
++        views.setLocked(true);
++        views.add(screen.get());
++        QTRY_COMPARE(attempts.count(), 1);
++        // The greeter may have started *during* suspend and missed the true signal.
++        const QString passwordPrompt = auth.promptForSecret();
++        QVERIFY(!passwordPrompt.isEmpty());
++        views.prepareForSleep(false);
++        QTRY_COMPARE(attempts.count(), 2);
++        // The existing password conversation must not be cancelled on wake.
++        QCOMPARE(auth.promptForSecret(), passwordPrompt);
++        auth.respond("my_password");
++        QTRY_VERIFY(auth.isUnlocked());
++        views.remove(screen.get());
++        QCOMPARE(auth.state(), PamAuthenticators::Idle);
++        views.prepareForSleep(false); // No view, no new attempt.
++        QTest::qWait(150);
++        QCOMPARE(attempts.count(), 2);
++    }
++
+     void graceAfterPasswordFailure()
+     {
+         PamAuthenticators auth(u"test_user"_s);

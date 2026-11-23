@@ -24,7 +24,7 @@ manipulation, or Goodix matcher/enrollment change.
 
 ## Plasma 6.8.3 native readiness candidate
 
-[The separate 6.8.3-1.2 recipe](native-readiness-6.8.3/PKGBUILD) targets the
+[The separate 6.8.3-1.3 recipe](native-readiness-6.8.3/PKGBUILD) targets the
 6.8.3 worker/greeter protocol. The initial native lock request survives worker
 startup. Cancellation discards the request, and concurrent theme attempts share
 one PAM conversation. The greeter arms the workers once the lock is effective and a completed
@@ -40,6 +40,8 @@ failures. Slow recurring hardware failures are indistinguishable from reader
 timeouts through this PAM result and may keep retrying until the lock stops.
 A normal password rejection or fingerprint mismatch keeps its existing policy.
 
+The fourth patch uses the native login1 sleep/wake event to restart stale PAM after S3. If the greeter missed the sleep signal, it restarts only the implicit fingerprint worker while preserving the password prompt. The biometric threshold and enrolled templates remain unchanged; no background pollers or external sleep hooks are installed.
+
 The optional package builds from the signed KDE release and ships the three
 Arch vendor PAM files. Its `check()` uses separate test service names, an
 isolated D-Bus session, private configuration/state and the built worker under
@@ -53,12 +55,12 @@ must be selected explicitly for a matching installation.
 
 From `native-readiness-6.8.3/`, run `makepkg --check` in an Arch build
 environment with the recipe's build and check dependencies. The recipe applies
-the three patches to the signed 6.8.3 source. Its separate check build selects
+the four patches to the signed 6.8.3 source. Its separate check build selects
 `test_password`, `test_fingerprint` and `test_smartcard`. The test aborts if
 the worker resolves outside the build tree or pam_wrapper is missing. The
 production build uses the vendor service names.
 
-The `ksmserver-pamReadinessTest` CTest entry exercises 14 cases:
+The `ksmserver-pamReadinessTest` CTest entry exercises 16 cases:
 
 | Behavior | Qt test cases |
 | --- | --- |
